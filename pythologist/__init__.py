@@ -107,7 +107,7 @@ class CellFrame(pd.DataFrame):
         keepers += list(self._continuous.values())
         return c[keepers]
     @staticmethod
-    def read_samples(path,verbose=False):
+    def read_inForm(path,verbose=False):
         """ path is the location of the folds
             """ 
         return _SampleSet(path,verbose).cells

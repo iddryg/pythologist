@@ -7,11 +7,11 @@ with open(path.join(this_folder,'README.md'),encoding='utf-8') as inf:
   long_description = inf.read()
 
 setup(
-  name='ipereader',
+  name='pythologist',
   version='0.1.0',
   description='inForm PerkinElmer Reader - Python interface to read outputs of the PerkinElmer inForm software',
   long_description=long_description,
-  url='https://github.com/jason-weirather/py-ipe-reader',
+  url='https://github.com/jason-weirather/pythologist',
   author='Jason L Weirather',
   author_email='jason.weirather@gmail.com',
   license='Apache License, Version 2.0',

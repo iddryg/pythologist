@@ -1,2 +1,3 @@
-# py-ipe-reader
-Read files from inForm software by PerkinElmer
+# pythologist
+
+Read files from inForm software by PerkinElmer.
