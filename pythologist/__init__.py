@@ -7,26 +7,74 @@
     r = read.software()
 
 """
-import os, re, sys
+import os, re, sys, h5py, json
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
+import pythologist.spatial
 
-class CellFrame(pd.DataFrame):
+def read_inForm(path,verbose=False,limit=None):
+    return InFormCellFrame.read_inForm(path,verbose,limit)
+
+
+
+class InFormCellFrame(pd.DataFrame):
     _metadata = ['_thresholds','_components','_scores','_continuous']
+    def kNearestNeighborsCross(self,
+                           markerSets,
+                           k=1,
+                           classlab='full_phenotype',
+                           threads=1,
+                           verbose=True):
+        df = self.df
+        results = []
+        for markerSet in markerSets:
+            markerA = markerSet[0]
+            markerB = markerSet[1]
+            for x in df.set_index(['sample','frame']).index.unique().tolist():
+                if verbose: sys.stderr.write("Getting NN Cross for "+x[0]+" "+x[1]+" "+markerA+" "+markerB+"\n")
+                sub = df[(df['sample']==x[0])&(df['frame']==x[1])]
+                nf = pythologist.spatial.kNearestNeighborsCross(sub,markerA,markerB,k=k,threads=threads,classlab=classlab)
+                results.append(nf)
+                nf['sample'] = x[0]
+                nf['frame'] = x[1]
+        return pythologist.spatial.CellFrameNearestNeighbors(self,pd.concat(results))
+    def to_hdf(self,path):
+        pd.DataFrame(self).to_hdf(path,'self',
+                                  format='table',
+                                  mode='w',
+                                  complib='zlib',
+                                  complevel=9)
+        self._thresholds.to_hdf(path,'thresholds',
+                                format = 'table',
+                                mode='r+',
+                                complib='zlib',
+                                complevel=9)
+        self._scores.infer_objects().to_hdf(path,'scores',
+                                format = 'table',
+                                mode='r+',
+                                complib='zlib',
+                                complevel=9)
+        o1 = json.dumps(self._components)
+        ho = h5py.File(path,'r+')
+        ho.attrs['components'] = o1
+        o2 = json.dumps(self._continuous)
+        ho.attrs['continuous'] = o2
+        ho.flush()
+        ho.close()
     @property
     def _constructor(self):
-        return CellFrame
+        return InFormCellFrame
     @property
     def _constructor_sliced(self):
-        return CellFrame
+        return InFormCellFrame
     def remove_threshold(self,phenotype):
         """ Wipe the current thresholding from a phenotype"""
         v = pd.DataFrame(self).copy()
         v.loc[v['phenotype']==phenotype,'threshold_marker'] = np.nan
         v.loc[v['phenotype']==phenotype,'threshold_call'] = np.nan
         v.loc[v['phenotype']==phenotype,'full_phenotype'] = v.loc[v['phenotype']==phenotype,'phenotype']
-        v = CellFrame(v)
+        v = InFormCellFrame(v)
         v._thresholds = self._thresholds.copy()
         v._components = self._components.copy()
         v._scores = self._scores.copy()
@@ -51,7 +99,7 @@ class CellFrame(pd.DataFrame):
         v = v.reset_index(drop=True)
         v.loc[v['phenotype']==phenotype,'full_phenotype'] = v[v['phenotype']==phenotype][['phenotype','threshold_marker','threshold_call']].\
             dropna().apply(lambda x: x[0]+' '+x[1]+x[2],1)
-        v = CellFrame(v)
+        v = InFormCellFrame(v)
         v._thresholds = self._thresholds.copy()
         v._components = self._components.copy()
         v._scores = self._scores.copy()
@@ -67,7 +115,7 @@ class CellFrame(pd.DataFrame):
         v.loc[v['phenotype'].isin(input_names),'full_phenotype'] = output_name
         v.loc[v['phenotype'].isin(input_names),'phenotype'] = output_name
 
-        v = CellFrame(v)
+        v = InFormCellFrame(v)
         v._thresholds = self._thresholds.copy()
         v._components = self._components.copy()
         v._scores = self._scores.copy()
@@ -107,10 +155,18 @@ class CellFrame(pd.DataFrame):
         keepers += list(self._continuous.values())
         return c[keepers]
     @staticmethod
-    def read_inForm(path,verbose=False):
+    def read_inForm(path,verbose=False,limit=None):
         """ path is the location of the folds
             """ 
-        return _SampleSet(path,verbose).cells
+        return _SampleSet(path,verbose,limit).cells
+    @classmethod
+    def read_hdf(cls,path):
+        seed = cls(pd.read_hdf(path,'self'))
+        seed._thresholds = pd.read_hdf(path,'thresholds')
+        seed._scores = pd.read_hdf(path,'scores')
+        seed._components = json.loads(h5py.File(path,'r').attrs['components'])
+        seed._continuous = json.loads(h5py.File(path,'r').attrs['continuous'])
+        return seed
     @property
     def samples(self):
         return self._samples
@@ -162,15 +218,18 @@ class _SampleSet(GenericSample):
     :param path: sample folder or folder containing sample folders
     :type path: string
     """
-    def __init__(self,path,verbose=False):
+    def __init__(self,path,verbose=False,limit=None):
         GenericSample.__init__(self)
         self._path = path
         self._samples = OrderedDict()
+        z = 0
         for p, dirs, files in os.walk(self._path,followlinks=True,topdown=False):
+            z += 1
             segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
             if len(segs) == 0: continue
             s = _Sample(p,verbose)
             self._samples[s.name] = s
+            if limit is not None and z >= limit: break
 
         # update our samples layout
         s = OrderedDict()
@@ -184,7 +243,7 @@ class _SampleSet(GenericSample):
         for sample in self._samples:
             for frame in self._samples[sample]:
                 rows.append(self._samples[sample][frame].cells)
-        c = CellFrame(pd.concat(rows))
+        c = InFormCellFrame(pd.concat(rows))
         c._thresholds = self.thresholds
         c._components = self.components
         c._scores = self.scores
@@ -290,7 +349,7 @@ class _Frame(GenericSample):
         v['threshold_marker'] = np.nan
         v['threshold_call'] = np.nan
         v['full_phenotype'] = v['phenotype']
-        c = CellFrame(v)
+        c = InFormCellFrame(v)
         c._thresholds = self.thresholds
         c._components = self.components
         c._scores = self.frame_scores
@@ -299,3 +358,6 @@ class _Frame(GenericSample):
     @property
     def samples(self):
         return OrderedDict({self._sample:OrderedDict({self._frame:self})})
+
+
+

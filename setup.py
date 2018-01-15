@@ -22,6 +22,6 @@ setup(
     'License :: OSI Approved :: Apache Software License'
   ],
   keywords='bioinformatics',
-  packages=['ipereader'],
+  packages=['pythologist'],
   install_requires=['pandas'],
 )
