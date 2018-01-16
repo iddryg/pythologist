@@ -20,25 +20,9 @@ def read_inForm(path,verbose=False,limit=None):
 
 class InFormCellFrame(pd.DataFrame):
     _metadata = ['_thresholds','_components','_scores','_continuous']
-    def kNearestNeighborsCross(self,
-                           markerSets,
-                           k=1,
-                           classlab='full_phenotype',
-                           threads=1,
-                           verbose=True):
-        df = self.df
-        results = []
-        for markerSet in markerSets:
-            markerA = markerSet[0]
-            markerB = markerSet[1]
-            for x in df.set_index(['sample','frame']).index.unique().tolist():
-                if verbose: sys.stderr.write("Getting NN Cross for "+x[0]+" "+x[1]+" "+markerA+" "+markerB+"\n")
-                sub = df[(df['sample']==x[0])&(df['frame']==x[1])]
-                nf = pythologist.spatial.kNearestNeighborsCross(sub,markerA,markerB,k=k,threads=threads,classlab=classlab)
-                results.append(nf)
-                nf['sample'] = x[0]
-                nf['frame'] = x[1]
-        return pythologist.spatial.CellFrameNearestNeighbors(self,pd.concat(results))
+    def kNearestNeighborsCross(cf,phenotypes,k=1,threads=1,dlim=None):
+        nn = pythologist.spatial.kNearestNeighborsCross(cf,phenotypes,k=k,threads=threads,dlim=dlim)
+        return pythologist.spatial.CellFrameNearestNeighbors(cf,nn)
     def to_hdf(self,path):
         pd.DataFrame(self).to_hdf(path,'self',
                                   format='table',
@@ -50,7 +34,9 @@ class InFormCellFrame(pd.DataFrame):
                                 mode='r+',
                                 complib='zlib',
                                 complevel=9)
-        self._scores.infer_objects().to_hdf(path,'scores',
+        z = self._scores.infer_objects()
+        z['Slide ID'] = z['Slide ID'].astype(str)
+        z.to_hdf(path,'scores',
                                 format = 'table',
                                 mode='r+',
                                 complib='zlib',

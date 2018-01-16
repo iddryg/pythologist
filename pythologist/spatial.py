@@ -2,19 +2,90 @@ from multiprocessing import Pool
 from functools import partial
 from collections import OrderedDict
 import pandas as pd
+import numpy as np
 import math, h5py
 import pythologist
 from plotnine import *
 from scipy.stats import spearmanr
+from scipy.spatial import cKDTree
 
 
-def _pointcross(df,k,xlab,ylab,idlab,point):
-    pt = (point[xlab],point[ylab])
-    dists = df.set_index(idlab).apply(lambda x: math.sqrt((pt[0]-x[xlab])**2+(pt[1]-x[ylab])**2),1).\
-        nsmallest(k).sort_values()
+def _access_tree(kd,sample,frame,markerA_name,markerB_name,k=1,dlim=None):
+    results = []
+    tree = kd[sample][frame][markerB_name]['kd']
+    points2 = kd[sample][frame][markerB_name]['points']
+    sub1 = kd[sample][frame][markerA_name]['sub']
+    points1 = sub1.apply(lambda x: (x['x'],x['y'],x['id']),1).tolist()
+    for point in points1:
+        id1 = point[2]
+        d,i = tree.query(point[0:2],k=k)
+        if k == 1:
+            d = [d]
+            i = [i]
+        for j,z in enumerate(i):
+            m = OrderedDict({'sample':sample,'frame':frame,'markerA_name':markerA_name,'markerB_name':markerB_name,'markerA_id':id1,'markerB_id':points2[z],'distance':d[j],'rank':(j+1)})
+            results.append(m)
+    df = pd.DataFrame(results)
+    if dlim is not None: df = df[df['distance']<=dlim]
+    return df
+
+def _get_trees(df,phenotypes,name):
+        data = OrderedDict()
+        dist = set()
+        for phenotype in phenotypes:
+            dist.add(phenotype[0])
+            dist.add(phenotype[1])
+        for phenotype in list(dist):
+            sub = df[(df['full_phenotype']==phenotype)&(df['sample']==name[0])&(df['frame']==name[1])]
+            points = sub.apply(lambda x: (x['x'],x['y'],x['id']),1)
+            tree = cKDTree(list(zip(sub['x'].tolist(),sub['y'].tolist())))
+            if phenotype not in data: 
+                data[phenotype] = OrderedDict()
+            data[phenotype]['kd'] = tree
+            r = OrderedDict()
+            data[phenotype]['points'] = [x[2] for x in points]
+            data[phenotype]['sub'] = sub
+        return data
+
+def _run_through(kd,phenotypes,dlim,k,name):
+    results = []
+    for p1,p2 in phenotypes:
+            r = _access_tree(kd,name[0],name[1],p1,p2,k=k,dlim=dlim)
+            results.append(r)
+    return pd.concat(results)
+    
+def kNearestNeighborsCross(cf,phenotypes,k=1,threads=1,dlim=None):
+    df = cf.df
+    names = df.set_index(['sample','frame']).index.unique().tolist()
+    pool = Pool(processes=threads)
+    func = partial(_get_trees,df,phenotypes)
+    v = pool.imap(func,names)
+    pool.close()
+    pool.join()
+    kd = OrderedDict()
+    for i,x in enumerate(v):
+        name = names[i]
+        if name[0] not in kd: kd[name[0]] = OrderedDict()
+        kd[name[0]][name[1]] = x
+    pool = Pool(processes=threads)
+    func = partial(_run_through,kd,phenotypes,dlim,k)
+    v = pool.imap(func,names)
+    pool.close()
+    pool.join()
+    return pd.concat([x for x in v])
+
+#def _euclidian(pt1,pt2,dlim):
+#    #dist = [(a - b)**2 for a, b in zip(pt1, pt2)]
+#    #dist = math.sqrt(sum(dist))
+#    return dist
+def _pointcross(df,k,idlab,dlim,point):
+    pt = (point['x'],point['y'])
+    dists = df.set_index(idlab).apply(lambda x: math.sqrt((pt[0]-x['x'])**2+(pt[1]-x['y'])**2),1)
+    if dlim is not None: dists = dists[dists <= dlim]
+    dists = dists.nsmallest(k).sort_values()
     return OrderedDict(dists.to_dict())
 
-def kNearestNeighborsCross(df,
+def kNearestNeighborsCross2(df,
                       markerA,
                       markerB,
                       k=1,
@@ -22,11 +93,12 @@ def kNearestNeighborsCross(df,
                       ylab='y',
                       classlab='full_phenotype',
                       idlab='id',
-                      threads=1):
+                      threads=1,
+                      dlim = None):
     mA = df[df[classlab]==markerA][[xlab,ylab,idlab]]
     mB = df[df[classlab]==markerB][[xlab,ylab,idlab]]
     mList = mA.apply(lambda x: x.to_dict(),1).tolist()
-    func = partial(_pointcross, mB, k, xlab, ylab, idlab)
+    func = partial(_pointcross, mB, k, idlab,dlim)
     pool = Pool(processes=threads)
     v = pool.imap_unordered(func, mList)
     pool.close()
@@ -86,12 +158,15 @@ class CellFrameNearestNeighbors:
             reset_index()[['sample','frame','rank']].rename(columns={'rank':'frame_count_A'})
         cntcut = cnt.copy()
         cntcut = cntcut[cntcut['frame_count_A']>=minimum_A]
-
+        #if cntcut.shape[0] == 0: continue
+        #if cut.shape[0] == 0: continue
         cnt2 = v[v['distance']<=dlim].groupby(['sample','frame']).\
             apply(lambda x: len(x['markerB_id'].unique().tolist())).\
             reset_index().rename(columns={0:'frame_count_B'})
+        #if cnt2.shape[0] == 0: continue
         cntcut2 = cnt2.copy()
         cntcut2 = cntcut2[cntcut2['frame_count_B']>=minimum_B]
+        #if cntcut2.shape[0] == 0: continue
         ocnt = cnt.merge(cnt2,on=['sample','frame'])
         ocnt['markerA'] = markerA
         ocnt['markerB'] = markerB
@@ -127,15 +202,16 @@ class CellFrameNearestNeighbors:
         + geom_bar(stat="identity")
         + facet_wrap(facets)
         + theme_bw()
+        + theme(axis_text_x=element_text(rotation=90, hjust=0))
         )
         if logscale:
             g += scale_y_log10()
         
-        pair = v2.groupby(facets).apply(lambda x: {'continuous':x['PDL1'].tolist()
+        pair = v2.groupby(facets).apply(lambda x: {'continuous':x[continuous].tolist()
                                          ,'distance':x['distance'].tolist()})
         pair = pd.DataFrame(pair.apply(lambda x: dict(zip(('r','p'),
                                                   spearmanr(x['continuous'],x['distance'])))))
         pair = pair.apply(lambda x: pd.Series(x[0]),1).sort_values('r').reset_index()
 
 
-        return (g,j,ocnt,pair)
+        return (g,j,cntcut2,pair)
