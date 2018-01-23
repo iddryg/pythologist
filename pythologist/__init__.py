@@ -135,7 +135,7 @@ class InFormCellFrame(pd.DataFrame):
     @property
     def df(self):
         c = pd.DataFrame(self).copy() 
-        keepers = ['sample','frame','id','phenotype','threshold_marker','threshold_call','full_phenotype','x','y','area']
+        keepers = ['sample','frame','tissue','tissue_area','total_area','id','phenotype','threshold_marker','threshold_call','full_phenotype','x','y','cell_area']
         for n1 in self._continuous:
             c = c.rename(columns={n1:self._continuous[n1]})
         keepers += list(self._continuous.values())
@@ -282,6 +282,7 @@ class _Frame(GenericSample):
         self._sample = sample
         self._seg = pd.read_csv(seg_file,"\t")
         self._score = OrderedDict(pd.read_csv(score_file,"\t").iloc[0].to_dict())
+        self._summary = None
         checks = ['First','Second','Third']
         # get the stains and thresholds
         self._stains = OrderedDict()
@@ -298,6 +299,24 @@ class _Frame(GenericSample):
         	if not m: continue
         	component = m.group(1)
         	if component not in self._components: self._components.append(component)
+        # In the circumstance that the summary file exsts extract information
+        if summary_file:
+            self._summary = pd.read_csv(summary_file,sep="\t")
+    @property
+    def areas (self):
+        if self._summary is None: raise ValueError("You need summary files present to get areas")
+        df = self._summary.copy()
+        mega = df.apply(lambda x: np.nan if float(x['Cell Density (per megapixel)']) == 0 else float(x['Total Cells'])/float(x['Cell Density (per megapixel)']),1) # cell area in mega pixels
+        df['Summary Area Megapixels'] = mega
+        # Lets ignore the cell specific things here
+        #return(df[df['Phenotype']=='All'])
+        df = df[['Tissue Category','Phenotype','Summary Area Megapixels']].\
+            rename(columns={'Tissue Category':'tissue',
+                            'Phenotype':'phenotype',
+                            'Summary Area Megapixels':'tissue_area'
+                           })
+        df = df.loc[df['phenotype']=='All',['tissue','tissue_area']].set_index('tissue')['tissue_area'].to_dict()
+        return(df)
     @property
     def frame_stains(self): return self._stains
     @property
@@ -322,19 +341,27 @@ class _Frame(GenericSample):
         keepers = ['Cell ID','Phenotype',
             'Cell X Position',
             'Cell Y Position',
-            'Entire Cell Area (pixels)']
+            'Entire Cell Area (pixels)','Tissue Category']
         keepers2 = [x for x in self._seg.columns if re.search('Mean \(Normalized Counts, Total Weighting\)$',x)]
         v = self._seg[keepers+keepers2]
         v = v.rename(columns = {'Cell ID':'id',
-            'Entire Cell Area (pixels)':'area',
+            'Entire Cell Area (pixels)':'cell_area',
             'Cell X Position':'x',
             'Cell Y Position':'y',
-            'Phenotype':'phenotype'})
+            'Phenotype':'phenotype',
+            'Tissue Category':'tissue'})
         v['frame'] = self._frame
         v['sample'] = self._sample
         v['threshold_marker'] = np.nan
         v['threshold_call'] = np.nan
         v['full_phenotype'] = v['phenotype']
+        if self._summary is not None:
+            myareas = self.areas
+            v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
+            v['total_area'] = v.apply(lambda x: myareas['All'],1)
+        else:
+            v['tissue_area'] = np.nan
+            v['total_area'] = np.nan
         c = InFormCellFrame(v)
         c._thresholds = self.thresholds
         c._components = self.components
