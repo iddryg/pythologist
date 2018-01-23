@@ -7,7 +7,7 @@
     r = read.software()
 
 """
-import os, re, sys, h5py, json
+import os, re, sys, h5py, json, math
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
@@ -16,10 +16,19 @@ import pythologist.spatial
 def read_inForm(path,verbose=False,limit=None):
     return InFormCellFrame.read_inForm(path,verbose,limit)
 
-
+def _swap(current,phenotype,name):
+    out = []
+    for p in json.loads(current):
+        if p != phenotype:
+            out.append(p)
+            continue
+        out.append(phenotype+" "+name+"+")
+        out.append(phenotype+" "+name+"-")
+    return json.dumps(out)
 
 class InFormCellFrame(pd.DataFrame):
-    _metadata = ['_thresholds','_components','_scores','_continuous']
+    _default_mpp = 0.496 # microns per pixel on vetra
+    _metadata = ['_thresholds','_components','_scores','_continuous','mpp']
     def kNearestNeighborsCross(cf,phenotypes,k=1,threads=1,dlim=None):
         nn = pythologist.spatial.kNearestNeighborsCross(cf,phenotypes,k=k,threads=threads,dlim=dlim)
         return pythologist.spatial.CellFrameNearestNeighbors(cf,nn)
@@ -46,8 +55,17 @@ class InFormCellFrame(pd.DataFrame):
         ho.attrs['components'] = o1
         o2 = json.dumps(self._continuous)
         ho.attrs['continuous'] = o2
+        o3 = json.dumps(self.mpp)
+        ho.attrs['mpp'] = o3
         ho.flush()
         ho.close()
+    def set_mpp(self,value):
+        self._mpp = value
+    @property
+    def mpp(self):
+        if hasattr(self,'_mpp'): return self._mpp
+        self._mpp = InFormCellFrame._default_mpp
+        return self._mpp
     @property
     def _constructor(self):
         return InFormCellFrame
@@ -55,6 +73,7 @@ class InFormCellFrame(pd.DataFrame):
     def _constructor_sliced(self):
         return InFormCellFrame
     def remove_threshold(self,phenotype):
+        raise ValueError("Haven't made compatible with the counts and phenotypes_present")
         """ Wipe the current thresholding from a phenotype"""
         v = pd.DataFrame(self).copy()
         v.loc[v['phenotype']==phenotype,'threshold_marker'] = np.nan
@@ -65,6 +84,7 @@ class InFormCellFrame(pd.DataFrame):
         v._components = self._components.copy()
         v._scores = self._scores.copy()
         v._continuous = self._continuous.copy()
+        v.set_mpp(self.mpp)
         return v
 
     def add_threshold(self,phenotype,component,name):
@@ -90,6 +110,9 @@ class InFormCellFrame(pd.DataFrame):
         v._components = self._components.copy()
         v._scores = self._scores.copy()
         v._continuous = self._continuous.copy()
+        v.set_mpp(self.mpp)
+        # fix those phenotypes present
+        v['phenotypes_present'] = v.apply(lambda x: _swap(x['phenotypes_present'],phenotype,name),1)
         return v
 
     def collapse_phenotypes(self,input_names,output_name):
@@ -106,6 +129,7 @@ class InFormCellFrame(pd.DataFrame):
         v._components = self._components.copy()
         v._scores = self._scores.copy()
         v._continuous = self._continuous.copy()
+        v.set_mpp(self.mpp)
         return v
     def add_continuous(self,compartment,component,name):
         if name in self.columns:
@@ -120,6 +144,7 @@ class InFormCellFrame(pd.DataFrame):
         c._components = self._components.copy()
         c._scores = self._scores.copy()
         c._continuous = self._continuous.copy()
+        c.set_mpp(self.mpp)
         c._continuous[v] = name
         return c
     def remove_continuous(self,name):
@@ -128,6 +153,7 @@ class InFormCellFrame(pd.DataFrame):
         c._components = self._components.copy()
         c._scores = self._scores.copy()
         c._continuous = self._continuous.copy()
+        c.set_mpp(self.mpp)
         for n1 in c._continuous:
             if c._continuous[n1] == name:
                 del c._continuous[n1]
@@ -152,6 +178,7 @@ class InFormCellFrame(pd.DataFrame):
         seed._scores = pd.read_hdf(path,'scores')
         seed._components = json.loads(h5py.File(path,'r').attrs['components'])
         seed._continuous = json.loads(h5py.File(path,'r').attrs['continuous'])
+        seed.set_mpp(json.loads(h5py.File(path,'r').attrs['mpp']))
         return seed
     @property
     def samples(self):
@@ -162,6 +189,94 @@ class InFormCellFrame(pd.DataFrame):
     def thresholds(self): return self._thresholds
     @property
     def scores(self): return self._scores
+    @property
+    def frame_counts(self):
+        basic = self.df.groupby(['sample','frame','tissue','full_phenotype']).first().reset_index()[['sample','frame','tissue','tissue_area','total_area','phenotype','threshold_marker','threshold_call','full_phenotype']]
+
+        cnts = self.df.groupby(['sample','frame','tissue','full_phenotype']).count().\
+             reset_index()[['sample','frame','tissue','full_phenotype','id']].\
+             rename(columns ={'id':'count'})
+        cnts = cnts.merge(basic,on=['sample','frame','tissue','full_phenotype'])
+        #return cnts
+        df = pd.DataFrame(self)[['sample','frame','phenotypes_present','areas_present']].groupby(['sample','frame']).first().reset_index()
+        empty = []
+        sample_tissues = {}
+        sample_phenotypes = {}
+        for frame in df.itertuples():
+            areas = json.loads(getattr(frame,"areas_present"))
+            phenotypes = json.loads(getattr(frame,"phenotypes_present"))
+            sname = getattr(frame,"sample")
+            fname = getattr(frame,"frame")
+            tlist = set()
+            plist = set()
+            for tissue in areas.keys():
+                if tissue == 'All': continue
+                tlist.add(tissue)
+                total = areas['All']
+                for phenotype in phenotypes:
+                    plist.add(phenotype)
+            if sname not in sample_tissues: sample_tissues[sname] = set()
+            sample_tissues[sname] |= tlist
+            if sname not in sample_phenotypes: sample_phenotypes[sname] = set()
+            sample_phenotypes[sname] |= plist
+        thresh = {}
+        for frame in cnts.itertuples():
+            pheno = getattr(frame,"phenotype")
+            full = getattr(frame,"full_phenotype")
+            label = getattr(frame,"threshold_marker")
+            call = getattr(frame,"threshold_call")
+            if not isinstance(label,str): continue
+            thresh[full] = {'label':label,'call':call,'phenotype':pheno}
+        for frame in df.itertuples():
+            sname = getattr(frame,"sample")
+            fname = getattr(frame,"frame")
+            tlist = list(sample_tissues[sname])
+            plist = list(sample_phenotypes[sname])
+            for tissue in sorted(tlist):
+                for phenotype in sorted(plist):            
+                    sub = cnts[(cnts['sample']==sname)&(cnts['frame']==fname)&(cnts['tissue']==tissue)&(cnts['full_phenotype']==phenotype)]
+                    subcnt = sub.shape[0]
+                    if subcnt != 0: continue
+                    g = pd.Series({'sample':sname,
+                                   'frame':fname,
+                                   'tissue':tissue,
+                                   'tissue_area':np.nan if tissue not in areas else areas[tissue],
+                                   'total_area':total,
+                                   'full_phenotype':phenotype,
+                                   'threshold_marker': np.nan if phenotype not in thresh else thresh[phenotype]['label'],
+                                   'threshold_call': np.nan if phenotype not in thresh else thresh[phenotype]['call'],
+                                   'phenotype': np.nan if phenotype not in thresh else thresh[phenotype]['phenotype'],
+                                   'count':0})
+                    empty.append(g)
+
+        out = pd.concat([cnts,pd.DataFrame(empty)])\
+              [['sample','frame','tissue','phenotype','threshold_marker','threshold_call','full_phenotype','tissue_area','total_area','count']].\
+            sort_values(['sample','frame','tissue','full_phenotype'])
+        out['tissue_area'] = out['tissue_area'].fillna(0)
+        out['density'] = out.apply(lambda x: np.nan if float(x['tissue_area']) == 0 else float(x['count'])/float(x['tissue_area']),1)
+        out['density_um2'] = out.apply(lambda x: x['density']/(self.mpp*self.mpp),1)
+        out['tissue_area_um2'] = out.apply(lambda x: x['tissue_area']/(self.mpp*self.mpp),1)
+        out['total_area_um2'] = out.apply(lambda x: x['total_area']/(self.mpp*self.mpp),1)
+        return(out)
+    @property
+    def sample_counts(self):
+        fc = self.frame_counts
+
+        v = fc[fc['density'].notnull()].groupby(['sample','tissue','full_phenotype']).\
+            count().reset_index()[['sample','tissue','full_phenotype','density']].\
+            rename(columns={'density':'present_count'})
+        basic = fc.groupby(['sample','tissue','full_phenotype']).first().reset_index()[['sample','tissue','phenotype','threshold_marker','threshold_call','full_phenotype']]
+        mean = fc.groupby(['sample','tissue','full_phenotype']).mean().reset_index()[['sample','tissue','full_phenotype','density']].rename(columns={'density':'mean'})
+        std = fc.groupby(['sample','tissue','full_phenotype']).std().reset_index()[['sample','tissue','full_phenotype','density']].rename(columns={'density':'std_dev'})
+        cnt =  fc.groupby(['sample','tissue','full_phenotype']).count().reset_index()[['sample','tissue','full_phenotype','count']].rename(columns={'count':'frame_count'})
+        out = basic.merge(mean,on=['sample','tissue','full_phenotype']).merge(std,on=['sample','tissue','full_phenotype']).merge(cnt,on=['sample','tissue','full_phenotype'])
+        out = out.merge(v,on=['sample','tissue','full_phenotype'],how='left')
+        out['present_count'] = out['present_count'].fillna(0).astype(int)
+        out['std_err'] = out.apply(lambda x: np.nan if x['present_count'] == 0 else x['std_dev']/(math.sqrt(x['present_count'])),1)
+        out['mean_um2'] = out.apply(lambda x: x['mean']/(self.mpp*self.mpp),1)
+        out['std_dev_um2'] = out.apply(lambda x: x['std_dev']/(self.mpp*self.mpp),1)
+        out['std_err_um2'] = out.apply(lambda x: x['std_err']/(self.mpp*self.mpp),1)
+        return out
 
 class GenericSample:
     @property
@@ -280,6 +395,9 @@ class _Frame(GenericSample):
         GenericSample.__init__(self)
         self._frame = frame
         self._sample = sample
+        self._areas = None #cache
+        self._phenotypes_present = None # cache for the value
+        self._tissues_present = None # cache for the value
         self._seg = pd.read_csv(seg_file,"\t")
         self._score = OrderedDict(pd.read_csv(score_file,"\t").iloc[0].to_dict())
         self._summary = None
@@ -303,8 +421,21 @@ class _Frame(GenericSample):
         if summary_file:
             self._summary = pd.read_csv(summary_file,sep="\t")
     @property
+    def tissues_present (self):
+        if self._summary is None: raise ValueError("You need summary file to list tissues")
+        if self._tissues_present is not None: return self._tissues_present
+        return [x for x in self.areas.keys() if x != 'All']
+        return self._tissues_present
+    @property
+    def phenotypes_present (self):
+        if self._summary is None: raise ValueError("You need summary file to list tissues")
+        if self._phenotypes_present is not None: return self._phenotypes_present
+        self._phenotypes_present = [x for x in sorted(self._summary['Phenotype'].unique().tolist()) if x != 'All']
+        return self._phenotypes_present
+    @property
     def areas (self):
         if self._summary is None: raise ValueError("You need summary files present to get areas")
+        if self._areas is not None: return self._areas
         df = self._summary.copy()
         mega = df.apply(lambda x: np.nan if float(x['Cell Density (per megapixel)']) == 0 else float(x['Total Cells'])/float(x['Cell Density (per megapixel)']),1) # cell area in mega pixels
         df['Summary Area Megapixels'] = mega
@@ -316,7 +447,8 @@ class _Frame(GenericSample):
                             'Summary Area Megapixels':'tissue_area'
                            })
         df = df.loc[df['phenotype']=='All',['tissue','tissue_area']].set_index('tissue')['tissue_area'].to_dict()
-        return(df)
+        self._areas = df
+        return(self._areas)
     @property
     def frame_stains(self): return self._stains
     @property
@@ -359,9 +491,13 @@ class _Frame(GenericSample):
             myareas = self.areas
             v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
             v['total_area'] = v.apply(lambda x: myareas['All'],1)
+            v['phenotypes_present'] = v.apply(lambda x: json.dumps(self.phenotypes_present),1)
+            v['areas_present'] = v.apply(lambda x: json.dumps(self.areas),1)
         else:
             v['tissue_area'] = np.nan
             v['total_area'] = np.nan
+            v['phenotypes_present'] = json.dumps([])
+            v['areas_present'] = json.dumps({})
         c = InFormCellFrame(v)
         c._thresholds = self.thresholds
         c._components = self.components
