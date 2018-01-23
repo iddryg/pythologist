@@ -148,7 +148,9 @@ class CellFrameNearestNeighbors:
                               logscale=True,
                               minimum_A=0,
                               minimum_B=0,
-                              rank=1):
+                              rank=1,
+                              scales=None):
+        # The expression of markerA's continuous variable vs the nearest neighbor distance to markerB
         cf = self._cf
         nn = self._nn
         v = nn[(nn['markerA_name']==markerA)&(nn['markerB_name']==markerB)&(nn['rank']==rank)]
@@ -200,18 +202,22 @@ class CellFrameNearestNeighbors:
             j[continuous] = n
         g = (ggplot(j.sort_values(facets),aes(x='bin',y='count',fill=continuous))
         + geom_bar(stat="identity")
-        + facet_wrap(facets)
         + theme_bw()
         + theme(axis_text_x=element_text(rotation=90, hjust=0))
         )
         if logscale:
             g += scale_y_log10()
-        
+        if scales:
+            g += facet_wrap(facets,scales=scales)
+        else:
+            g += facet_wrap(facets)
         pair = v2.groupby(facets).apply(lambda x: {'continuous':x[continuous].tolist()
                                          ,'distance':x['distance'].tolist()})
         pair = pd.DataFrame(pair.apply(lambda x: dict(zip(('r','p'),
                                                   spearmanr(x['continuous'],x['distance'])))))
         pair = pair.apply(lambda x: pd.Series(x[0]),1).sort_values('r').reset_index()
 
-
-        return (g,j,cntcut2,pair)
+        plot_data_frame = j
+        cell_counts = ocnt
+        correlations = pair
+        return (g,plot_data_frame,cell_counts,correlations)
