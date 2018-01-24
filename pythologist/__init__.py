@@ -16,7 +16,15 @@ import pythologist.spatial
 def read_inForm(path,verbose=False,limit=None):
     return InFormCellFrame.read_inForm(path,verbose,limit)
 
-def _swap(current,phenotype,name):
+def _swap(current,phenotypes,name):
+    out = []
+    for p in json.loads(current):
+        if not p in phenotypes:
+            out.append(p)
+            continue
+        out.append(name)
+    return json.dumps(out)
+def _add(current,phenotype,name):
     out = []
     for p in json.loads(current):
         if p != phenotype:
@@ -25,6 +33,15 @@ def _swap(current,phenotype,name):
         out.append(phenotype+" "+name+"+")
         out.append(phenotype+" "+name+"-")
     return json.dumps(out)
+def _swap_tissue(areas,old_name,new_name):
+    areas = json.loads(areas)
+    v = {}
+    for k in list(areas.keys()):
+        if k == old_name:
+            v[new_name] = areas[k]
+        else:
+            v[k] = areas[k]
+    return json.dumps(v)
 
 class InFormCellFrame(pd.DataFrame):
     _default_mpp = 0.496 # microns per pixel on vetra
@@ -72,8 +89,8 @@ class InFormCellFrame(pd.DataFrame):
     @property
     def _constructor_sliced(self):
         return InFormCellFrame
-    def remove_threshold(self,phenotype):
-        raise ValueError("Haven't made compatible with the counts and phenotypes_present")
+    def _remove_threshold(self,phenotype):
+        #raise ValueError("Haven't made compatible with the counts and phenotypes_present")
         """ Wipe the current thresholding from a phenotype"""
         v = pd.DataFrame(self).copy()
         v.loc[v['phenotype']==phenotype,'threshold_marker'] = np.nan
@@ -92,6 +109,7 @@ class InFormCellFrame(pd.DataFrame):
         v['dbid'] = range(1,v.shape[0]+1,1)
         mythresh = self.thresholds[self.thresholds['component']==component]
         combo = v.merge(mythresh,on=['sample','frame'])
+        #print(combo)
         choice = pd.DataFrame(combo[['compartment','component']].iloc[0]).apply(lambda x: x[0]+' '+x[1]+' Mean (Normalized Counts, Total Weighting)')[0]
         combo = combo[['dbid','sample','frame','id','phenotype','threshold',choice]].\
             rename(columns={choice:'observed'})
@@ -105,6 +123,7 @@ class InFormCellFrame(pd.DataFrame):
         v = v.reset_index(drop=True)
         v.loc[v['phenotype']==phenotype,'full_phenotype'] = v[v['phenotype']==phenotype][['phenotype','threshold_marker','threshold_call']].\
             dropna().apply(lambda x: x[0]+' '+x[1]+x[2],1)
+        v['phenotypes_present'] = v.apply(lambda x: _add(x['phenotypes_present'],phenotype,name),1)
         v = InFormCellFrame(v)
         v._thresholds = self._thresholds.copy()
         v._components = self._components.copy()
@@ -112,18 +131,12 @@ class InFormCellFrame(pd.DataFrame):
         v._continuous = self._continuous.copy()
         v.set_mpp(self.mpp)
         # fix those phenotypes present
-        v['phenotypes_present'] = v.apply(lambda x: _swap(x['phenotypes_present'],phenotype,name),1)
         return v
 
-    def collapse_phenotypes(self,input_names,output_name):
-        """ Collapse a list of phenotypes into another name, also removes thresholding """
-        v = self.copy()
-        for input_name in input_names: v = v.remove_threshold(input_name)
-        v = v.remove_threshold(output_name)
-        v = pd.DataFrame(v.copy())
-        v.loc[v['phenotype'].isin(input_names),'full_phenotype'] = output_name
-        v.loc[v['phenotype'].isin(input_names),'phenotype'] = output_name
-
+    def rename_tissue(self,old_name,new_name):
+        v = pd.DataFrame(self).copy()
+        v['areas_present'] = v.apply(lambda x: _swap_tissue(x['areas_present'],old_name,new_name),1)
+        v.loc[v['tissue']==old_name,'tissue'] = new_name
         v = InFormCellFrame(v)
         v._thresholds = self._thresholds.copy()
         v._components = self._components.copy()
@@ -131,6 +144,51 @@ class InFormCellFrame(pd.DataFrame):
         v._continuous = self._continuous.copy()
         v.set_mpp(self.mpp)
         return v
+
+
+
+    def lock_all_thresholds(self):
+        v = pd.DataFrame(self).copy()
+        v['phenotype'] = v['full_phenotype'].copy()
+        v['threshold_marker'] = np.nan
+        v['threshold_call'] = np.nan
+        v = InFormCellFrame(v)
+        v._thresholds = self._thresholds.copy()
+        v._components = self._components.copy()
+        v._scores = self._scores.copy()
+        v._continuous = self._continuous.copy()
+        v.set_mpp(self.mpp)
+        return v
+
+    def collapse_phenotypes(self,input_names,output_name):
+        """ Collapse a list of phenotypes into another name, also removes thresholding """
+        v = self.copy()
+        for input_name in input_names: v = v._remove_threshold(input_name)
+        v = v._remove_threshold(output_name)
+        v = pd.DataFrame(v.copy())
+        v.loc[v['phenotype'].isin(input_names),'full_phenotype'] = output_name
+        v.loc[v['phenotype'].isin(input_names),'phenotype'] = output_name
+
+        v['phenotypes_present'] = v.apply(lambda x: _swap(x['phenotypes_present'],input_names,output_name),1)
+
+        v = InFormCellFrame(v)
+        v._thresholds = self._thresholds.copy()
+        v._components = self._components.copy()
+        v._scores = self._scores.copy()
+        v._continuous = self._continuous.copy()
+        v.set_mpp(self.mpp)
+
+        return v
+    def copy(self):
+        v = pd.DataFrame(self).copy()
+        v = InFormCellFrame(v)
+        v._thresholds = self._thresholds.copy()
+        v._components = self._components.copy()
+        v._scores = self._scores.copy()
+        v._continuous = self._continuous.copy()
+        v.set_mpp(self.mpp)
+        return v        
+
     def add_continuous(self,compartment,component,name):
         if name in self.columns:
             raise ValueError("ERROR name "+name+" already is in early use")
@@ -147,6 +205,7 @@ class InFormCellFrame(pd.DataFrame):
         c.set_mpp(self.mpp)
         c._continuous[v] = name
         return c
+
     def remove_continuous(self,name):
         c = self.copy()
         c._thresholds = self._thresholds.copy()
@@ -191,6 +250,7 @@ class InFormCellFrame(pd.DataFrame):
     def scores(self): return self._scores
     @property
     def frame_counts(self):
+        # Assuming all phenotypes and all tissues could be present in all frames
         basic = self.df.groupby(['sample','frame','tissue','full_phenotype']).first().reset_index()[['sample','frame','tissue','tissue_area','total_area','phenotype','threshold_marker','threshold_call','full_phenotype']]
 
         cnts = self.df.groupby(['sample','frame','tissue','full_phenotype']).count().\
@@ -202,6 +262,8 @@ class InFormCellFrame(pd.DataFrame):
         empty = []
         sample_tissues = {}
         sample_phenotypes = {}
+        all_tissues = set()
+        all_phenotypes = set()
         for frame in df.itertuples():
             areas = json.loads(getattr(frame,"areas_present"))
             phenotypes = json.loads(getattr(frame,"phenotypes_present"))
@@ -212,9 +274,11 @@ class InFormCellFrame(pd.DataFrame):
             for tissue in areas.keys():
                 if tissue == 'All': continue
                 tlist.add(tissue)
+                all_tissues.add(tissue)
                 total = areas['All']
                 for phenotype in phenotypes:
                     plist.add(phenotype)
+                    all_phenotypes.add(phenotype)
             if sname not in sample_tissues: sample_tissues[sname] = set()
             sample_tissues[sname] |= tlist
             if sname not in sample_phenotypes: sample_phenotypes[sname] = set()
@@ -232,6 +296,8 @@ class InFormCellFrame(pd.DataFrame):
             fname = getattr(frame,"frame")
             tlist = list(sample_tissues[sname])
             plist = list(sample_phenotypes[sname])
+            #tlist = list(all_tissues)
+            #plist = list(all_phenotypes)
             for tissue in sorted(tlist):
                 for phenotype in sorted(plist):            
                     sub = cnts[(cnts['sample']==sname)&(cnts['frame']==fname)&(cnts['tissue']==tissue)&(cnts['full_phenotype']==phenotype)]
