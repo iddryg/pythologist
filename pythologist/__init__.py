@@ -466,6 +466,8 @@ class _Frame(GenericSample):
         self._tissues_present = None # cache for the value
         self._seg = pd.read_csv(seg_file,"\t")
         self._score = OrderedDict(pd.read_csv(score_file,"\t").iloc[0].to_dict())
+        if pd.read_csv(score_file,"\t").shape[0] > 1:
+            raise ValueError("You need to fix code to allow for more than one thresolding in a single score file")
         self._summary = None
         checks = ['First','Second','Third']
         # get the stains and thresholds
