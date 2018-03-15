@@ -229,7 +229,7 @@ class InFormCellFrame(pd.DataFrame):
     def read_inForm(path,verbose=False,limit=None):
         """ path is the location of the folds
             """ 
-        return _SampleSet(path,verbose,limit).cells
+        return _SampleSet(path,verbose,limit)
     @classmethod
     def read_hdf(cls,path):
         seed = cls(pd.read_hdf(path,'self'))
@@ -402,20 +402,9 @@ class _SampleSet(GenericSample):
         s = OrderedDict()
         for samp in self._samples: s[samp] = self._samples[samp].samples[samp]
         self._samples = s
+
     @property
     def samples(self): return self._samples
-    @property
-    def cells(self):
-        rows = []
-        for sample in self._samples:
-            for frame in self._samples[sample]:
-                rows.append(self._samples[sample][frame].cells)
-        c = InFormCellFrame(pd.concat(rows))
-        c._thresholds = self.thresholds
-        c._components = self.components
-        c._scores = self.scores
-        c._continuous = OrderedDict()
-        return c
 
 
 class _Sample(GenericSample):
@@ -442,10 +431,11 @@ class _Sample(GenericSample):
             if not os.path.exists(score):
             	raise ValueError('Missing score file '+score)
             f = _Frame(path,sample,frame,data,score,summary)
-            self._frames[frame] = f
+            self._frames[frame] = f.cells
         if len(snames) > 1:
         	raise ValueError('Error multiple samples in folder '+path)
-        self._sample_name = list(snames)[0]
+        self._sample_name = list(snames)[0]        
+
     @property
     def name(self): return self._sample_name
     @property
@@ -469,7 +459,8 @@ class _Frame(GenericSample):
         if pd.read_csv(score_file,"\t").shape[0] > 1:
             raise ValueError("You need to fix code to allow for more than one thresolding in a single score file")
         self._summary = None
-        checks = ['First','Second','Third']
+        # get the enumeration of the components from a pattern match
+        checks = [re.match('(\S+)\s+',x).group(1) for x in list(self._score.keys()) if re.match('\S+ Cell Compartment$',x)]
         # get the stains and thresholds
         self._stains = OrderedDict()
         for check in checks:
@@ -488,6 +479,70 @@ class _Frame(GenericSample):
         # In the circumstance that the summary file exsts extract information
         if summary_file:
             self._summary = pd.read_csv(summary_file,sep="\t")
+
+        ##### FINISHED READING IN THINGS NOW OUTPUT THINGS ##########
+        keepers = ['Cell ID','Phenotype',
+            'Cell X Position',
+            'Cell Y Position',
+            'Entire Cell Area (pixels)','Tissue Category']
+        keepers2 = [x for x in self._seg.columns if re.search('Entire Cell.*Mean \(Normalized Counts, Total Weighting\)$',x)]
+        keepers3 = [x for x in self._seg.columns if re.search('Mean \(Normalized Counts, Total Weighting\)$',x) and x not in keepers2]
+        entire = {}
+        for cname in keepers2:
+            m = re.match('Entire Cell\s+(.*) Mean \(Normalized Counts, Total Weighting\)$',cname)
+            stain = m.group(1)
+            v = self._seg[['Cell ID',cname]]
+            v.columns = ['Cell ID','value']
+            v = v.copy()
+            for row in v.itertuples(index=False):
+                if row[0] not in entire: entire[row[0]] = {}
+                entire[row[0]][stain]=row[1]
+        compartments = {}
+        for cname in keepers2:
+            if re.match('Entire Cell',cname): continue
+            m = re.match('(\S+)\s+(.*) Mean \(Normalized Counts, Total Weighting\)$',cname)
+            compartment = m.group(1)
+            stain = m.group(2)
+            v = self._seg[['Cell ID',cname]]
+            v.columns = ['Cell ID','value']
+            v = v.copy()
+            for row in v.itertuples(index=False):
+                if row[0] not in compartments: compartments[row[0]] = {}
+                if stain not in compartments[row[0]]: compartments[row[0]][stain] = {}
+                compartments[row[0]][stain][compartment] = row[1]
+        v = self._seg[keepers].copy()
+        v['compartment_values'] = v.apply(lambda x: compartments[x['Cell ID']],1)
+        v['entire_cell_values'] = v.apply(lambda x: entire[x['Cell ID']],1)
+        #v = self._seg[keepers+keepers2]
+        v = v.rename(columns = {'Cell ID':'id',
+            'Entire Cell Area (pixels)':'cell_area',
+            'Cell X Position':'x',
+            'Cell Y Position':'y',
+            'Phenotype':'phenotype',
+            'Tissue Category':'tissue'})
+        v['frame'] = self._frame
+        v['sample'] = self._sample
+        v['threshold_marker'] = np.nan
+        v['threshold_call'] = np.nan
+        v['full_phenotype'] = v['phenotype']
+        v['frame_stains'] = None
+        fs = self.frame_stains
+        v['frame_stains'] = v.apply(lambda x: fs,1) 
+        if self._summary is not None:
+            myareas = self.areas
+            v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
+            v['total_area'] = v.apply(lambda x: myareas['All'],1)
+            v['phenotypes_present'] = v.apply(lambda x: json.dumps(self.phenotypes_present),1)
+            v['areas_present'] = v.apply(lambda x: json.dumps(self.areas),1)
+        else:
+            v['tissue_area'] = np.nan
+            v['total_area'] = np.nan
+            v['phenotypes_present'] = json.dumps([])
+            v['areas_present'] = json.dumps({})
+        self._cells = v 
+    @property
+    def cells (self):
+        return self._cells
     @property
     def tissues_present (self):
         if self._summary is None: raise ValueError("You need summary file to list tissues")
@@ -496,7 +551,7 @@ class _Frame(GenericSample):
         return self._tissues_present
     @property
     def phenotypes_present (self):
-        if self._summary is None: raise ValueError("You need summary file to list tissues")
+        if self._summary is None: raise ValueError("You need summary file to list phenotypes")
         if self._phenotypes_present is not None: return self._phenotypes_present
         self._phenotypes_present = [x for x in sorted(self._summary['Phenotype'].unique().tolist()) if x != 'All']
         return self._phenotypes_present
@@ -536,42 +591,8 @@ class _Frame(GenericSample):
         v['sample'] = self._sample
         v['frame'] = self._frame
         return pd.DataFrame(pd.Series(v)).transpose()
-    @property
-    def cells(self):
-        keepers = ['Cell ID','Phenotype',
-            'Cell X Position',
-            'Cell Y Position',
-            'Entire Cell Area (pixels)','Tissue Category']
-        keepers2 = [x for x in self._seg.columns if re.search('Mean \(Normalized Counts, Total Weighting\)$',x)]
-        v = self._seg[keepers+keepers2]
-        v = v.rename(columns = {'Cell ID':'id',
-            'Entire Cell Area (pixels)':'cell_area',
-            'Cell X Position':'x',
-            'Cell Y Position':'y',
-            'Phenotype':'phenotype',
-            'Tissue Category':'tissue'})
-        v['frame'] = self._frame
-        v['sample'] = self._sample
-        v['threshold_marker'] = np.nan
-        v['threshold_call'] = np.nan
-        v['full_phenotype'] = v['phenotype']
-        if self._summary is not None:
-            myareas = self.areas
-            v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
-            v['total_area'] = v.apply(lambda x: myareas['All'],1)
-            v['phenotypes_present'] = v.apply(lambda x: json.dumps(self.phenotypes_present),1)
-            v['areas_present'] = v.apply(lambda x: json.dumps(self.areas),1)
-        else:
-            v['tissue_area'] = np.nan
-            v['total_area'] = np.nan
-            v['phenotypes_present'] = json.dumps([])
-            v['areas_present'] = json.dumps({})
-        c = InFormCellFrame(v)
-        c._thresholds = self.thresholds
-        c._components = self.components
-        c._scores = self.frame_scores
-        c._continuous = OrderedDict()
-        return c
+
+
     @property
     def samples(self):
         return OrderedDict({self._sample:OrderedDict({self._frame:self})})
