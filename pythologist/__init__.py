@@ -13,8 +13,8 @@ import pandas as pd
 import numpy as np
 import pythologist.spatial
 
-def read_inForm(path,verbose=False,limit=None):
-    return InFormCellFrame.read_inForm(path,verbose,limit)
+def read_Vectra(path,verbose=False,limit=None):
+    return InFormCellFrame.read_Vectra(path,verbose,limit)
 
 def _swap(current,phenotypes,name):
     out = []
@@ -46,6 +46,13 @@ def _swap_tissue(areas,old_name,new_name):
 class InFormCellFrame(pd.DataFrame):
     _default_mpp = 0.496 # microns per pixel on vetra
     _metadata = ['_thresholds','_components','_scores','_continuous','mpp']
+    def __repr__(self): return ''
+    def _repr_html_(self): return pd.DataFrame(self)._repr_html_()
+    @staticmethod
+    def read_Vectra(path,verbose=False,limit=None):
+        """ path is the location of the folds
+            """ 
+        return InFormCellFrame(_SampleSet(path,verbose,limit).cells)
     def kNearestNeighborsCross(cf,phenotypes,k=1,threads=1,dlim=None):
         nn = pythologist.spatial.kNearestNeighborsCross(cf,phenotypes,k=k,threads=threads,dlim=dlim)
         return pythologist.spatial.CellFrameNearestNeighbors(cf,nn)
@@ -219,17 +226,7 @@ class InFormCellFrame(pd.DataFrame):
         return c
     @property
     def df(self):
-        c = pd.DataFrame(self).copy() 
-        keepers = ['sample','frame','tissue','tissue_area','total_area','id','phenotype','threshold_marker','threshold_call','full_phenotype','x','y','cell_area']
-        for n1 in self._continuous:
-            c = c.rename(columns={n1:self._continuous[n1]})
-        keepers += list(self._continuous.values())
-        return c[keepers]
-    @staticmethod
-    def read_inForm(path,verbose=False,limit=None):
-        """ path is the location of the folds
-            """ 
-        return _SampleSet(path,verbose,limit)
+        return pd.DataFrame(self).copy()
     @classmethod
     def read_hdf(cls,path):
         seed = cls(pd.read_hdf(path,'self'))
@@ -260,8 +257,8 @@ class InFormCellFrame(pd.DataFrame):
         #return cnts
         df = pd.DataFrame(self)[['sample','frame','phenotypes_present','areas_present']].groupby(['sample','frame']).first().reset_index()
         empty = []
-        sample_tissues = {}
-        sample_phenotypes = {}
+        sample_tissues = OrderedDict()
+        sample_phenotypes = OrderedDict()
         all_tissues = set()
         all_phenotypes = set()
         for frame in df.itertuples():
@@ -386,29 +383,32 @@ class _SampleSet(GenericSample):
     :type path: string
     """
     def __init__(self,path,verbose=False,limit=None):
+        base = os.path.abspath(path)
+        path = os.path.abspath(path)
         GenericSample.__init__(self)
         self._path = path
-        self._samples = OrderedDict()
+        self._samples = []
         z = 0
         for p, dirs, files in os.walk(self._path,followlinks=True,topdown=False):
+            mydir = p[len(path):]
             z += 1
             segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
             if len(segs) == 0: continue
-            s = _Sample(p,verbose)
-            self._samples[s.name] = s
+            s = _Sample(p,mydir,verbose)
+            self._samples.append(s)
             if limit is not None and z >= limit: break
-
         # update our samples layout
-        s = OrderedDict()
-        for samp in self._samples: s[samp] = self._samples[samp].samples[samp]
-        self._samples = s
-
+        #s = OrderedDict()
+        #or samp in self._samples: s[samp] = self._samples[samp].samples[samp]
+        #self._samples = s
+    @property
+    def cells(self): return pd.concat([x.cells for x in self._samples])
     @property
     def samples(self): return self._samples
 
 
 class _Sample(GenericSample):
-    def __init__(self,path,verbose=False):
+    def __init__(self,path,mydir,verbose=False):
         GenericSample.__init__(self)
         self._path = path
         files = os.listdir(path)
@@ -430,12 +430,14 @@ class _Sample(GenericSample):
             score = os.path.join(path,sample+'_'+frame+'_score_data.txt')
             if not os.path.exists(score):
             	raise ValueError('Missing score file '+score)
-            f = _Frame(path,sample,frame,data,score,summary)
-            self._frames[frame] = f.cells
+            f = _Frame(path,mydir,sample,frame,data,score,summary)
+            self._frames[frame] = f
         if len(snames) > 1:
         	raise ValueError('Error multiple samples in folder '+path)
         self._sample_name = list(snames)[0]        
-
+    @property
+    def cells(self):
+        return pd.concat([x.cells for x in self._frames.values()])
     @property
     def name(self): return self._sample_name
     @property
@@ -446,7 +448,7 @@ class _Sample(GenericSample):
         return OrderedDict({self._sample_name:self.frames})
 
 class _Frame(GenericSample):
-    def __init__(self,path,sample,frame,seg_file,score_file,summary_file):
+    def __init__(self,path,mydir,sample,frame,seg_file,score_file,summary_file):
         #self._seg = pd.read_csv(seg_file,sep=",")
         GenericSample.__init__(self)
         self._frame = frame
@@ -498,7 +500,7 @@ class _Frame(GenericSample):
                 if row[0] not in entire: entire[row[0]] = {}
                 entire[row[0]][stain]=row[1]
         compartments = {}
-        for cname in keepers2:
+        for cname in keepers3:
             if re.match('Entire Cell',cname): continue
             m = re.match('(\S+)\s+(.*) Mean \(Normalized Counts, Total Weighting\)$',cname)
             compartment = m.group(1)
@@ -532,13 +534,14 @@ class _Frame(GenericSample):
             myareas = self.areas
             v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
             v['total_area'] = v.apply(lambda x: myareas['All'],1)
-            v['phenotypes_present'] = v.apply(lambda x: json.dumps(self.phenotypes_present),1)
-            v['areas_present'] = v.apply(lambda x: json.dumps(self.areas),1)
+            v['phenotypes_present'] = v.apply(lambda x: self.phenotypes_present,1)
+            v['areas_present'] = v.apply(lambda x: self.areas,1)
         else:
             v['tissue_area'] = np.nan
             v['total_area'] = np.nan
-            v['phenotypes_present'] = json.dumps([])
-            v['areas_present'] = json.dumps({})
+            v['phenotypes_present'] = []
+            v['areas_present'] = {}
+        v['folder'] = mydir.lstrip('/').lstrip('\\')
         self._cells = v 
     @property
     def cells (self):
