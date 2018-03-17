@@ -10,8 +10,6 @@ class MantraFrame:
         self._seg = pd.read_csv(seg_file,"\t")     
         self._stains = OrderedDict()
         #### Read in the files here and create a dataframe
-        print(sample)
-        print(frame)
         #### Read the score file first
         if self._scores['Sample Name'].unique().shape[0] > 1:
             raise ValueError('Multiple samples present in score file '+score_file)
@@ -19,6 +17,8 @@ class MantraFrame:
                                      'Cell Compartment',
                                      'Stain Component',
                                      'Positivity Threshold']].drop_duplicates()
+        # nan is too much trouble to deal with
+        self._scores.loc[self._scores['Tissue Category'].isna(),'Tissue Category'] = ''
         for row in self._scores.itertuples(index=False):
             s = pd.Series(row,index=self._scores.columns)
             tissue = s['Tissue Category']
@@ -41,7 +41,6 @@ class MantraFrame:
             'Entire Cell Area (pixels)']
         keepers2 = [x for x in self._seg.columns if re.search('Entire Cell.*Mean \(Normalized Counts, Total Weighting\)$',x)]
         keepers3 = [x for x in self._seg.columns if re.search('Mean \(Normalized Counts, Total Weighting\)$',x) and x not in keepers2]
-        print(keepers2)
         entire = OrderedDict()
         for cname in keepers2:
             m = re.match('Entire Cell\s+(.*) Mean \(Normalized Counts, Total Weighting\)$',cname)
@@ -82,23 +81,23 @@ class MantraFrame:
         #v['full_phenotype'] = v['phenotype']
         v['frame_stains'] = None
         v['frame_stains'] = v.apply(lambda x: json.dumps(self._stains),1) 
-
+        v['tissue'] = ''
         if self._summary is not None:
             #### Read our areas from the summary #####
             myareas = OrderedDict(self._get_mantra_frame_areas())
-            ### Now we have our areas read lets put that data into things
-            #tissues_present = [x for x in myareas.keys() if x != 'All']
-            #v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
-            #v['total_area'] = v.apply(lambda x: myareas['All'],1)
-            #v['tissues_present'] = v.apply(lambda x: json.dumps(tissues_present),1)
-            ### Lets the phenotypes that are here
-            #phenotypes_present = [x for x in sorted(self._summary['Phenotype'].unique().tolist()) if x != 'All']
-            #v['phenotypes_present'] = v.apply(lambda x: json.dumps(phenotypes_present),1)
-        #else:
-        #    #v['tissue_area'] = np.nan
-        #    #v['total_area'] = np.nan
-        #    #v['phenotypes_present'] = json.dumps([])
-        #    #v['tissues_present'] = json.dumps({})
+            ## Now we have our areas read lets put that data into things
+            tissues_present = [x for x in myareas.keys() if x != 'All']
+            v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
+            v['total_area'] = v.apply(lambda x: myareas[''],1)
+            v['tissues_present'] = v.apply(lambda x: json.dumps(tissues_present),1)
+            ## Lets the phenotypes that are here
+            phenotypes_present = [x for x in sorted(self._summary['Phenotype'].unique().tolist()) if x != 'All']
+            v['phenotypes_present'] = v.apply(lambda x: json.dumps(phenotypes_present),1)
+        else:
+            v['tissue_area'] = np.nan
+            v['total_area'] = np.nan
+            v['phenotypes_present'] = json.dumps([])
+            v['tissues_present'] = json.dumps({})
         v['folder'] = mydir.lstrip('/').lstrip('\\')
         self._cells = v
     def _get_mantra_frame_areas(self):
@@ -112,10 +111,13 @@ class MantraFrame:
             rename(columns={'Phenotype':'phenotype',
                             'Summary Area Megapixels':'tissue_area'
                            })
+        df['tissue'] = ''
         df = df.loc[df['phenotype']=='All',['tissue','tissue_area']].\
             set_index('tissue')['tissue_area'].to_dict()
-        print(df)
         return df
+    @property
+    def cells (self):
+        return self._cells
 
 
 
