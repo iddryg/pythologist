@@ -13,6 +13,7 @@ import pandas as pd
 import numpy as np
 import pythologist.spatial
 import pythologist.read
+import pythologist.write
 
 def read_inForm(path,mpp=0.496,verbose=False,limit=None,type="Vectra"):
     return InFormCellFrame.read_inForm(path,mpp=mpp,verbose=verbose,limit=limit,type=type)
@@ -47,7 +48,7 @@ def _swap_tissue(areas,old_name,new_name):
 class InFormCellFrame(pd.DataFrame):
     ##_default_mpp = 0.496 # microns per pixel on vetra
     #### Things for extending pd.DataFrame #####
-    _metadata = ['_thresholds','_components','_scores','_continuous','mpp']
+    _metadata = ['_mpp']
     @property
     def _constructor(self):
         return InFormCellFrame
@@ -65,12 +66,13 @@ class InFormCellFrame(pd.DataFrame):
     def __repr__(self): return 'pig'
     def _repr_html_(self): return pd.DataFrame(self)._repr_html_()
     def copy(self):
-        v = InFormCellFrame(pd.DataFrame(self).copy(),mpp=self.mpp)
-        return v
+        return InFormCellFrame(pd.DataFrame(self).copy(),mpp=self.mpp)
     def to_hdf(self,path):
         string_version = self.copy()
-        string_version['compartment_values'] = string_version.apply(lambda x: json.dumps(x['compartment_values']),1)
-        string_version['entire_cell_values'] = string_version.apply(lambda x: json.dumps(x['entire_cell_values']),1)
+        string_version['compartment_values'] = string_version.apply(lambda x: 
+            json.dumps(x['compartment_values']),1)
+        string_version['entire_cell_values'] = string_version.apply(lambda x: 
+            json.dumps(x['entire_cell_values']),1)
         pd.DataFrame(string_version).to_hdf(path,'self',
                                   format='table',
                                   mode='w',
@@ -95,7 +97,10 @@ class InFormCellFrame(pd.DataFrame):
         """ path is the location of the folds
             """ 
         return InFormCellFrame(pythologist.read.SampleSet(path,verbose,limit,type=type).cells,mpp=mpp)
-
+    def write_inForm(self,path,type="Vectra",overwrite=False):
+        """ path is the location of the folds
+            """ 
+        return pythologist.write.write_inForm(self,path,type=type,overwrite=overwrite)
     #### Properties of the InFormCellFrame
     @property
     def samples(self):
@@ -140,6 +145,12 @@ class InFormCellFrame(pd.DataFrame):
                 for stain in sdict[stain_str][tissue]:
                     stains.add(stain)
         return sorted(list(stains))
+    @property
+    def mpp(self): return self._mpp
+
+    @property
+    def df(self):
+        return pd.DataFrame(self).copy()
 
     #### Operations to QC an InFormCellFrame
     def rename_tissue(self,old_name,new_name):
@@ -204,106 +215,6 @@ class InFormCellFrame(pd.DataFrame):
         return pythologist.spatial.CellFrameNearestNeighbors(cf,nn)
     def set_mpp(self,value):
         self._mpp = value
-    @property
-    def mpp(self): return self._mpp
-
-    #@property
-    #def _constructor_sliced(self):
-    #    return InFormCellFrame
-    def _remove_threshold(self,phenotype):
-        #raise ValueError("Haven't made compatible with the counts and phenotypes_present")
-        """ Wipe the current thresholding from a phenotype"""
-        v = pd.DataFrame(self).copy()
-        v.loc[v['phenotype']==phenotype,'threshold_marker'] = np.nan
-        v.loc[v['phenotype']==phenotype,'threshold_call'] = np.nan
-        v.loc[v['phenotype']==phenotype,'full_phenotype'] = v.loc[v['phenotype']==phenotype,'phenotype']
-        v = InFormCellFrame(v,mpp=self.mpp)
-        v._thresholds = self._thresholds.copy()
-        v._components = self._components.copy()
-        v._scores = self._scores.copy()
-        v._continuous = self._continuous.copy()
-        v.set_mpp(self.mpp)
-        return v
-
-    def add_threshold(self,phenotype,component,name):
-        v = pd.DataFrame(self).copy()
-        v['dbid'] = range(1,v.shape[0]+1,1)
-        mythresh = self.thresholds[self.thresholds['component']==component]
-        combo = v.merge(mythresh,on=['sample','frame'])
-        #print(combo)
-        choice = pd.DataFrame(combo[['compartment','component']].iloc[0]).apply(lambda x: x[0]+' '+x[1]+' Mean (Normalized Counts, Total Weighting)')[0]
-        combo = combo[['dbid','sample','frame','id','phenotype','threshold',choice]].\
-            rename(columns={choice:'observed'})
-        low = combo[(combo['threshold']>combo['observed'])&(combo['phenotype']==phenotype)].set_index('dbid')
-        high = combo[(combo['threshold']<=combo['observed'])&(combo['phenotype']==phenotype)].set_index('dbid')
-        v = v.set_index('dbid')
-        v.loc[low.index,'threshold_marker'] = name
-        v.loc[low.index,'threshold_call'] = '-'
-        v.loc[high.index,'threshold_marker'] = name
-        v.loc[high.index,'threshold_call'] = '+'
-        v = v.reset_index(drop=True)
-        v.loc[v['phenotype']==phenotype,'full_phenotype'] = v[v['phenotype']==phenotype][['phenotype','threshold_marker','threshold_call']].\
-            dropna().apply(lambda x: x[0]+' '+x[1]+x[2],1)
-        v['phenotypes_present'] = v.apply(lambda x: _add(x['phenotypes_present'],phenotype,name),1)
-        v = InFormCellFrame(v,mpp=self.mpp)
-        v._thresholds = self._thresholds.copy()
-        v._components = self._components.copy()
-        v._scores = self._scores.copy()
-        v._continuous = self._continuous.copy()
-        v.set_mpp(self.mpp)
-        # fix those phenotypes present
-        return v
-
-
-
-
-    def lock_all_thresholds(self):
-        v = pd.DataFrame(self).copy()
-        v['phenotype'] = v['full_phenotype'].copy()
-        v['threshold_marker'] = np.nan
-        v['threshold_call'] = np.nan
-        v = InFormCellFrame(v,mpp=self.mpp)
-        v._thresholds = self._thresholds.copy()
-        v._components = self._components.copy()
-        v._scores = self._scores.copy()
-        v._continuous = self._continuous.copy()
-        v.set_mpp(self.mpp)
-        return v
-
-
-
-    def add_continuous(self,compartment,component,name):
-        if name in self.columns:
-            raise ValueError("ERROR name "+name+" already is in early use")
-        if name in self.df.columns:
-            raise ValueError("ERROR name "+name+" already is in use")
-        v = compartment+' '+component+' Mean (Normalized Counts, Total Weighting)'
-        if v not in self.columns:
-            raise ValueError("ERROR "+v+" not in columns")
-        c = self.copy()
-        c._thresholds = self._thresholds.copy()
-        c._components = self._components.copy()
-        c._scores = self._scores.copy()
-        c._continuous = self._continuous.copy()
-        c.set_mpp(self.mpp)
-        c._continuous[v] = name
-        return c
-
-    def remove_continuous(self,name):
-        c = self.copy()
-        c._thresholds = self._thresholds.copy()
-        c._components = self._components.copy()
-        c._scores = self._scores.copy()
-        c._continuous = self._continuous.copy()
-        c.set_mpp(self.mpp)
-        for n1 in c._continuous:
-            if c._continuous[n1] == name:
-                del c._continuous[n1]
-        return c
-
-    @property
-    def df(self):
-        return pd.DataFrame(self).copy()
     @property
     def components(self): return self._components
     @property
