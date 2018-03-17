@@ -12,9 +12,10 @@ from collections import OrderedDict
 import pandas as pd
 import numpy as np
 import pythologist.spatial
+import pythologist.read
 
-def read_Vectra(path,mpp=0.496,verbose=False,limit=None):
-    return InFormCellFrame.read_Vectra(path,mpp,verbose,limit)
+def read_inForm(path,mpp=0.496,verbose=False,limit=None,type="Vectra"):
+    return InFormCellFrame.read_inForm(path,mpp=mpp,verbose=verbose,limit=limit,type=type)
 
 def _swap(current,phenotypes,name):
     out = []
@@ -90,13 +91,10 @@ class InFormCellFrame(pd.DataFrame):
         seed.set_mpp(json.loads(h5py.File(path,'r').attrs['mpp']))
         return seed
     @staticmethod
-    def read_Vectra(path,mpp=0.496,verbose=False,limit=None):
+    def read_inForm(path,mpp=0.496,verbose=False,limit=None,type="Vectra"):
         """ path is the location of the folds
             """ 
-        print(mpp)
-        print(verbose)
-        print(limit)
-        return InFormCellFrame(SampleSet(path,verbose,limit).cells,mpp=mpp)
+        return InFormCellFrame(pythologist.read.SampleSet(path,verbose,limit,type=type).cells,mpp=mpp)
 
     #### Properties of the InFormCellFrame
     @property
@@ -208,10 +206,6 @@ class InFormCellFrame(pd.DataFrame):
         self._mpp = value
     @property
     def mpp(self): return self._mpp
-    #    if hasattr(self,'_mpp'): return self._mpp
-    #    else: return None
-    #    self._mpp = InFormCellFrame._default_mpp
-    #    return self._mpp
 
     #@property
     #def _constructor_sliced(self):
@@ -412,233 +406,9 @@ class InFormCellFrame(pd.DataFrame):
         out['std_err_um2'] = out.apply(lambda x: x['std_err']/(self.mpp*self.mpp),1)
         return out
 
-class GenericSamples:
-    @property
-    def cells():
-        # should be overridden by child
-        return None
 
 
-class SampleSet(GenericSamples):
-    """ Read in a Folder containing sample folders recursively
-
-    .. note:: This connection class is the primary portal to
-              work with the REDCap system
-
-    :param path: sample folder or folder containing sample folders
-    :type path: string
-    """
-    def __init__(self,path,verbose=False,limit=None):
-        base = os.path.abspath(path)
-        path = os.path.abspath(path)
-        GenericSamples.__init__(self)
-        self._path = path
-        self._cells = None
-        self._samples = []
-        z = 0
-        for p, dirs, files in os.walk(self._path,followlinks=True,topdown=False):
-            mydir = p[len(path):]
-            z += 1
-            segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
-            if len(segs) == 0: continue
-            s = Sample(p,mydir,verbose)
-            self._samples.append(s)
-            if limit is not None and z >= limit: break
-        # update our samples layout
-        #s = OrderedDict()
-        #or samp in self._samples: s[samp] = self._samples[samp].samples[samp]
-        #self._samples = s
-    @property
-    def cells(self): 
-        if self._cells is not None: return self._cells
-        v = pd.concat([x.cells for x in self._samples])
-        self._cells = v
-        return self._cells
-
-class Sample(GenericSamples):
-    def __init__(self,path,mydir,verbose=False):
-        GenericSamples.__init__(self)
-        self._path = path
-        self._cells = None
-        files = os.listdir(path)
-        # Find frames in the same by a filename type we should have
-        segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
-        sample_folder = os.path.basename(path)
-        self._frames = OrderedDict()
-        snames = set()
-        for file in segs:
-            m = re.match('(.*)_(\[\d+,\d+\])_cell_seg_data.txt$',file)
-            sample = m.group(1)
-            snames.add(sample)
-            frame = m.group(2)
-            data = os.path.join(path,file)
-            summary = os.path.join(path,sample+'_'+frame+'_cell_seg_data_summary.txt')
-            if not os.path.exists(summary):
-            	if verbose: sys.stderr.write('Missing summary file '+summary+"\n")
-            	summary = None
-            score = os.path.join(path,sample+'_'+frame+'_score_data.txt')
-            if not os.path.exists(score):
-            	raise ValueError('Missing score file '+score)
-            f = Frame(path,mydir,sample,frame,data,score,summary)
-            self._frames[frame] = f
-        if len(snames) > 1:
-        	raise ValueError('Error multiple samples in folder '+path)
-        self._sample_name = list(snames)[0]        
-    @property
-    def cells(self):
-        if self._cells is not None: return self._cells
-        v =  pd.concat([x.cells for x in self._frames.values()])
-        self._cells = v
-        return(v)
-
-class Frame(GenericSamples):
-    def __init__(self,path,mydir,sample,frame,seg_file,score_file,summary_file):
-        #self._seg = pd.read_csv(seg_file,sep=",")
-        GenericSamples.__init__(self)
-        self._frame = frame
-        self._sample = sample
-        self._areas = None #cache
-        self._phenotypes_present = None # cache for the value
-        self._tissues_present = None # cache for the value
-        self._seg = pd.read_csv(seg_file,"\t")
-        #self._score = OrderedDict(pd.read_csv(score_file,"\t").iloc[0].to_dict())
-        self._scores = OrderedDict()
-        sfile = pd.read_csv(score_file,"\t")
-        head = sfile.columns
-        for row in sfile.itertuples(index=False):
-            #row = row.to_dict()
-            s = pd.Series(row,index=head)
-            if s['Tissue Category'] in self._scores: raise ValueError('Same tissue is scored multiple times '+"\n"+str(s))
-            self._scores[s['Tissue Category']] = OrderedDict(s.to_dict())
-        if pd.read_csv(score_file,"\t").shape[0] > 1:
-            raise ValueError("You need to fix code to allow for more than one thresolding in a single score file")
-        self._summary = None
-        # get the enumeration of the components from a pattern match
-        # get the stains and thresholds
-        self._stains = OrderedDict()
-        for tissue in self._scores:
-            if tissue not in self._stains:
-                self._stains[tissue] = OrderedDict()
-            checks = [re.match('(\S+)\s+',x).group(1) for x in list(self._scores[tissue].keys()) if re.match('\S+ Cell Compartment$',x)]
-            for check in checks:
-                compartment = check+' Cell Compartment'
-                stain = check+' Stain Component'
-                if compartment in self._scores[tissue]:
-                    self._stains[tissue][self._scores[tissue][stain]] = OrderedDict({'compartment':self._scores[tissue][compartment],
-                   	    'threshold':self._get_threshold(tissue,self._scores[tissue][stain])})#self._scores[tissue][stain]})
-        # get the components
-        self._components = []
-        for name in self._seg.columns:
-        	m = re.match('Entire Cell (.*) Mean \(Normalized Counts, Total Weighting\)',name)
-        	if not m: continue
-        	component = m.group(1)
-        	if component not in self._components: self._components.append(component)
-        # In the circumstance that the summary file exsts extract information
-        if summary_file:
-            self._summary = pd.read_csv(summary_file,sep="\t")
-
-        ##### FINISHED READING IN THINGS NOW OUTPUT THINGS ##########
-        keepers = ['Cell ID','Phenotype',
-            'Cell X Position',
-            'Cell Y Position',
-            'Entire Cell Area (pixels)','Tissue Category']
-        keepers2 = [x for x in self._seg.columns if re.search('Entire Cell.*Mean \(Normalized Counts, Total Weighting\)$',x)]
-        keepers3 = [x for x in self._seg.columns if re.search('Mean \(Normalized Counts, Total Weighting\)$',x) and x not in keepers2]
-        entire = OrderedDict()
-        for cname in keepers2:
-            m = re.match('Entire Cell\s+(.*) Mean \(Normalized Counts, Total Weighting\)$',cname)
-            stain = m.group(1)
-            v = self._seg[['Cell ID',cname]]
-            v.columns = ['Cell ID','value']
-            v = v.copy()
-            for row in v.itertuples(index=False):
-                if row[0] not in entire: entire[row[0]] = OrderedDict()
-                entire[row[0]][stain]=row[1]
-        compartments = OrderedDict()
-        for cname in keepers3:
-            if re.match('Entire Cell',cname): continue
-            m = re.match('(\S+)\s+(.*) Mean \(Normalized Counts, Total Weighting\)$',cname)
-            compartment = m.group(1)
-            stain = m.group(2)
-            v = self._seg[['Cell ID',cname]]
-            v.columns = ['Cell ID','value']
-            v = v.copy()
-            for row in v.itertuples(index=False):
-                if row[0] not in compartments: compartments[row[0]] = OrderedDict()
-                if stain not in compartments[row[0]]: compartments[row[0]][stain] = OrderedDict()
-                compartments[row[0]][stain][compartment] = row[1]
-        v = self._seg[keepers].copy()
-        v['compartment_values'] = v.apply(lambda x: compartments[x['Cell ID']],1)
-        v['entire_cell_values'] = v.apply(lambda x: entire[x['Cell ID']],1)
-        #v = self._seg[keepers+keepers2]
-        v = v.rename(columns = {'Cell ID':'id',
-            'Entire Cell Area (pixels)':'cell_area',
-            'Cell X Position':'x',
-            'Cell Y Position':'y',
-            'Phenotype':'phenotype',
-            'Tissue Category':'tissue'})
-        v['frame'] = self._frame
-        v['sample'] = self._sample
-        #v['threshold_marker'] = np.nan
-        #v['threshold_call'] = np.nan
-        #v['full_phenotype'] = v['phenotype']
-        v['frame_stains'] = None
-        v['frame_stains'] = v.apply(lambda x: json.dumps(self._stains),1) 
 
 
-        if self._summary is not None:
-            #### Read our areas from the summary #####
-            
-            myareas = OrderedDict(self.frame_areas)
-            ### Now we have our areas read lets put that data into things
-            tissues_present = [x for x in myareas.keys() if x != 'All']
-            v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
-            v['total_area'] = v.apply(lambda x: myareas['All'],1)
-            v['tissues_present'] = v.apply(lambda x: json.dumps(tissues_present),1)
-            ### Lets the phenotypes that are here
-            phenotypes_present = [x for x in sorted(self._summary['Phenotype'].unique().tolist()) if x != 'All']
-            v['phenotypes_present'] = v.apply(lambda x: json.dumps(phenotypes_present),1)
-        else:
-            v['tissue_area'] = np.nan
-            v['total_area'] = np.nan
-            v['phenotypes_present'] = json.dumps([])
-            v['tissues_present'] = json.dumps({})
-        v['folder'] = mydir.lstrip('/').lstrip('\\')
-        self._cells = v
-    @property
-    def cells (self):
-        return self._cells
-    @property
-    def frame_areas (self):
-        if self._summary is None: raise ValueError("You need summary files present to get areas")
-        if self._areas is not None: return self._areas
-        df = self._summary.copy()
-        mega = df.apply(lambda x: np.nan if float(x['Cell Density (per megapixel)']) == 0 else float(x['Total Cells'])/float(x['Cell Density (per megapixel)']),1) # cell area in mega pixels
-        df['Summary Area Megapixels'] = mega
-        # Lets ignore the cell specific things here
-        #return(df[df['Phenotype']=='All'])
-        df = df[['Tissue Category','Phenotype','Summary Area Megapixels']].\
-            rename(columns={'Tissue Category':'tissue',
-                            'Phenotype':'phenotype',
-                            'Summary Area Megapixels':'tissue_area'
-                           })
-        df = df.loc[df['phenotype']=='All',['tissue','tissue_area']].set_index('tissue')['tissue_area'].to_dict()
-        self._areas = df
-        return(self._areas)
-    @property
-    def frame_components(self): return self._components
-    def _get_threshold(self,tissue,stain):
-        v = [x for x in self._scores[tissue].keys() if re.search(' Threshold$',x)]
-        for entry in v:
-            name = re.match('(.*) Threshold$',entry).group(1)
-            if name == stain:
-                return self._scores[tissue][entry]
-        raise ValueError('did not find tissue and stain '+str(tissue)+' '+str(stain)+' '+str(self._scores))
-    @property
-    def frame_scores(self):
-        v = self._score.copy()
-        v['sample'] = self._sample
-        v['frame'] = self._frame
-        return pd.DataFrame(pd.Series(v)).transpose()
 
 
