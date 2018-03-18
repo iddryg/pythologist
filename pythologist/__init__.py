@@ -216,12 +216,6 @@ class InFormCellFrame(pd.DataFrame):
     def set_mpp(self,value):
         self._mpp = value
     @property
-    def components(self): return self._components
-    @property
-    def thresholds(self): return self._thresholds
-    @property
-    def scores(self): return self._scores
-    @property
     def frame_counts(self):
         # Assuming all phenotypes and all tissues could be present in all frames
         basic = self.df.groupby(['sample','frame','tissue','full_phenotype']).first().reset_index()[['sample','frame','tissue','tissue_area','total_area','phenotype','threshold_marker','threshold_call','full_phenotype']]

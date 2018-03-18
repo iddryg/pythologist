@@ -46,6 +46,10 @@ def write_inForm(idf,output_directory,type="Vectra",overwrite=False):
             _make_segmentation_file(opath,sample,frame,base,fdf)
 
 def _make_segmentation_file(opath,sample,frame,base,fdf):
+    first = fdf['compartment_values'].iloc[0]
+    stains = list(first.keys())
+    compartments = [list(first[stain].keys()) for stain in first][0]
+    segments = []
     for row in fdf.itertuples(index=False):
         s = pd.Series(row,index=fdf.columns)
         o = OrderedDict()
@@ -63,8 +67,46 @@ def _make_segmentation_file(opath,sample,frame,base,fdf):
         o['Distance from Process Region Edge (pixels)'] = '#N/A'
         o['Category Region ID'] = 1
         o['Distance from Tissue Category Edge (pixels)'] = 0 #filler
-        
-        print(s)
+        d = s['compartment_values']
+        for compartment in compartments:
+            o[compartment+' Area (pixels)'] = 0
+            o[compartment+' Area (percent)'] = 0
+            o[compartment+' Compactness'] = 0
+            o[compartment+' Minor Axis'] = 0
+            o[compartment+' Major Axis'] = 0
+            o[compartment+' Axis Ratio'] = 0
+            o[compartment+' Axis Ratio'] = 0
+            for stain in stains:
+                o[compartment+' '+stain+' Min (Normalized Counts, Total Weighting)'] = 0
+                o[compartment+' '+stain+' Mean (Normalized Counts, Total Weighting)'] = d[stain][compartment]
+                o[compartment+' '+stain+' Max (Normalized Counts, Total Weighting)'] = 0
+                o[compartment+' '+stain+' Std Dev (Normalized Counts, Total Weighting)'] = 0
+                o[compartment+' '+stain+' Total (Normalized Counts, Total Weighting)'] = 0
+        o['Entire Cell Area (pixels)'] = s['cell_area']
+        o['Entire Cell Area (percent)'] = 0
+        o['Entire Cell Compactness'] = 0
+        o['Entire Cell Minor Axis'] = 0
+        o['Entire Cell Major Axis'] = 0
+        o['Entire Cell Axis Ratio'] = 0
+        o['Entire Cell Axis Ratio'] = 0
+        for stain in stains:
+            o['Entire Cell '+stain+' Min (Normalized Counts, Total Weighting)'] = 0
+            o['Entire Cell '+stain+' Mean (Normalized Counts, Total Weighting)'] = s['entire_cell_values'][stain]
+            o['Entire Cell '+stain+' Max (Normalized Counts, Total Weighting)'] = 0
+            o['Entire Cell '+stain+' Std Dev (Normalized Counts, Total Weighting)'] = 0
+            o['Entire Cell '+stain+' Total (Normalized Counts, Total Weighting)'] = 0
+        o['Lab ID'] = ''
+        o['Slide ID'] = sample
+        o['TMA Sector'] = 0
+        o['TMA Row'] = 0
+        o['TMA Column'] = 0
+        o['TMA Field'] = 0
+        o['Confidence'] = 0
+        o['inForm 2.3.6298.15583'] = ''
+        segments.append(pd.Series(o))
+    segments = pd.DataFrame(segments)
+    segments_file = os.path.join(opath,base+'_cell_seg_data.txt')
+    segments.to_csv(segments_file,sep="\t",index=False)
 
 def _make_score_file(opath,sample,frame,base,fdf):
     ### Do the score file
