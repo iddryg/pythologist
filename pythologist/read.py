@@ -74,8 +74,9 @@ class MantraFrame:
             'Cell Y Position':'y',
             'Phenotype':'phenotype',
             'Tissue Category':'tissue'})
-        v['frame'] = frame
+        v['folder'] = mydir.lstrip('/').lstrip('\\')
         v['sample'] = sample
+        v['frame'] = frame
         #v['threshold_marker'] = np.nan
         #v['threshold_call'] = np.nan
         #v['full_phenotype'] = v['phenotype']
@@ -96,9 +97,8 @@ class MantraFrame:
         else:
             v['tissue_area'] = np.nan
             v['total_area'] = np.nan
-            v['phenotypes_present'] = json.dumps([])
-            v['tissues_present'] = json.dumps({})
-        v['folder'] = mydir.lstrip('/').lstrip('\\')
+            v['tissues_present'] = json.dumps(list(v['tissue'].unique()))
+            v['phenotypes_present'] = json.dumps(list(v['phenotype'][v['phenotype'].notna()].unique()))
         self._cells = v
     def _get_mantra_frame_areas(self):
         if self._summary is None: raise ValueError("You need summary files present to get areas")
@@ -147,7 +147,9 @@ class VectraFrame:
         keepers = ['Cell ID','Phenotype',
             'Cell X Position',
             'Cell Y Position',
-            'Entire Cell Area (pixels)','Tissue Category']
+            'Entire Cell Area (pixels)']
+        # Some older versions don't have tissue category
+        if 'Tissue Category' in self._seg.columns: keepers.append('Tissue Category')
         keepers2 = [x for x in self._seg.columns if re.search('Entire Cell.*Mean \(Normalized Counts, Total Weighting\)$',x)]
         keepers3 = [x for x in self._seg.columns if re.search('Mean \(Normalized Counts, Total Weighting\)$',x) and x not in keepers2]
         entire = OrderedDict()
@@ -174,6 +176,7 @@ class VectraFrame:
                 if stain not in compartments[row[0]]: compartments[row[0]][stain] = OrderedDict()
                 compartments[row[0]][stain][compartment] = row[1]
         v = self._seg[keepers].copy()
+        if 'Tissue Category' not in v.columns: v['Tissue Category'] = ''
         v['compartment_values'] = v.apply(lambda x: compartments[x['Cell ID']],1)
         v['entire_cell_values'] = v.apply(lambda x: entire[x['Cell ID']],1)
         #v = self._seg[keepers+keepers2]
@@ -183,8 +186,9 @@ class VectraFrame:
             'Cell Y Position':'y',
             'Phenotype':'phenotype',
             'Tissue Category':'tissue'})
-        v['frame'] = frame
+        v['folder'] = mydir.lstrip('/').lstrip('\\')
         v['sample'] = sample
+        v['frame'] = frame
         #v['threshold_marker'] = np.nan
         #v['threshold_call'] = np.nan
         #v['full_phenotype'] = v['phenotype']
@@ -205,11 +209,12 @@ class VectraFrame:
             phenotypes_present = [x for x in sorted(self._summary['Phenotype'].unique().tolist()) if x != 'All']
             v['phenotypes_present'] = v.apply(lambda x: json.dumps(phenotypes_present),1)
         else:
+            # We need to get these values from elsewhere
+            sys.stderr.write("Guessing at phenotypes present\n")
             v['tissue_area'] = np.nan
             v['total_area'] = np.nan
-            v['phenotypes_present'] = json.dumps([])
-            v['tissues_present'] = json.dumps({})
-        v['folder'] = mydir.lstrip('/').lstrip('\\')
+            v['tissues_present'] = json.dumps(list(v['tissue'].unique()))
+            v['phenotypes_present'] = json.dumps(list(v['phenotype'][v['phenotype'].notna()].unique()))
         self._cells = v
     @property
     def cells (self):
@@ -241,6 +246,7 @@ class VectraFrame:
         # This order dictionary contains series for each line of the score file
         _scores = OrderedDict()
         sfile = pd.read_csv(score_file,"\t")
+        sfile.loc[sfile['Tissue Category'].isna(),'Tissue Category'] = ''
         head = sfile.columns
         obs_sample = None
         for row in sfile.itertuples(index=False):

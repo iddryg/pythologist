@@ -310,10 +310,53 @@ class InFormCellFrame(pd.DataFrame):
         out['std_dev_um2'] = out.apply(lambda x: x['std_dev']/(self.mpp*self.mpp),1)
         out['std_err_um2'] = out.apply(lambda x: x['std_err']/(self.mpp*self.mpp),1)
         return out
-
-
-
-
-
-
-
+    def merge_phenotype_data(self,replacement_idf,phenotype_old,phenotype_replacement,scale=1):
+        #Assumes sample and frame names are unique and there are not multiple folders
+        # for each
+        rdf = replacement_idf[(replacement_idf['phenotype']==phenotype_replacement)]
+        replace = rdf.df[['sample','frame','x','y','id','cell_area']].drop_duplicates()
+        replace['cell_radius'] = replace.apply(lambda x: math.sqrt(x['cell_area']/math.pi),1)
+        
+        current = self.df
+        current['cell_radius'] = current.apply(lambda x: math.sqrt(x['cell_area']/math.pi),1)
+        current = current.reset_index(drop=True).reset_index()
+        can = current.loc[current['phenotype']==phenotype_old,['sample','frame','x','y','id','cell_radius','index']]
+        alone = []
+        match = []
+        dropped = set()
+        for row in replace.itertuples(index=False):
+            s = pd.Series(row,index=replace.columns)
+            found = can[(can['sample']==s['sample'])&
+                (can['frame']==s['frame'])&
+                (can['x']>s['x']-(s['cell_radius']+can['cell_radius'])*scale)&
+                (can['x']<s['x']+(s['cell_radius']+can['cell_radius'])*scale)&
+                (can['y']>s['y']-(s['cell_radius']+can['cell_radius'])*scale)&
+                (can['y']<s['y']+(s['cell_radius']+can['cell_radius'])*scale)&
+                (~can['id'].isin(list(dropped)))]
+            if found.shape[0] == 0:
+                alone.append(s)
+                continue
+            found = found.copy()
+            found['x1'] = s['x']
+            found['y1'] = s['y']
+            found['id1'] = s['id']
+            found['distance'] = found.apply(lambda x: 
+                math.sqrt(((x['x1']-x['x'])*(x['x1']-x['x']))+((x['y1']-x['y'])*(x['y1']-x['y']))),1)
+            found=found.sort_values('distance').iloc[0]
+            dropped.add(found['id']) # These IDs have already been flagged to be dropped
+            match.append(found)
+        keepers1 = replacement_idf.df.merge(pd.DataFrame(match).drop(columns=['id']).\
+            rename(columns={'id1':'id'})[['sample','frame','id']],on=['sample','frame','id'])
+        drop1 = current.merge(pd.DataFrame(match),on=['sample','frame','id','index'])[['sample','frame','id','index']]
+        keepers2 = replacement_idf.df.merge(pd.DataFrame(alone)[['sample','frame','id']],on=['sample','frame','id'])
+        keepers_alt = current[~current['index'].isin(drop1['index'])][['sample','frame','id']]
+        mdf = pd.concat([keepers1,
+                        keepers2,
+                        self.df.merge(keepers_alt,on=['sample','frame','id'])])
+        organized = [] 
+        for sample in mdf['sample'].unique():
+            for frame in mdf.loc[mdf['sample']==sample,'frame'].unique():
+                frame = mdf[(mdf['sample']==sample)&(mdf['frame']==frame)].copy().sort_values(['x','y']).reset_index(drop=True)
+                frame['id'] = range(1,frame.shape[0]+1,1)
+                organized.append(frame)
+        return InFormCellFrame(pd.concat(organized),mpp=self.mpp)
