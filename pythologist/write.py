@@ -1,6 +1,7 @@
-import os
+import os, json
 import pythologist
 import pandas as pd
+import numpy as np
 from collections import OrderedDict
 
 _prefixes = ['First','Second','Third','Fourth','Fifth','Sixth','Seventh']
@@ -44,6 +45,94 @@ def write_inForm(idf,output_directory,type="Vectra",overwrite=False):
             if frame.startswith(sample): base = frame
             _make_score_file(opath,sample,frame,base,fdf)
             _make_segmentation_file(opath,sample,frame,base,fdf)
+            _make_summary_file(opath,sample,frame,base,fdf)
+def _make_summary_file(opath,sample,frame,base,fdf):
+    first = fdf['compartment_values'].iloc[0]
+    stains = list(first.keys())
+    compartments = [list(first[stain].keys()) for stain in first][0]
+
+    first = fdf.iloc[0]
+    tissues = json.loads(first['tissues_present'])
+    phenotypes = json.loads(first['phenotypes_present'])
+
+    rows = []
+    for tissue in tissues+['All']:
+        for phenotype in phenotypes+['All']:
+            mytissue = np.array([True]*fdf.shape[0])
+            if tissue != 'All': mytissue = fdf['tissue']==tissue
+            mypheno = np.array([True]*fdf.shape[0])
+            if phenotype != 'All': mypheno = fdf['phenotype']==phenotype
+            specific = fdf[mytissue&mypheno]
+            o = OrderedDict()
+            o['Path'] = opath
+            o['Sample Name'] = sample
+            o['Tissue Category'] = tissue
+            o['Phenotype'] = phenotype
+            o['Total Cells'] = specific.shape[0]
+            o['Cell ID'] = 'all'
+            if tissue == 'All':
+                tpx = 0
+                if o['Total Cells'] > 0: tpx = specific['total_area'].iloc[0]*1000000
+                o['Tissue Category Area (pixels)'] = int(tpx)
+                o['Cell Density (per megapixel)'] = 0
+                if tpx > 0: o['Cell Density (per megapixel)'] = specific.shape[0]/specific['total_area'].iloc[0]
+            else:
+                tpx = 0
+                if o['Total Cells'] > 0: tpx = specific['tissue_area'].iloc[0]*1000000
+                o['Tissue Category Area (pixels)'] = int(tpx)
+                o['Cell Density (per megapixel)'] = 0
+                if tpx > 0: o['Cell Density (per megapixel)'] = specific.shape[0]/specific['tissue_area'].iloc[0]
+            o['Cell X Position'] = ''
+            o['Cell Y Position'] = ''
+            o['Process Region ID'] = ''
+            o['Distance from Process Region Edge (pixels)'] = ''
+            o['Category Region ID'] = ''
+            o['Distance from Tissue Category Edge (pixels)'] = ''
+
+
+
+            for compartment in compartments:
+                o[compartment+' Area (pixels)'] = 0
+                o[compartment+' Area (percent)'] = 0
+                o[compartment+' Compactness'] = ''
+                o[compartment+' Minor Axis'] = ''
+                o[compartment+' Major Axis'] = ''
+                o[compartment+' Axis Ratio'] = ''
+                o[compartment+' Axis Ratio'] = ''
+                for stain in stains:
+                    o[compartment+' '+stain+' Min (Normalized Counts, Total Weighting)'] = 0
+                    o[compartment+' '+stain+' Mean (Normalized Counts, Total Weighting)'] = 0
+                    o[compartment+' '+stain+' Max (Normalized Counts, Total Weighting)'] = 0
+                    o[compartment+' '+stain+' Std Dev (Normalized Counts, Total Weighting)'] = 0
+                    o[compartment+' '+stain+' Total (Normalized Counts, Total Weighting)'] = 0
+            o['Entire Cell Area (pixels)'] = 0
+            o['Entire Cell Area (percent)'] = 0
+            o['Entire Cell Compactness'] = ''
+            o['Entire Cell Minor Axis'] = ''
+            o['Entire Cell Major Axis'] = ''
+            o['Entire Cell Axis Ratio'] = ''
+            o['Entire Cell Axis Ratio'] = ''
+            for stain in stains:
+                o['Entire Cell '+stain+' Min (Normalized Counts, Total Weighting)'] = 0
+                o['Entire Cell '+stain+' Mean (Normalized Counts, Total Weighting)'] = 0
+                o['Entire Cell '+stain+' Max (Normalized Counts, Total Weighting)'] = 0
+                o['Entire Cell '+stain+' Std Dev (Normalized Counts, Total Weighting)'] = 0
+                o['Entire Cell '+stain+' Total (Normalized Counts, Total Weighting)'] = 0
+            o['Lab ID'] = ''
+            o['Slide ID'] = sample
+            o['TMA Sector'] = 0
+            o['TMA Row'] = 0
+            o['TMA Column'] = 0
+            o['TMA Field'] = 0
+            o['Confidence'] = 0
+            o['inForm 2.3.6298.15583'] = ''
+
+            rows.append(pd.Series(o))
+    summary = pd.DataFrame(rows)
+    summary_file = os.path.join(opath,base+'_cell_seg_data_summary.txt')
+    summary.to_csv(summary_file,sep="\t",index=False)
+
+
 
 def _make_segmentation_file(opath,sample,frame,base,fdf):
     first = fdf['compartment_values'].iloc[0]
