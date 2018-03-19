@@ -3,7 +3,7 @@ from collections import OrderedDict
 import pandas as pd
 import numpy as np
 
-
+_float_decimals = 6
 class MantraFrame:
     def __init__(self,path,mydir,sample,frame,seg_file,score_file,summary_file):
         self._scores = pd.read_csv(score_file,sep="\t")
@@ -18,7 +18,7 @@ class MantraFrame:
                                      'Stain Component',
                                      'Positivity Threshold']].drop_duplicates()
         # nan is too much trouble to deal with
-        self._scores.loc[self._scores['Tissue Category'].isna(),'Tissue Category'] = ''
+        self._scores.loc[self._scores['Tissue Category'].isna(),'Tissue Category'] = 'any'
         for row in self._scores.itertuples(index=False):
             s = pd.Series(row,index=self._scores.columns)
             tissue = s['Tissue Category']
@@ -39,31 +39,34 @@ class MantraFrame:
             'Cell X Position',
             'Cell Y Position',
             'Entire Cell Area (pixels)']
-        keepers2 = [x for x in self._seg.columns if re.search('Entire Cell.*Mean \(Normalized Counts, Total Weighting\)$',x)]
-        keepers3 = [x for x in self._seg.columns if re.search('Mean \(Normalized Counts, Total Weighting\)$',x) and x not in keepers2]
+        keepers2 = [x for x in self._seg.columns if re.search('Entire Cell.*\s+\S+ \(Normalized Counts, Total Weighting\)$',x)]
+        keepers3 = [x for x in self._seg.columns if re.search('\S+ \(Normalized Counts, Total Weighting\)$',x) and x not in keepers2]
         entire = OrderedDict()
         for cname in keepers2:
-            m = re.match('Entire Cell\s+(.*) Mean \(Normalized Counts, Total Weighting\)$',cname)
+            m = re.match('Entire Cell\s+(.*) (Mean|Min|Max|Std Dev|Total) \(Normalized Counts, Total Weighting\)$',cname)
             stain = m.group(1)
             v = self._seg[['Cell ID',cname]]
             v.columns = ['Cell ID','value']
             v = v.copy()
             for row in v.itertuples(index=False):
                 if row[0] not in entire: entire[row[0]] = OrderedDict()
-                entire[row[0]][stain]=row[1]
+                if stain not in entire[row[0]]: entire[row[0]][stain] = OrderedDict()
+                entire[row[0]][stain][m.group(2)]=round(row[1],_float_decimals)
         compartments = OrderedDict()
         for cname in keepers3:
             if re.match('Entire Cell',cname): continue
-            m = re.match('(\S+)\s+(.*) Mean \(Normalized Counts, Total Weighting\)$',cname)
+            m = re.match('(\S+)\s+(.*) (Mean|Min|Max|Std Dev|Total) \(Normalized Counts, Total Weighting\)$',cname)
             compartment = m.group(1)
             stain = m.group(2)
-            v = self._seg[['Cell ID',cname]]
-            v.columns = ['Cell ID','value']
+            v = self._seg[['Cell ID',cname,compartment+' Area (pixels)']]
+            v.columns = ['Cell ID','value','area']
             v = v.copy()
             for row in v.itertuples(index=False):
                 if row[0] not in compartments: compartments[row[0]] = OrderedDict()
                 if stain not in compartments[row[0]]: compartments[row[0]][stain] = OrderedDict()
-                compartments[row[0]][stain][compartment] = row[1]
+                if compartment not in compartments[row[0]][stain]: compartments[row[0]][stain][compartment] = OrderedDict()
+                compartments[row[0]][stain][compartment][m.group(3)] = round(row[1],_float_decimals)
+                compartments[row[0]][stain][compartment]['Area'] = round(row[2],_float_decimals)
         v = self._seg[keepers].copy()
         v['compartment_values'] = v.apply(lambda x: compartments[x['Cell ID']],1)
         v['entire_cell_values'] = v.apply(lambda x: entire[x['Cell ID']],1)
@@ -82,17 +85,17 @@ class MantraFrame:
         #v['full_phenotype'] = v['phenotype']
         v['frame_stains'] = None
         v['frame_stains'] = v.apply(lambda x: json.dumps(self._stains),1) 
-        v['tissue'] = ''
+        v['tissue'] = 'any'
         if self._summary is not None:
             #### Read our areas from the summary #####
             myareas = OrderedDict(self._get_mantra_frame_areas())
             ## Now we have our areas read lets put that data into things
             tissues_present = [x for x in myareas.keys() if x != 'All']
             v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
-            v['total_area'] = v.apply(lambda x: myareas[''],1)
+            v['total_area'] = v.apply(lambda x: myareas['any'],1)
             v['tissues_present'] = v.apply(lambda x: json.dumps(tissues_present),1)
             ## Lets the phenotypes that are here
-            phenotypes_present = [x for x in sorted(self._summary['Phenotype'].unique().tolist()) if x != 'All']
+            phenotypes_present = [x for x in sorted(self._summary['Phenotype'].dropna().unique().tolist()) if x != 'All']
             v['phenotypes_present'] = v.apply(lambda x: json.dumps(phenotypes_present),1)
         else:
             v['tissue_area'] = np.nan
@@ -111,7 +114,7 @@ class MantraFrame:
             rename(columns={'Phenotype':'phenotype',
                             'Summary Area Megapixels':'tissue_area'
                            })
-        df['tissue'] = ''
+        df['tissue'] = 'any'
         df = df.loc[df['phenotype']=='All',['tissue','tissue_area']].\
             set_index('tissue')['tissue_area'].to_dict()
         return df
@@ -150,31 +153,34 @@ class VectraFrame:
             'Entire Cell Area (pixels)']
         # Some older versions don't have tissue category
         if 'Tissue Category' in self._seg.columns: keepers.append('Tissue Category')
-        keepers2 = [x for x in self._seg.columns if re.search('Entire Cell.*Mean \(Normalized Counts, Total Weighting\)$',x)]
-        keepers3 = [x for x in self._seg.columns if re.search('Mean \(Normalized Counts, Total Weighting\)$',x) and x not in keepers2]
+        keepers2 = [x for x in self._seg.columns if re.search('Entire Cell.*\s+\S+ \(Normalized Counts, Total Weighting\)$',x)]
+        keepers3 = [x for x in self._seg.columns if re.search('\s+\S+ \(Normalized Counts, Total Weighting\)$',x) and x not in keepers2]
         entire = OrderedDict()
         for cname in keepers2:
-            m = re.match('Entire Cell\s+(.*) Mean \(Normalized Counts, Total Weighting\)$',cname)
+            m = re.match('Entire Cell\s+(.*) (Mean|Min|Max|Std Dev|Total) \(Normalized Counts, Total Weighting\)$',cname)
             stain = m.group(1)
             v = self._seg[['Cell ID',cname]]
             v.columns = ['Cell ID','value']
             v = v.copy()
             for row in v.itertuples(index=False):
                 if row[0] not in entire: entire[row[0]] = OrderedDict()
-                entire[row[0]][stain]=row[1]
+                if stain not in entire[row[0]]: entire[row[0]][stain] = OrderedDict()
+                entire[row[0]][stain][m.group(2)]=round(row[1],_float_decimals)
         compartments = OrderedDict()
         for cname in keepers3:
             if re.match('Entire Cell',cname): continue
-            m = re.match('(\S+)\s+(.*) Mean \(Normalized Counts, Total Weighting\)$',cname)
+            m = re.match('(\S+)\s+(.*) (Mean|Min|Max|Std Dev|Total) \(Normalized Counts, Total Weighting\)$',cname)
             compartment = m.group(1)
             stain = m.group(2)
-            v = self._seg[['Cell ID',cname]]
-            v.columns = ['Cell ID','value']
+            v = self._seg[['Cell ID',cname,compartment+' Area (pixels)']]
+            v.columns = ['Cell ID','value','value1']
             v = v.copy()
             for row in v.itertuples(index=False):
                 if row[0] not in compartments: compartments[row[0]] = OrderedDict()
                 if stain not in compartments[row[0]]: compartments[row[0]][stain] = OrderedDict()
-                compartments[row[0]][stain][compartment] = row[1]
+                if compartment not in compartments[row[0]][stain]: compartments[row[0]][stain][compartment] = OrderedDict()
+                compartments[row[0]][stain][compartment][m.group(3)] = round(row[1],_float_decimals)
+                compartments[row[0]][stain][compartment]['Area'] = round(row[2],_float_decimals)
         v = self._seg[keepers].copy()
         if 'Tissue Category' not in v.columns: v['Tissue Category'] = ''
         v['compartment_values'] = v.apply(lambda x: compartments[x['Cell ID']],1)
@@ -206,7 +212,7 @@ class VectraFrame:
             v['total_area'] = v.apply(lambda x: myareas['All'],1)
             v['tissues_present'] = v.apply(lambda x: json.dumps(tissues_present),1)
             ### Lets the phenotypes that are here
-            phenotypes_present = [x for x in sorted(self._summary['Phenotype'].unique().tolist()) if x != 'All']
+            phenotypes_present = [x for x in sorted(self._summary['Phenotype'].dropna().unique().tolist()) if x != 'All']
             v['phenotypes_present'] = v.apply(lambda x: json.dumps(phenotypes_present),1)
         else:
             # We need to get these values from elsewhere

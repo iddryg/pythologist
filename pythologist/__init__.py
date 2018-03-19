@@ -200,7 +200,7 @@ class InFormCellFrame(pd.DataFrame):
             merge(self.score_data,on=['folder','sample','frame','tissue'])
         mf = mf[mf['stain']==stain].copy()
         mf['gate'] = '-'
-        mf.loc[mf.apply(lambda x: x['compartment_values'][stain][x['compartment']] > x['threshold'],1),'gate'] = '+'
+        mf.loc[mf.apply(lambda x: x['compartment_values'][stain][x['compartment']]['Mean'] > x['threshold'],1),'gate'] = '+'
         mf = mf[['folder','sample','frame','phenotype','gate','id']].\
             set_index(['folder','sample','frame','id']).\
             apply(lambda x: x['phenotype']+' '+abbrev+x['gate'],1).reset_index().\
@@ -353,6 +353,9 @@ class InFormCellFrame(pd.DataFrame):
         mdf = pd.concat([keepers1,
                         keepers2,
                         self.df.merge(keepers_alt,on=['sample','frame','id'])])
+        phenotypes = json.dumps(list(mdf['phenotype'].dropna().unique()))
+        mdf['phenotypes_present'] = phenotypes
+        mdf['folder'] = mdf.apply(lambda x: x['sample'],1)
         organized = [] 
         for sample in mdf['sample'].unique():
             for frame in mdf.loc[mdf['sample']==sample,'frame'].unique():

@@ -44,9 +44,9 @@ def write_inForm(idf,output_directory,type="Vectra",overwrite=False):
             base = sample+'_'+frame
             if frame.startswith(sample): base = frame
             _make_score_file(opath,sample,frame,base,fdf)
-            _make_segmentation_file(opath,sample,frame,base,fdf)
-            _make_summary_file(opath,sample,frame,base,fdf)
-def _make_summary_file(opath,sample,frame,base,fdf):
+            _make_segmentation_file(opath,sample,frame,base,fdf,type)
+            _make_summary_file(opath,sample,frame,base,fdf,type)
+def _make_summary_file(opath,sample,frame,base,fdf,type):
     first = fdf['compartment_values'].iloc[0]
     stains = list(first.keys())
     compartments = [list(first[stain].keys()) for stain in first][0]
@@ -68,8 +68,8 @@ def _make_summary_file(opath,sample,frame,base,fdf):
             o['Sample Name'] = sample
             o['Tissue Category'] = tissue
             o['Phenotype'] = phenotype
-            o['Total Cells'] = specific.shape[0]
             o['Cell ID'] = 'all'
+            o['Total Cells'] = specific.shape[0]
             if tissue == 'All':
                 tpx = 0
                 if o['Total Cells'] > 0: tpx = specific['total_area'].iloc[0]*1000000
@@ -129,12 +129,15 @@ def _make_summary_file(opath,sample,frame,base,fdf):
 
             rows.append(pd.Series(o))
     summary = pd.DataFrame(rows)
+    if type == 'Mantra':
+        summary = summary[summary['Tissue Category']=='All'].copy()
+        summary = summary.drop(columns=['Tissue Category','Tissue Category Area (pixels)'])
     summary_file = os.path.join(opath,base+'_cell_seg_data_summary.txt')
     summary.to_csv(summary_file,sep="\t",index=False)
 
 
 
-def _make_segmentation_file(opath,sample,frame,base,fdf):
+def _make_segmentation_file(opath,sample,frame,base,fdf,type):
     first = fdf['compartment_values'].iloc[0]
     stains = list(first.keys())
     compartments = [list(first[stain].keys()) for stain in first][0]
@@ -144,11 +147,11 @@ def _make_segmentation_file(opath,sample,frame,base,fdf):
         o = OrderedDict()
         o['Path'] = opath
         o['Sample Name'] = sample
-        o['Tissue Category'] = s['tissue']
+        if type != "Mantra": o['Tissue Category'] = s['tissue']
         o['Phenotype'] = s['phenotype']
         o['Cell ID'] = s['id']
         o['Total Cells'] = ''
-        o['Tissue Category Area (pixels)'] = ''
+        if type != "Mantra": o['Tissue Category Area (pixels)'] = ''
         o['Cell Density (per megapixel)'] = ''
         o['Cell X Position'] = s['x']
         o['Cell Y Position'] = s['y']
@@ -158,7 +161,7 @@ def _make_segmentation_file(opath,sample,frame,base,fdf):
         o['Distance from Tissue Category Edge (pixels)'] = 0 #filler
         d = s['compartment_values']
         for compartment in compartments:
-            o[compartment+' Area (pixels)'] = 0
+            o[compartment+' Area (pixels)'] = d[list(d.keys())[0]][compartment]['Area']
             o[compartment+' Area (percent)'] = 0
             o[compartment+' Compactness'] = 0
             o[compartment+' Minor Axis'] = 0
@@ -166,11 +169,9 @@ def _make_segmentation_file(opath,sample,frame,base,fdf):
             o[compartment+' Axis Ratio'] = 0
             o[compartment+' Axis Ratio'] = 0
             for stain in stains:
-                o[compartment+' '+stain+' Min (Normalized Counts, Total Weighting)'] = 0
-                o[compartment+' '+stain+' Mean (Normalized Counts, Total Weighting)'] = d[stain][compartment]
-                o[compartment+' '+stain+' Max (Normalized Counts, Total Weighting)'] = 0
-                o[compartment+' '+stain+' Std Dev (Normalized Counts, Total Weighting)'] = 0
-                o[compartment+' '+stain+' Total (Normalized Counts, Total Weighting)'] = 0
+                stats = ['Min','Mean','Max','Std Dev','Total']
+                for stat in stats:
+                    o[compartment+' '+stain+' '+stat+' (Normalized Counts, Total Weighting)'] = d[stain][compartment][stat]
         o['Entire Cell Area (pixels)'] = s['cell_area']
         o['Entire Cell Area (percent)'] = 0
         o['Entire Cell Compactness'] = 0
@@ -179,11 +180,9 @@ def _make_segmentation_file(opath,sample,frame,base,fdf):
         o['Entire Cell Axis Ratio'] = 0
         o['Entire Cell Axis Ratio'] = 0
         for stain in stains:
-            o['Entire Cell '+stain+' Min (Normalized Counts, Total Weighting)'] = 0
-            o['Entire Cell '+stain+' Mean (Normalized Counts, Total Weighting)'] = s['entire_cell_values'][stain]
-            o['Entire Cell '+stain+' Max (Normalized Counts, Total Weighting)'] = 0
-            o['Entire Cell '+stain+' Std Dev (Normalized Counts, Total Weighting)'] = 0
-            o['Entire Cell '+stain+' Total (Normalized Counts, Total Weighting)'] = 0
+            stats = ['Min','Mean','Max','Std Dev','Total']
+            for stat in stats:
+                o['Entire Cell '+stain+' '+stat+' (Normalized Counts, Total Weighting)'] = s['entire_cell_values'][stain][stat]
         o['Lab ID'] = ''
         o['Slide ID'] = sample
         o['TMA Sector'] = 0
