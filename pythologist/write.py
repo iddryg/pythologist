@@ -43,7 +43,11 @@ def write_inForm(idf,output_directory,type="Vectra",overwrite=False):
             fdf = pythologist.InFormCellFrame(fdf)
             base = sample+'_'+frame
             if frame.startswith(sample): base = frame
-            _make_score_file(opath,sample,frame,base,fdf)
+            if type == "Vectra":
+                _make_score_file_vectra(opath,sample,frame,base,fdf)
+            elif type == "Mantra":
+                _make_score_file_mantra(opath,sample,frame,base,fdf)
+            else: raise ValueError("type does not exist "+str(type))
             _make_segmentation_file(opath,sample,frame,base,fdf,type)
             _make_summary_file(opath,sample,frame,base,fdf,type)
 def _make_summary_file(opath,sample,frame,base,fdf,type):
@@ -160,8 +164,9 @@ def _make_segmentation_file(opath,sample,frame,base,fdf,type):
         o['Category Region ID'] = 1
         o['Distance from Tissue Category Edge (pixels)'] = 0 #filler
         d = s['compartment_values']
+        d1 = s['compartment_areas']
         for compartment in compartments:
-            o[compartment+' Area (pixels)'] = d[list(d.keys())[0]][compartment]['Area']
+            o[compartment+' Area (pixels)'] = d1[compartment]
             o[compartment+' Area (percent)'] = 0
             o[compartment+' Compactness'] = 0
             o[compartment+' Minor Axis'] = 0
@@ -196,7 +201,7 @@ def _make_segmentation_file(opath,sample,frame,base,fdf,type):
     segments_file = os.path.join(opath,base+'_cell_seg_data.txt')
     segments.to_csv(segments_file,sep="\t",index=False)
 
-def _make_score_file(opath,sample,frame,base,fdf):
+def _make_score_file_vectra(opath,sample,frame,base,fdf):
     ### Do the score file
     score_formated = []
     score_df = fdf.score_data
@@ -223,6 +228,36 @@ def _make_score_file(opath,sample,frame,base,fdf):
             prefix = _prefixes[i]
             s = pd.Series(row,tdf.columns)
             o[s['stain']+' Threshold'] = s['threshold']
+        o['Lab ID'] = ''
+        o['Slide ID'] = sample
+        o['TMA Sector'] = 0
+        o['TMA Row'] = 0
+        o['TMA Column'] = 0
+        o['TMA Field'] = 0
+        o['inForm 2.3.6298.15583'] = ''
+        score_formated.append(pd.Series(o))
+    score_formated = pd.DataFrame(score_formated)
+    score_file = os.path.join(opath,base+'_score_data.txt')
+    score_formated.to_csv(score_file,sep="\t",index=False)
+def _make_score_file_mantra(opath,sample,frame,base,fdf):
+    ### Do the score file
+    score_formated = []
+    score_df = fdf.score_data
+    print(score_df)
+    for tissue in score_df['tissue'].unique():
+        tdf = score_df[score_df['tissue']==tissue]
+        if tissue == 'any': tissue = ''
+        if tdf.shape[0] > 1: raise ValueError("cant output multiple stains as Mantra")
+        o = OrderedDict()
+        o['Path'] = opath
+        o['Sample Name'] = sample
+        o['Tissue Category'] = tissue
+        o['Cell Compartment'] = tdf.iloc[0]['compartment']
+        o['Stain Component'] = tdf.iloc[0]['stain']
+        o['Positivity'] = 0
+        o['Tissue Category Area (Percent)'] = 0
+        o['Number of Cells'] = fdf.shape[0]
+        o['Positivity Threshold'] = tdf.iloc[0]['threshold']
         o['Lab ID'] = ''
         o['Slide ID'] = sample
         o['TMA Sector'] = 0

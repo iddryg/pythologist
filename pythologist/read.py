@@ -52,6 +52,7 @@ class MantraFrame:
                 if row[0] not in entire: entire[row[0]] = OrderedDict()
                 if stain not in entire[row[0]]: entire[row[0]][stain] = OrderedDict()
                 entire[row[0]][stain][m.group(2)]=round(row[1],_float_decimals)
+        compartment_areas = OrderedDict()
         compartments = OrderedDict()
         for cname in keepers3:
             if re.match('Entire Cell',cname): continue
@@ -66,8 +67,11 @@ class MantraFrame:
                 if stain not in compartments[row[0]]: compartments[row[0]][stain] = OrderedDict()
                 if compartment not in compartments[row[0]][stain]: compartments[row[0]][stain][compartment] = OrderedDict()
                 compartments[row[0]][stain][compartment][m.group(3)] = round(row[1],_float_decimals)
-                compartments[row[0]][stain][compartment]['Area'] = round(row[2],_float_decimals)
+                #compartments[row[0]][stain][compartment]['Area'] = round(row[2],_float_decimals)
+                if row[0] not in compartment_areas: compartment_areas[row[0]] = OrderedDict()
+                compartment_areas[row[0]][compartment] = round(row[2],_float_decimals)
         v = self._seg[keepers].copy()
+        v['compartment_areas'] = v.apply(lambda x: compartment_areas[x['Cell ID']],1)
         v['compartment_values'] = v.apply(lambda x: compartments[x['Cell ID']],1)
         v['entire_cell_values'] = v.apply(lambda x: entire[x['Cell ID']],1)
         #v = self._seg[keepers+keepers2]
@@ -166,6 +170,7 @@ class VectraFrame:
                 if row[0] not in entire: entire[row[0]] = OrderedDict()
                 if stain not in entire[row[0]]: entire[row[0]][stain] = OrderedDict()
                 entire[row[0]][stain][m.group(2)]=round(row[1],_float_decimals)
+        compartment_areas = OrderedDict()
         compartments = OrderedDict()
         for cname in keepers3:
             if re.match('Entire Cell',cname): continue
@@ -180,9 +185,12 @@ class VectraFrame:
                 if stain not in compartments[row[0]]: compartments[row[0]][stain] = OrderedDict()
                 if compartment not in compartments[row[0]][stain]: compartments[row[0]][stain][compartment] = OrderedDict()
                 compartments[row[0]][stain][compartment][m.group(3)] = round(row[1],_float_decimals)
-                compartments[row[0]][stain][compartment]['Area'] = round(row[2],_float_decimals)
+                #compartments[row[0]][stain][compartment]['Area'] = round(row[2],_float_decimals)
+                if row[0] not in compartment_areas: compartment_areas[row[0]] = OrderedDict()
+                compartment_areas[row[0]][compartment] = round(row[2],_float_decimals)
         v = self._seg[keepers].copy()
         if 'Tissue Category' not in v.columns: v['Tissue Category'] = ''
+        v['compartment_areas'] = v.apply(lambda x: compartment_areas[x['Cell ID']],1)
         v['compartment_values'] = v.apply(lambda x: compartments[x['Cell ID']],1)
         v['entire_cell_values'] = v.apply(lambda x: entire[x['Cell ID']],1)
         #v = self._seg[keepers+keepers2]

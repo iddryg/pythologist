@@ -107,7 +107,7 @@ class InFormCellFrame(pd.DataFrame):
         return None
     @property
     def frame_data(self):
-        frame_general = self.df[['folder','sample','frame','total_area','tissues_present','phenotypes_present','frame_stains']].drop_duplicates()
+        frame_general = self.df[['folder','sample','frame','total_area','tissues_present','phenotypes_present','frame_stains']].drop_duplicates(subset=['folder','sample','frame','tissue'])
         frame_counts = self.df.groupby(['folder','sample','frame']).\
             count()[['id']].reset_index().rename(columns={'id':'cell_count'})
         frame_data = frame_general.merge(frame_counts,on=['folder','sample','frame'])
@@ -118,7 +118,7 @@ class InFormCellFrame(pd.DataFrame):
     @property
     def score_data(self):
         rows = []
-        for row in self.df[['folder','sample','frame','tissue','tissue_area','total_area','frame_stains']].drop_duplicates().itertuples(index=False):
+        for row in self.df[['folder','sample','frame','tissue','tissue_area','total_area','frame_stains']].drop_duplicates(subset=['folder','sample','frame','tissue']).itertuples(index=False):
             stains = json.loads(row.frame_stains)
             for tissue in stains:
                 for stain in stains[tissue]:
@@ -137,7 +137,7 @@ class InFormCellFrame(pd.DataFrame):
             s[area_str] = json.loads(area_str)
         return s
     @property
-    def stains(self):
+    def scored_stains(self):
         stains = set()
         sdict = self.frame_stains_to_dict()
         for stain_str in sdict:
@@ -146,11 +146,61 @@ class InFormCellFrame(pd.DataFrame):
                     stains.add(stain)
         return sorted(list(stains))
     @property
+    def all_stains(self):
+        stains = set()
+        for ecv in self['entire_cell_values']:
+            stains |= set(list(ecv.keys()))
+        return list(stains)
+    @property
+    def compartments(self):
+        compartments = set()
+        for com in self['compartment_areas']: compartments |= set(list(com.keys()))
+        return list(compartments)
+    @property
     def mpp(self): return self._mpp
 
     @property
     def df(self):
         return pd.DataFrame(self).copy()
+
+    ### Drop a stain
+    def drop_stain(self,stain):
+        fsd = self.frame_stains_to_dict()
+        rows = []
+        for row in self.itertuples(index=False):
+            s = pd.Series(row,index=self.columns)
+            fs = fsd[s['frame_stains']]
+            for tissue in fs.keys():
+                if stain in fs[tissue]: del fs[tissue][stain]
+            s['frame_stains'] = json.dumps(fs)
+            ecv = s['entire_cell_values']
+            if stain in ecv: del ecv[stain]
+            s['entire_cell_values'] = ecv
+            cv = s['compartment_values']
+            if stain in cv: del cv[stain]
+            s['compartment_values'] = cv
+            rows.append(s)
+        return InFormCellFrame(pd.DataFrame(rows),mpp=self.mpp)
+    # For stains and tissues give all the cells values
+    def zero_fill_values(self):
+        rows = []
+        all_stains = self.all_stains
+        compartments = self.compartments
+        for row in self.itertuples(index=False):
+            s = pd.Series(row,index=self.columns)
+            for stain in all_stains:
+                if stain not in s['compartment_values']:
+                    s['compartment_values'][stain] = OrderedDict()
+                if stain not in s['entire_cell_values']:
+                    s['entire_cell_values'][stain] = OrderedDict({'Min':0,'Mean':0,'Max':0,'Std Dev':0,'Total':0})
+                for compartment in compartments:
+                    if compartment not in s['compartment_values'][stain]: 
+                        s['compartment_values'][stain][compartment] = OrderedDict({'Min':0,'Mean':0,'Max':0,'Std Dev':0,'Total':0})
+            rows.append(s)
+        return InFormCellFrame(pd.DataFrame(rows),mpp=self.mpp)
+
+
+
 
     #### Operations to QC an InFormCellFrame
     def rename_tissue(self,old_name,new_name):
@@ -312,6 +362,7 @@ class InFormCellFrame(pd.DataFrame):
         return out
     def merge_phenotype_data(self,replacement_idf,phenotype_old,phenotype_replacement,scale=1):
         #Assumes sample and frame names are unique and there are not multiple folders
+        # Be careful the phenotype you add in will not be properly thresholded, and if a stain was not measured if you do not specifically remove it, it will be set to zero
         # for each
         rdf = replacement_idf[(replacement_idf['phenotype']==phenotype_replacement)]
         replace = rdf.df[['sample','frame','x','y','id','cell_area']].drop_duplicates()
@@ -349,9 +400,20 @@ class InFormCellFrame(pd.DataFrame):
             rename(columns={'id1':'id'})[['sample','frame','id']],on=['sample','frame','id'])
         drop1 = current.merge(pd.DataFrame(match),on=['sample','frame','id','index'])[['sample','frame','id','index']]
         keepers2 = replacement_idf.df.merge(pd.DataFrame(alone)[['sample','frame','id']],on=['sample','frame','id'])
+        ### We need to set the frame stains in keepers 1 and keepers 2 to what they are in self's frames
+        both = pd.concat([keepers1,keepers2])
+        rows = []
+        for row in both.itertuples(index=False):
+            s = pd.Series(row,index=both.columns)
+            frame = self[(self['sample']==s['sample'])&(self['frame']==s['frame'])&(self['tissue']==s['tissue'])]
+            if frame.shape[0] == 0: s['frame_stains'] = json.dumps({s['tissue']:OrderedDict()})
+            else: s['frame_stains'] = frame.iloc[0]['frame_stains']
+            rows.append(s)
+        both = pd.DataFrame(rows)
+
+        
         keepers_alt = current[~current['index'].isin(drop1['index'])][['sample','frame','id']]
-        mdf = pd.concat([keepers1,
-                        keepers2,
+        mdf = pd.concat([both,
                         self.df.merge(keepers_alt,on=['sample','frame','id'])])
         phenotypes = json.dumps(list(mdf['phenotype'].dropna().unique()))
         mdf['phenotypes_present'] = phenotypes
