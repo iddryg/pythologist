@@ -56,7 +56,8 @@ def _make_summary_file(opath,sample,frame,base,fdf,type):
     compartments = [list(first[stain].keys()) for stain in first][0]
 
     first = fdf.iloc[0]
-    tissues = json.loads(first['tissues_present'])
+    td = json.loads(first['tissues_present'])
+    tissues = list(json.loads(first['tissues_present']).keys())
     phenotypes = json.loads(first['phenotypes_present'])
 
     rows = []
@@ -76,16 +77,16 @@ def _make_summary_file(opath,sample,frame,base,fdf,type):
             o['Total Cells'] = specific.shape[0]
             if tissue == 'All':
                 tpx = 0
-                if o['Total Cells'] > 0: tpx = specific['total_area'].iloc[0]*1000000
+                if o['Total Cells'] > 0: tpx = fdf['total_area'].iloc[0]
                 o['Tissue Category Area (pixels)'] = int(tpx)
                 o['Cell Density (per megapixel)'] = 0
-                if tpx > 0: o['Cell Density (per megapixel)'] = specific.shape[0]/specific['total_area'].iloc[0]
+                if tpx > 0: o['Cell Density (per megapixel)'] = 1000000*specific.shape[0]/fdf['total_area'].iloc[0]
             else:
                 tpx = 0
-                if o['Total Cells'] > 0: tpx = specific['tissue_area'].iloc[0]*1000000
+                if o['Total Cells'] > 0: tpx = td[tissue]
                 o['Tissue Category Area (pixels)'] = int(tpx)
                 o['Cell Density (per megapixel)'] = 0
-                if tpx > 0: o['Cell Density (per megapixel)'] = specific.shape[0]/specific['tissue_area'].iloc[0]
+                if tpx > 0: o['Cell Density (per megapixel)'] = 1000000*specific.shape[0]/td[tissue]
             o['Cell X Position'] = ''
             o['Cell Y Position'] = ''
             o['Process Region ID'] = ''
@@ -243,7 +244,6 @@ def _make_score_file_mantra(opath,sample,frame,base,fdf):
     ### Do the score file
     score_formated = []
     score_df = fdf.score_data
-    print(score_df)
     for tissue in score_df['tissue'].unique():
         tdf = score_df[score_df['tissue']==tissue]
         if tissue == 'any': tissue = ''

@@ -93,24 +93,25 @@ class MantraFrame:
         if self._summary is not None:
             #### Read our areas from the summary #####
             myareas = OrderedDict(self._get_mantra_frame_areas())
+            #print(myareas)
             ## Now we have our areas read lets put that data into things
             tissues_present = [x for x in myareas.keys() if x != 'All']
-            v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
+            #v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
             v['total_area'] = v.apply(lambda x: myareas['any'],1)
-            v['tissues_present'] = v.apply(lambda x: json.dumps(tissues_present),1)
+            v['tissues_present'] = v.apply(lambda x: json.dumps(myareas),1)
             ## Lets the phenotypes that are here
             phenotypes_present = [x for x in sorted(self._summary['Phenotype'].dropna().unique().tolist()) if x != 'All']
             v['phenotypes_present'] = v.apply(lambda x: json.dumps(phenotypes_present),1)
         else:
-            v['tissue_area'] = np.nan
-            v['total_area'] = np.nan
+            #v['tissue_area'] = np.nan
+            #v['total_area'] = np.nan
             v['tissues_present'] = json.dumps(list(v['tissue'].unique()))
             v['phenotypes_present'] = json.dumps(list(v['phenotype'][v['phenotype'].notna()].unique()))
         self._cells = v
     def _get_mantra_frame_areas(self):
         if self._summary is None: raise ValueError("You need summary files present to get areas")
         df = self._summary.copy()
-        mega = df.apply(lambda x: np.nan if float(x['Cell Density (per megapixel)']) == 0 else float(x['Total Cells'])/float(x['Cell Density (per megapixel)']),1) # cell area in mega pixels
+        mega = df.apply(lambda x: np.nan if float(x['Cell Density (per megapixel)']) == 0 else int(1000000*float(x['Total Cells'])/float(x['Cell Density (per megapixel)'])),1) # cell area in mega pixels
         df['Summary Area Megapixels'] = mega
         # Lets ignore the cell specific things here
         #return(df[df['Phenotype']=='All'])
@@ -216,18 +217,21 @@ class VectraFrame:
             myareas = OrderedDict(self._get_vectra_frame_areas())
             ### Now we have our areas read lets put that data into things
             tissues_present = [x for x in myareas.keys() if x != 'All']
-            v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
+            myarea2 = OrderedDict()
+            for tissue in tissues_present:
+                myarea2[tissue] = int(myareas[tissue])
+            #v['tissue_area'] = v.apply(lambda x: myareas[x['tissue']],1)
             v['total_area'] = v.apply(lambda x: myareas['All'],1)
-            v['tissues_present'] = v.apply(lambda x: json.dumps(tissues_present),1)
+            v['tissues_present'] = v.apply(lambda x: json.dumps(myarea2),1)
             ### Lets the phenotypes that are here
             phenotypes_present = [x for x in sorted(self._summary['Phenotype'].dropna().unique().tolist()) if x != 'All']
             v['phenotypes_present'] = v.apply(lambda x: json.dumps(phenotypes_present),1)
         else:
             # We need to get these values from elsewhere
             sys.stderr.write("Guessing at phenotypes present\n")
-            v['tissue_area'] = np.nan
-            v['total_area'] = np.nan
-            v['tissues_present'] = json.dumps(list(v['tissue'].unique()))
+            #v['tissue_area'] = np.nan
+            #v['total_area'] = np.nan
+            v['tissues_present'] = np.nan
             v['phenotypes_present'] = json.dumps(list(v['phenotype'][v['phenotype'].notna()].unique()))
         self._cells = v
     @property
@@ -236,7 +240,7 @@ class VectraFrame:
     def _get_vectra_frame_areas(self):
         if self._summary is None: raise ValueError("You need summary files present to get areas")
         df = self._summary.copy()
-        mega = df.apply(lambda x: np.nan if float(x['Cell Density (per megapixel)']) == 0 else float(x['Total Cells'])/float(x['Cell Density (per megapixel)']),1) # cell area in mega pixels
+        mega = df.apply(lambda x: np.nan if float(x['Cell Density (per megapixel)']) == 0 else int(1000000*float(x['Total Cells'])/float(x['Cell Density (per megapixel)'])),1) # cell area in mega pixels
         df['Summary Area Megapixels'] = mega
         # Lets ignore the cell specific things here
         #return(df[df['Phenotype']=='All'])
@@ -245,7 +249,8 @@ class VectraFrame:
                             'Phenotype':'phenotype',
                             'Summary Area Megapixels':'tissue_area'
                            })
-        df = df.loc[df['phenotype']=='All',['tissue','tissue_area']].set_index('tissue')['tissue_area'].to_dict()
+        df = df[df['tissue_area'].notna()]
+        df = df.loc[(df['phenotype']=='All'),['tissue','tissue_area']].set_index('tissue')['tissue_area'].to_dict()
         return df
     def _get_vectra_threshold(self,tissue,stain):
         v = [x for x in self._scores[tissue].keys() if re.search(' Threshold$',x)]

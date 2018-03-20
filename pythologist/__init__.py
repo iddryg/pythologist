@@ -118,7 +118,7 @@ class InFormCellFrame(pd.DataFrame):
     @property
     def score_data(self):
         rows = []
-        for row in self.df[['folder','sample','frame','tissue','tissue_area','total_area','frame_stains']].drop_duplicates(subset=['folder','sample','frame','tissue']).itertuples(index=False):
+        for row in self.df[['folder','sample','frame','tissue','tissues_present','frame_stains']].drop_duplicates(subset=['folder','sample','frame','tissue']).itertuples(index=False):
             stains = json.loads(row.frame_stains)
             for tissue in stains:
                 for stain in stains[tissue]:
@@ -268,92 +268,63 @@ class InFormCellFrame(pd.DataFrame):
     @property
     def frame_counts(self):
         # Assuming all phenotypes and all tissues could be present in all frames
-        basic = self.df.groupby(['sample','frame','tissue','full_phenotype']).first().reset_index()[['sample','frame','tissue','tissue_area','total_area','phenotype','threshold_marker','threshold_call','full_phenotype']]
+        basic = self.df.groupby(['folder','sample','frame','tissue','phenotype']).first().reset_index()[['folder','sample','frame','tissue','phenotype','tissues_present']]
 
-        cnts = self.df.groupby(['sample','frame','tissue','full_phenotype']).count().\
-             reset_index()[['sample','frame','tissue','full_phenotype','id']].\
+        cnts = self.df.groupby(['folder','sample','frame','tissue','phenotype']).count().\
+             reset_index()[['folder','sample','frame','tissue','phenotype','id']].\
              rename(columns ={'id':'count'})
-        cnts = cnts.merge(basic,on=['sample','frame','tissue','full_phenotype'])
-        #return cnts
-        df = pd.DataFrame(self)[['sample','frame','phenotypes_present','tissues_present']].groupby(['sample','frame']).first().reset_index()
+        cnts = cnts.merge(basic,on=['folder','sample','frame','tissue','phenotype'])
+        cnts['tissue_area'] = cnts.apply(lambda x: json.loads(x['tissues_present'])[x['tissue']],1)
+        # For each frame
+        df = pd.DataFrame(self)[['folder','sample','frame','phenotypes_present','tissues_present']].groupby(['folder','sample','frame']).first().reset_index()
         empty = []
-        sample_tissues = OrderedDict()
-        sample_phenotypes = OrderedDict()
-        all_tissues = set()
-        all_phenotypes = set()
-        for frame in df.itertuples():
-            areas = json.loads(getattr(frame,"tissues_present"))
-            phenotypes = json.loads(getattr(frame,"phenotypes_present"))
-            sname = getattr(frame,"sample")
-            fname = getattr(frame,"frame")
-            tlist = set()
-            plist = set()
-            for tissue in areas.keys():
-                if tissue == 'All': continue
-                tlist.add(tissue)
-                all_tissues.add(tissue)
-                total = areas['All']
-                for phenotype in phenotypes:
-                    plist.add(phenotype)
-                    all_phenotypes.add(phenotype)
-            if sname not in sample_tissues: sample_tissues[sname] = set()
-            sample_tissues[sname] |= tlist
-            if sname not in sample_phenotypes: sample_phenotypes[sname] = set()
-            sample_phenotypes[sname] |= plist
-        thresh = {}
-        for frame in cnts.itertuples():
-            pheno = getattr(frame,"phenotype")
-            full = getattr(frame,"full_phenotype")
-            label = getattr(frame,"threshold_marker")
-            call = getattr(frame,"threshold_call")
-            if not isinstance(label,str): continue
-            thresh[full] = {'label':label,'call':call,'phenotype':pheno}
-        for frame in df.itertuples():
-            sname = getattr(frame,"sample")
-            fname = getattr(frame,"frame")
-            tlist = list(sample_tissues[sname])
-            plist = list(sample_phenotypes[sname])
-            #tlist = list(all_tissues)
-            #plist = list(all_phenotypes)
-            for tissue in sorted(tlist):
-                for phenotype in sorted(plist):            
-                    sub = cnts[(cnts['sample']==sname)&(cnts['frame']==fname)&(cnts['tissue']==tissue)&(cnts['full_phenotype']==phenotype)]
+        for frame in df.itertuples(index=False):
+            s = pd.Series(frame,df.columns)
+            f = self[(self['folder']==s['folder'])&(self['sample']==s['sample'])&(self['frame']==s['frame'])]
+            f = f.copy()
+            tissues = list(json.loads(s["tissues_present"]).keys())
+            td = json.loads(s["tissues_present"])
+            phenotypes = json.loads(s["phenotypes_present"])
+            folder = s['folder']
+            sname = s["sample"]
+            fname = s["frame"]
+            for tissue in tissues:
+                for phenotype in phenotypes:            
+                    sub = cnts[(cnts['folder']==folder)&(cnts['sample']==sname)&(cnts['frame']==fname)&(cnts['tissue']==tissue)&(cnts['phenotype']==phenotype)]
                     subcnt = sub.shape[0]
                     if subcnt != 0: continue
-                    g = pd.Series({'sample':sname,
+                    g = pd.Series({'folder':folder,
+                                   'sample':sname,
                                    'frame':fname,
                                    'tissue':tissue,
-                                   'tissue_area':np.nan if tissue not in areas else areas[tissue],
-                                   'total_area':total,
-                                   'full_phenotype':phenotype,
-                                   'threshold_marker': np.nan if phenotype not in thresh else thresh[phenotype]['label'],
-                                   'threshold_call': np.nan if phenotype not in thresh else thresh[phenotype]['call'],
-                                   'phenotype': np.nan if phenotype not in thresh else thresh[phenotype]['phenotype'],
+                                   'tissue_area':td[tissue],
+                                   #'total_area':s['total_area'],
+                                   'phenotype':phenotype,
                                    'count':0})
                     empty.append(g)
 
         out = pd.concat([cnts,pd.DataFrame(empty)])\
-              [['sample','frame','tissue','phenotype','threshold_marker','threshold_call','full_phenotype','tissue_area','total_area','count']].\
-            sort_values(['sample','frame','tissue','full_phenotype'])
+              [['folder','sample','frame','tissue','tissue_area','phenotype','count']].\
+            sort_values(['sample','frame','tissue','phenotype'])
         out['tissue_area'] = out['tissue_area'].fillna(0)
-        out['density'] = out.apply(lambda x: np.nan if float(x['tissue_area']) == 0 else float(x['count'])/float(x['tissue_area']),1)
-        out['density_um2'] = out.apply(lambda x: x['density']/(self.mpp*self.mpp),1)
-        out['tissue_area_um2'] = out.apply(lambda x: x['tissue_area']/(self.mpp*self.mpp),1)
-        out['total_area_um2'] = out.apply(lambda x: x['total_area']/(self.mpp*self.mpp),1)
+        out['tissue_density'] = out.apply(lambda x: np.nan if float(x['tissue_area']/1000000) == 0 else float(x['count'])/(float(x['tissue_area'])/1000000),1)
+        out['tissue_area_um2'] = out.apply(lambda x: (x['tissue_area']/1000000)/(self.mpp*self.mpp),1)
+        out['tissue_density_um2'] = out.apply(lambda x: x['tissue_density']/(self.mpp*self.mpp),1)
+        #out['total_area'] = out['total_area'].fillna(0)
         return(out)
     @property
     def sample_counts(self):
         fc = self.frame_counts
 
-        v = fc[fc['density'].notnull()].groupby(['sample','tissue','full_phenotype']).\
-            count().reset_index()[['sample','tissue','full_phenotype','density']].\
-            rename(columns={'density':'present_count'})
-        basic = fc.groupby(['sample','tissue','full_phenotype']).first().reset_index()[['sample','tissue','phenotype','threshold_marker','threshold_call','full_phenotype']]
-        mean = fc.groupby(['sample','tissue','full_phenotype']).mean().reset_index()[['sample','tissue','full_phenotype','density']].rename(columns={'density':'mean'})
-        std = fc.groupby(['sample','tissue','full_phenotype']).std().reset_index()[['sample','tissue','full_phenotype','density']].rename(columns={'density':'std_dev'})
-        cnt =  fc.groupby(['sample','tissue','full_phenotype']).count().reset_index()[['sample','tissue','full_phenotype','count']].rename(columns={'count':'frame_count'})
-        out = basic.merge(mean,on=['sample','tissue','full_phenotype']).merge(std,on=['sample','tissue','full_phenotype']).merge(cnt,on=['sample','tissue','full_phenotype'])
-        out = out.merge(v,on=['sample','tissue','full_phenotype'],how='left')
+        v = fc[fc['tissue_density'].notnull()].groupby(['folder','sample','tissue','phenotype']).\
+            count().reset_index()[['folder','sample','tissue','phenotype','tissue_density']].\
+            rename(columns={'tissue_density':'present_count'})
+        basic = fc.groupby(['folder','sample','tissue','phenotype']).first().reset_index()[['folder','sample','tissue','phenotype']]
+        mean = fc.groupby(['folder','sample','tissue','phenotype']).mean().reset_index()[['folder','sample','tissue','phenotype','tissue_density']].rename(columns={'tissue_density':'mean'})
+        std = fc.groupby(['folder','sample','tissue','phenotype']).std().reset_index()[['folder','sample','tissue','phenotype','tissue_density']].rename(columns={'tissue_density':'std_dev'})
+        cnt =  fc.groupby(['folder','sample','tissue','phenotype']).count().reset_index()[['folder','sample','tissue','phenotype','count']].rename(columns={'count':'frame_count'})
+        out = basic.merge(mean,on=['folder','sample','tissue','phenotype']).merge(std,on=['folder','sample','tissue','phenotype']).merge(cnt,on=['folder','sample','tissue','phenotype'])
+        out = out.merge(v,on=['folder','sample','tissue','phenotype'],how='left')
         out['present_count'] = out['present_count'].fillna(0).astype(int)
         out['std_err'] = out.apply(lambda x: np.nan if x['present_count'] == 0 else x['std_dev']/(math.sqrt(x['present_count'])),1)
         out['mean_um2'] = out.apply(lambda x: x['mean']/(self.mpp*self.mpp),1)
