@@ -4,32 +4,9 @@ import pandas as pd
 import numpy as np
 from collections import OrderedDict
 
-_prefixes = ['First','Second','Third','Fourth','Fifth','Sixth','Seventh']
-_vectra_score_header = [
- 'Path',
- 'Sample Name',
- 'Tissue Category'
- 'First Cell Compartment',
- 'First Stain Component',
- 'Second Cell Compartment',
- 'Second Stain Component',
- 'Double Negative',
- 'Single CD163 (Opal 690)',
- 'Single PDL1 (Opal 520)',
- 'Double Positive',
- 'Tissue Category Area (Percent)',
- 'Number of Cells',
- 'CD163 (Opal 690) Threshold',
- 'PDL1 (Opal 520) Threshold',
- 'Lab ID',
- 'Slide ID',
- 'TMA Sector',
- 'TMA Row',
- 'TMA Column',
- 'TMA Field',
- 'inForm 2.3.6298.15583']
+_inform_prefixes = ['First','Second','Third','Fourth','Fifth','Sixth','Seventh']
 
-def write_inForm(idf,output_directory,type="Vectra",overwrite=False):
+def write_inForm(idf,output_directory,overwrite=False):
     if os.path.exists(output_directory) and overwrite is False:
         raise ValueError("Cannot create directory '"+output_directory+"'' since it already exists")
     for folder in idf['folder'].unique():
@@ -41,15 +18,17 @@ def write_inForm(idf,output_directory,type="Vectra",overwrite=False):
         for frame in sub['frame'].unique():
             fdf = sub[sub['frame']==frame]
             fdf = pythologist.InFormCellFrame(fdf)
-            base = sample+'_'+frame
-            if frame.startswith(sample): base = frame
-            if type == "Vectra":
-                _make_score_file_vectra(opath,sample,frame,base,fdf)
-            elif type == "Mantra":
-                _make_score_file_mantra(opath,sample,frame,base,fdf)
-            else: raise ValueError("type does not exist "+str(type))
+            base = frame
+            type = 'single-stain'
+            if len(idf.scored_stains)>1:
+                type = 'multi-stain'
+                _make_score_file_multi(opath,sample,frame,base,fdf)
+            elif len(idf.scored_stains)==1:
+                _make_score_file_single(opath,sample,frame,base,fdf)
+            else: raise ValueError("don't know how to do this with zero scored stains yet")
             _make_segmentation_file(opath,sample,frame,base,fdf,type)
             _make_summary_file(opath,sample,frame,base,fdf,type)
+
 def _make_summary_file(opath,sample,frame,base,fdf,type):
     first = fdf['compartment_values'].iloc[0]
     stains = list(first.keys())
@@ -134,7 +113,7 @@ def _make_summary_file(opath,sample,frame,base,fdf,type):
 
             rows.append(pd.Series(o))
     summary = pd.DataFrame(rows)
-    if type == 'Mantra':
+    if type == 'single-stain':
         summary = summary[summary['Tissue Category']=='All'].copy()
         summary = summary.drop(columns=['Tissue Category','Tissue Category Area (pixels)'])
     summary_file = os.path.join(opath,base+'_cell_seg_data_summary.txt')
@@ -152,11 +131,11 @@ def _make_segmentation_file(opath,sample,frame,base,fdf,type):
         o = OrderedDict()
         o['Path'] = opath
         o['Sample Name'] = sample
-        if type != "Mantra": o['Tissue Category'] = s['tissue']
+        if type != "single-stain": o['Tissue Category'] = s['tissue']
         o['Phenotype'] = s['phenotype']
         o['Cell ID'] = s['id']
         o['Total Cells'] = ''
-        if type != "Mantra": o['Tissue Category Area (pixels)'] = ''
+        if type != "single-stain": o['Tissue Category Area (pixels)'] = ''
         o['Cell Density (per megapixel)'] = ''
         o['Cell X Position'] = s['x']
         o['Cell Y Position'] = s['y']
@@ -202,7 +181,7 @@ def _make_segmentation_file(opath,sample,frame,base,fdf,type):
     segments_file = os.path.join(opath,base+'_cell_seg_data.txt')
     segments.to_csv(segments_file,sep="\t",index=False)
 
-def _make_score_file_vectra(opath,sample,frame,base,fdf):
+def _make_score_file_multi(opath,sample,frame,base,fdf):
     ### Do the score file
     score_formated = []
     score_df = fdf.score_data
@@ -213,20 +192,20 @@ def _make_score_file_vectra(opath,sample,frame,base,fdf):
         o['Sample Name'] = sample
         o['Tissue Category'] = tissue
         for i,row in enumerate(tdf.itertuples(index=False)):
-            prefix = _prefixes[i]
+            prefix = _inform_prefixes[i]
             s = pd.Series(row,tdf.columns)
             o[prefix+' Cell Compartment'] = s['compartment']
             o[prefix+' Stain Component'] = s['stain']
         o['Double Negative'] = 0
         for i,row in enumerate(tdf.itertuples(index=False)):
-            prefix = _prefixes[i]
+            prefix = _inform_prefixes[i]
             s = pd.Series(row,tdf.columns)
             o['Single '+s['stain']] = 0
         o['Double Positive'] = 0
         o['Tissue Category Area (Percent)'] = 0
         o['Number of Cells'] = fdf.shape[0]
         for i,row in enumerate(tdf.itertuples(index=False)):
-            prefix = _prefixes[i]
+            prefix = _inform_prefixes[i]
             s = pd.Series(row,tdf.columns)
             o[s['stain']+' Threshold'] = s['threshold']
         o['Lab ID'] = ''
@@ -240,14 +219,14 @@ def _make_score_file_vectra(opath,sample,frame,base,fdf):
     score_formated = pd.DataFrame(score_formated)
     score_file = os.path.join(opath,base+'_score_data.txt')
     score_formated.to_csv(score_file,sep="\t",index=False)
-def _make_score_file_mantra(opath,sample,frame,base,fdf):
+def _make_score_file_single(opath,sample,frame,base,fdf):
     ### Do the score file
     score_formated = []
     score_df = fdf.score_data
     for tissue in score_df['tissue'].unique():
         tdf = score_df[score_df['tissue']==tissue]
         if tissue == 'any': tissue = ''
-        if tdf.shape[0] > 1: raise ValueError("cant output multiple stains as Mantra")
+        if tdf.shape[0] > 1: raise ValueError("cant output multiple stains as single")
         o = OrderedDict()
         o['Path'] = opath
         o['Sample Name'] = sample

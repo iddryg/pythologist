@@ -15,8 +15,8 @@ import pythologist.spatial
 import pythologist.read
 import pythologist.write
 
-def read_inForm(path,mpp=0.496,verbose=False,limit=None,type="Vectra"):
-    return InFormCellFrame.read_inForm(path,mpp=mpp,verbose=verbose,limit=limit,type=type)
+def read_inForm(path,mpp=0.496,verbose=False,limit=None):
+    return InFormCellFrame.read_inForm(path,mpp=mpp,verbose=verbose,limit=limit)
 
 def _swap(current,phenotypes,name):
     out = []
@@ -93,14 +93,14 @@ class InFormCellFrame(pd.DataFrame):
         seed.set_mpp(json.loads(h5py.File(path,'r').attrs['mpp']))
         return seed
     @staticmethod
-    def read_inForm(path,mpp=0.496,verbose=False,limit=None,type="Vectra"):
+    def read_inForm(path,mpp=0.496,verbose=False,limit=None):
         """ path is the location of the folds
             """ 
-        return InFormCellFrame(pythologist.read.SampleSet(path,verbose,limit,type=type).cells,mpp=mpp)
-    def write_inForm(self,path,type="Vectra",overwrite=False):
+        return InFormCellFrame(pythologist.read.SampleSet(path,verbose,limit).cells,mpp=mpp)
+    def write_inForm(self,path,overwrite=False):
         """ path is the location of the folds
             """ 
-        return pythologist.write.write_inForm(self,path,type=type,overwrite=overwrite)
+        return pythologist.write.write_inForm(self,path,overwrite=overwrite)
     #### Properties of the InFormCellFrame
     @property
     def samples(self):
@@ -156,6 +156,18 @@ class InFormCellFrame(pd.DataFrame):
         compartments = set()
         for com in self['compartment_areas']: compartments |= set(list(com.keys()))
         return list(compartments)
+    @property
+    def phenotypes(self):
+        phenotypes = set()
+        for pp in self['phenotypes_present'].unique():
+            for phenotype in json.loads(pp): phenotypes.add(phenotype)
+        return list(phenotypes)
+    @property
+    def tissues(self):
+        tissues = set()
+        for tissue_dict in [json.loads(x) for x in self['tissues_present'].unique()]:
+            for t in tissue_dict.keys(): tissues.add(t)
+        return list(tissues)
     @property
     def mpp(self): return self._mpp
 
