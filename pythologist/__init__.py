@@ -165,7 +165,7 @@ class InFormCellFrame(pd.DataFrame):
     @property
     def tissues(self):
         tissues = set()
-        for tissue_dict in [json.loads(x) for x in self['tissues_present'].unique()]:
+        for tissue_dict in [json.loads(x) for x in self['tissues_present'][self['tissues_present'].notnull()].unique()]:
             for t in tissue_dict.keys(): tissues.add(t)
         return list(tissues)
     @property

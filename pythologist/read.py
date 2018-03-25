@@ -10,6 +10,7 @@ class Frame:
         self._seg = pd.read_csv(seg_file,"\t")
         self._scores = self._read_vectra_score_file(score_file)
         self._summary = None
+        
 
         # get the enumeration of the components from a pattern match
         # get the stains and thresholds
