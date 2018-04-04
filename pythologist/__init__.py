@@ -44,6 +44,14 @@ def _swap_tissue(areas,old_name,new_name):
         else:
             v[k] = areas[k]
     return json.dumps(v)
+def _modify_phenotypes(phenotypes_present,target,abbrev):
+    keep = []
+    for phenotype in json.loads(phenotypes_present):
+        if phenotype == target:
+            keep.append(phenotype+' '+abbrev+'+')
+            keep.append(phenotype+' '+abbrev+'-')
+        else: keep.append(phenotype)
+    return json.dumps(keep)
 
 class InFormCellFrame(pd.DataFrame):
     ##_default_mpp = 0.496 # microns per pixel on vetra
@@ -270,6 +278,7 @@ class InFormCellFrame(pd.DataFrame):
         mf2 = self.df.merge(mf,on=['folder','sample','frame','id'],how='left')
         to_change = mf2['new_phenotype'].notna()
         mf2.loc[to_change,'phenotype'] = mf2.loc[to_change,'new_phenotype']
+        mf2['phenotypes_present'] = mf2.apply(lambda x: _modify_phenotypes(x['phenotypes_present'],phenotype,abbrev),1)
         return InFormCellFrame(mf2.drop(columns=['new_phenotype']),mpp=self.mpp)
 
     def kNearestNeighborsCross(cf,phenotypes,k=1,threads=1,dlim=None):
