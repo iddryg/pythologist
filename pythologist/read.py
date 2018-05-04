@@ -159,6 +159,8 @@ class Frame:
         # This order dictionary contains series for each line of the score file
         _scores = OrderedDict()
         sfile = pd.read_csv(score_file,"\t")
+        if 'Tissue Category' not in sfile:
+            raise ValueError('cannot read Tissue Category from '+str(score_file))
         sfile.loc[sfile['Tissue Category'].isna(),'Tissue Category'] = 'any'
         head = sfile.columns
         obs_sample = None
@@ -184,7 +186,7 @@ class SampleSet:
     :param path: sample folder or folder containing sample folders
     :type path: string
     """
-    def __init__(self,path,verbose=False,limit=None):
+    def __init__(self,path,verbose=False,limit=None,sample_index=1):
         base = os.path.abspath(path)
         path = os.path.abspath(path)
         self._path = path
@@ -196,7 +198,7 @@ class SampleSet:
             z += 1
             segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
             if len(segs) == 0: continue
-            s = Sample(p,mydir,verbose)
+            s = Sample(p,mydir,verbose,sample_index)
             self._samples.append(s)
             if limit is not None and z >= limit: break
     @property
@@ -207,13 +209,13 @@ class SampleSet:
         return self._cells
 
 class Sample:
-    def __init__(self,path,mydir,verbose=False):
+    def __init__(self,path,mydir,verbose=False,sample_index=1):
         self._path = path
         self._cells = None
         files = os.listdir(path)
         # Find frames in the same by a filename type we should have
         segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
-        sample_folder = os.path.basename(path)
+        sample_folder = path.split(os.sep)[-1*sample_index] #os.path.basename(path)
         self._frames = OrderedDict()
         snames = set()
         for file in segs:

@@ -129,7 +129,7 @@ class ComponentImage(GenericImage):
         frame_images = OrderedDict()
         with TiffFile(input_tiff) as tif:
             images = tif.asarray()
-            for page in tif:
+            for page in tif.pages:
                 name = None
                 description = None
                 if 'image_description' in page.tags.keys():
@@ -175,11 +175,14 @@ class BinarySegMapImage(GenericImage):
         frame_images = OrderedDict()
         with TiffFile(input_tiff) as tif:
             images = tif.asarray()
-            for page in tif:
+            for page in tif.pages:
                 compartment = None
                 description = None
                 kind = None
-                description = page.tags['image_description'].value.decode('utf-8')
+                if 'image_description' in page.tags:
+                    description = page.tags['image_description'].value #.decode('utf-8')
+                elif 'ImageDescription' in page.tags:
+                    description = page.tags['ImageDescription'].value #.decode('utf-8')
                 tree = ET.ElementTree(ET.fromstring(description)).getroot()
                 kind = tree.tag
                 compartments = [x.text for x in tree if x.tag == 'CompartmentType']

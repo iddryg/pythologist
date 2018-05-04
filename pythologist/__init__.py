@@ -15,8 +15,8 @@ import pythologist.spatial
 import pythologist.read
 import pythologist.write
 
-def read_inForm(path,mpp=0.496,verbose=False,limit=None):
-    return InFormCellFrame.read_inForm(path,mpp=mpp,verbose=verbose,limit=limit)
+def read_inForm(path,mpp=0.496,verbose=False,limit=None,sample_index=1):
+    return InFormCellFrame.read_inForm(path,mpp=mpp,verbose=verbose,limit=limit,sample_index=sample_index)
 
 def _swap(current,phenotypes,name):
     out = []
@@ -101,10 +101,10 @@ class InFormCellFrame(pd.DataFrame):
         seed.set_mpp(json.loads(h5py.File(path,'r').attrs['mpp']))
         return seed
     @staticmethod
-    def read_inForm(path,mpp=0.496,verbose=False,limit=None):
+    def read_inForm(path,mpp=0.496,verbose=False,limit=None,sample_index=1):
         """ path is the location of the folds
             """ 
-        return InFormCellFrame(pythologist.read.SampleSet(path,verbose,limit).cells,mpp=mpp)
+        return InFormCellFrame(pythologist.read.SampleSet(path,verbose,limit,sample_index).cells,mpp=mpp)
     def write_inForm(self,path,overwrite=False):
         """ path is the location of the folds
             """ 
@@ -119,6 +119,7 @@ class InFormCellFrame(pd.DataFrame):
         frame_counts = self.df.groupby(['folder','sample','frame']).\
             count()[['id']].reset_index().rename(columns={'id':'cell_count'})
         frame_data = frame_general.merge(frame_counts,on=['folder','sample','frame'])
+
         frame_data['tissues_present'] = frame_data.apply(lambda x: json.loads(x['tissues_present']),1)
         frame_data['phenotypes_present'] = frame_data.apply(lambda x: json.loads(x['phenotypes_present']),1)
         frame_data['frame_stains'] = frame_data.apply(lambda x: json.loads(x['frame_stains']),1)
@@ -242,21 +243,25 @@ class InFormCellFrame(pd.DataFrame):
             sdict[jstr] = json.dumps(new_sdict)
         df['frame_stains'] = df.apply(lambda x: sdict[x['frame_stains']],1)
         adict = self.tissues_present_to_dict()
+        #print(self['tissues_present'])
+        #print(adict)
         anew = OrderedDict()
         for astr in adict:
             if old_name not in adict[astr]:
                 anew[astr] = astr
                 continue
             if new_name in adict[astr]: raise ValueError("error can't rename a tissue to one thats already there")
-            v = []
+            v = OrderedDict()
             for tissue in adict[astr]:
                 if tissue != old_name:
-                    v.append(tissue)
+                    v[tissue] = adict[astr][tissue]
                     continue
                 else:
-                    v.append(new_name)
+                    v[new_name] = adict[astr][tissue]
             anew[astr] = json.dumps(v)
+        #print(anew)
         df['tissues_present'] = df.apply(lambda x: anew[x['tissues_present']],1)
+        #print(df['tissues_present'])
         return InFormCellFrame(df,mpp=self.mpp)
 
     def collapse_phenotypes(self,input_names,output_name):
