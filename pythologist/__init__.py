@@ -334,8 +334,8 @@ class InFormCellFrame(pd.DataFrame):
             sort_values(['sample','frame','tissue','phenotype'])
         out['tissue_area'] = out['tissue_area'].fillna(0)
         out['tissue_density'] = out.apply(lambda x: np.nan if float(x['tissue_area']/1000000) == 0 else float(x['count'])/(float(x['tissue_area'])/1000000),1)
-        out['tissue_area_um2'] = out.apply(lambda x: (x['tissue_area']/1000000)/(self.mpp*self.mpp),1)
-        out['tissue_density_um2'] = out.apply(lambda x: x['tissue_density']/(self.mpp*self.mpp),1)
+        out['tissue_area_mm2'] = out.apply(lambda x: (x['tissue_area']/1000000)/(self.mpp*self.mpp),1)
+        out['tissue_density_mm2'] = out.apply(lambda x: x['tissue_density']/(self.mpp*self.mpp),1)
         #out['total_area'] = out['total_area'].fillna(0)
         return(out)
     @property
@@ -353,9 +353,9 @@ class InFormCellFrame(pd.DataFrame):
         out = out.merge(v,on=['folder','sample','tissue','phenotype'],how='left')
         out['present_count'] = out['present_count'].fillna(0).astype(int)
         out['std_err'] = out.apply(lambda x: np.nan if x['present_count'] == 0 else x['std_dev']/(math.sqrt(x['present_count'])),1)
-        out['mean_um2'] = out.apply(lambda x: x['mean']/(self.mpp*self.mpp),1)
-        out['std_dev_um2'] = out.apply(lambda x: x['std_dev']/(self.mpp*self.mpp),1)
-        out['std_err_um2'] = out.apply(lambda x: x['std_err']/(self.mpp*self.mpp),1)
+        out['mean_mm2'] = out.apply(lambda x: x['mean']/(self.mpp*self.mpp),1)
+        out['std_dev_mm2'] = out.apply(lambda x: x['std_dev']/(self.mpp*self.mpp),1)
+        out['std_err_mm2'] = out.apply(lambda x: x['std_err']/(self.mpp*self.mpp),1)
         return out
     def merge_phenotype_data(self,replacement_idf,phenotype_old,phenotype_replacement,scale=1):
         #Assumes sample and frame names are unique and there are not multiple folders
