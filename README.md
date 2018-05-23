@@ -76,6 +76,11 @@ test.scored_stain_compartment()
 raw.all_stains
 ```
 
+### Combine two or more phenotypes into one or rename a phenotype
+```python
+collapsed = raw.collapse_phenotypes(['CD68 PDL1+','CD68 PDL1-'],'CD68')
+```
+
 ### Rename a tisssue
 
 Rename *TUMOR* to *Tumor*
