@@ -115,8 +115,12 @@ class InFormCellFrame(pd.DataFrame):
         return None
     @property
     def frame_data(self):
-        frame_general = self.df[['folder','sample','frame','total_area','tissues_present','phenotypes_present','frame_stains']].drop_duplicates(subset=['folder','sample','frame','tissue'])
-        frame_counts = self.df.groupby(['folder','sample','frame']).\
+        data = self.df
+        data['tissues_present'] = data['tissues_present'].astype(str)
+        data['frame_stains'] = data['frame_stains'].astype(str)
+        data['phenotypes_present'] = data['phenotypes_present'].astype(str)
+        frame_general = data[['folder','sample','frame','total_area','tissues_present','phenotypes_present','frame_stains']].drop_duplicates(subset=['folder','sample','frame','tissue'])
+        frame_counts = data.groupby(['folder','sample','frame']).\
             count()[['id']].reset_index().rename(columns={'id':'cell_count'})
         frame_data = frame_general.merge(frame_counts,on=['folder','sample','frame'])
 
