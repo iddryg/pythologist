@@ -8,7 +8,7 @@ with open(path.join(this_folder,'README.md'),encoding='utf-8') as inf:
 
 setup(
   name='pythologist',
-  version='0.1.4',
+  version='0.1.5',
   description='inForm PerkinElmer Reader - Python interface to read outputs of the PerkinElmer inForm software',
   long_description=long_description,
   url='https://github.com/jason-weirather/pythologist',
@@ -23,5 +23,5 @@ setup(
   ],
   keywords='bioinformatics',
   packages=['pythologist'],
-  install_requires=['pandas','numpy','plotnine','scipy','h5py'],
+  install_requires=['pandas>=0.23.0','numpy','plotnine','scipy','h5py'],
 )
