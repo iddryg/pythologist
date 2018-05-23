@@ -204,7 +204,7 @@ class SampleSet:
     @property
     def cells(self): 
         if self._cells is not None: return self._cells
-        v = pd.concat([x.cells for x in self._samples])
+        v = pd.concat([x.cells for x in self._samples],sort=True)
         self._cells = v
         return self._cells
 
@@ -238,6 +238,6 @@ class Sample:
     @property
     def cells(self):
         if self._cells is not None: return self._cells
-        v =  pd.concat([x.cells for x in self._frames.values()])
+        v =  pd.concat([x.cells for x in self._frames.values()],sort=True)
         self._cells = v
         return(v)

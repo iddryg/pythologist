@@ -52,7 +52,7 @@ def _run_through(kd,phenotypes,dlim,k,name):
     for p1,p2 in phenotypes:
             r = _access_tree(kd,name[0],name[1],p1,p2,k=k,dlim=dlim)
             results.append(r)
-    return pd.concat(results)
+    return pd.concat(results,sort=True)
     
 def kNearestNeighborsCross(cf,phenotypes,k=1,threads=1,dlim=None):
     df = cf.df
@@ -72,7 +72,7 @@ def kNearestNeighborsCross(cf,phenotypes,k=1,threads=1,dlim=None):
     v = pool.imap(func,names)
     pool.close()
     pool.join()
-    return pd.concat([x for x in v])
+    return pd.concat([x for x in v],sort=True)
 
 #def _euclidian(pt1,pt2,dlim):
 #    #dist = [(a - b)**2 for a, b in zip(pt1, pt2)]

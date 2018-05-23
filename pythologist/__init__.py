@@ -334,7 +334,7 @@ class InFormCellFrame(pd.DataFrame):
                                    'count':0})
                     empty.append(g)
 
-        out = pd.concat([cnts,pd.DataFrame(empty)])\
+        out = pd.concat([cnts,pd.DataFrame(empty)],sort=True)\
               [['folder','sample','frame','tissue','tissue_area','phenotype','count']].\
             sort_values(['sample','frame','tissue','phenotype'])
         out['tissue_area'] = out['tissue_area'].fillna(0)
@@ -403,7 +403,7 @@ class InFormCellFrame(pd.DataFrame):
         drop1 = current.merge(pd.DataFrame(match),on=['sample','frame','id','index'])[['sample','frame','id','index']]
         keepers2 = replacement_idf.df.merge(pd.DataFrame(alone)[['sample','frame','id']],on=['sample','frame','id'])
         ### We need to set the frame stains in keepers 1 and keepers 2 to what they are in self's frames
-        both = pd.concat([keepers1,keepers2])
+        both = pd.concat([keepers1,keepers2],sort=True)
         rows = []
         for row in both.itertuples(index=False):
             s = pd.Series(row,index=both.columns)
@@ -416,7 +416,7 @@ class InFormCellFrame(pd.DataFrame):
         
         keepers_alt = current[~current['index'].isin(drop1['index'])][['sample','frame','id']]
         mdf = pd.concat([both,
-                        self.df.merge(keepers_alt,on=['sample','frame','id'])])
+                        self.df.merge(keepers_alt,on=['sample','frame','id'])],sort=True)
         phenotypes = json.dumps(list(mdf['phenotype'].dropna().unique()))
         mdf['phenotypes_present'] = phenotypes
         mdf['folder'] = mdf.apply(lambda x: x['sample'],1)
@@ -426,4 +426,4 @@ class InFormCellFrame(pd.DataFrame):
                 frame = mdf[(mdf['sample']==sample)&(mdf['frame']==frame)].copy().sort_values(['x','y']).reset_index(drop=True)
                 frame['id'] = range(1,frame.shape[0]+1,1)
                 organized.append(frame)
-        return InFormCellFrame(pd.concat(organized),mpp=self.mpp)
+        return InFormCellFrame(pd.concat(organized,sort=True),mpp=self.mpp)
