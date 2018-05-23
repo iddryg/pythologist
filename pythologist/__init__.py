@@ -115,12 +115,8 @@ class InFormCellFrame(pd.DataFrame):
         return None
     @property
     def frame_data(self):
-        data = self.df
-        data['tissues_present'] = data['tissues_present'].astype(str)
-        data['frame_stains'] = data['frame_stains'].astype(str)
-        data['phenotypes_present'] = data['phenotypes_present'].astype(str)
-        frame_general = data[['folder','sample','frame','total_area','tissues_present','phenotypes_present','frame_stains']].drop_duplicates(subset=['folder','sample','frame','tissue'])
-        frame_counts = data.groupby(['folder','sample','frame']).\
+        frame_general = self.df.[['folder','sample','frame','total_area','tissues_present','phenotypes_present','frame_stains']].drop_duplicates(subset=['folder','sample','frame','tissue'])
+        frame_counts = self.df.groupby(['folder','sample','frame']).\
             count()[['id']].reset_index().rename(columns={'id':'cell_count'})
         frame_data = frame_general.merge(frame_counts,on=['folder','sample','frame'])
 
@@ -297,10 +293,15 @@ class InFormCellFrame(pd.DataFrame):
         self._mpp = value
     @property
     def frame_counts(self):
-        # Assuming all phenotypes and all tissues could be present in all frames
-        basic = self.df.groupby(['folder','sample','frame','tissue','phenotype']).first().reset_index()[['folder','sample','frame','tissue','phenotype','tissues_present']]
+        data = self.df
+        data['tissues_present'] = data['tissues_present'].astype(str)
+        data['frame_stains'] = data['frame_stains'].astype(str)
+        data['phenotypes_present'] = data['phenotypes_present'].astype(str)
 
-        cnts = self.df.groupby(['folder','sample','frame','tissue','phenotype']).count().\
+        # Assuming all phenotypes and all tissues could be present in all frames
+        basic = data.groupby(['folder','sample','frame','tissue','phenotype']).first().reset_index()[['folder','sample','frame','tissue','phenotype','tissues_present']]
+
+        cnts = data.groupby(['folder','sample','frame','tissue','phenotype']).count().\
              reset_index()[['folder','sample','frame','tissue','phenotype','id']].\
              rename(columns ={'id':'count'})
         cnts = cnts.merge(basic,on=['folder','sample','frame','tissue','phenotype'])
