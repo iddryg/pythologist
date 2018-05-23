@@ -23,5 +23,5 @@ setup(
   ],
   keywords='bioinformatics',
   packages=['pythologist'],
-  install_requires=['pandas'],
+  install_requires=['pandas','numpy','plotnine','scipy','h5py'],
 )
