@@ -2,6 +2,12 @@
 
 Read files from inForm software by PerkinElmer.
 
+## Install
+
+```
+$ pip install pythologist
+```
+
 ## Common tasks
 
 ### Reading in data
