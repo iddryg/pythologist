@@ -138,7 +138,7 @@ either copy the folder in your file explorer or from command line i.e.
 
 `$ cp -r myfolder myfolder2`
 
-2. write your new data into the file
+2. write your new data into the folder
 
 ```python
 CD68_CD163pos.write_inForm('myfolder2',overwrite=True)
