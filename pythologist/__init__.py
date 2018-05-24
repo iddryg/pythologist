@@ -15,8 +15,8 @@ import pythologist.spatial
 import pythologist.read
 import pythologist.write
 
-def read_inForm(path,mpp=0.496,verbose=False,limit=None,sample_index=1):
-    return InFormCellFrame.read_inForm(path,mpp=mpp,verbose=verbose,limit=limit,sample_index=sample_index)
+def read_inForm(path,mpp=0.496,verbose=False,limit=None,sample_index=1,folder_as_sample=False):
+    return InFormCellFrame.read_inForm(path,mpp=mpp,verbose=verbose,limit=limit,sample_index=sample_index,folder_as_sample=folder_as_sample)
 
 def _swap(current,phenotypes,name):
     out = []
@@ -63,6 +63,7 @@ class InFormCellFrame(pd.DataFrame):
     def __init__(self,*args,**kw):
         # hide mpp for now when we send to parent since it doesn't use that argument
         kwcopy = kw.copy()
+        if 'folder_as_sample' in kwcopy: del kwcopy['folder_as_sample']
         if 'mpp' in kwcopy: del kwcopy['mpp']
         super(InFormCellFrame,self).__init__(*args,**kwcopy)
         if 'mpp' in kw: self._mpp = kw['mpp']
@@ -71,6 +72,9 @@ class InFormCellFrame(pd.DataFrame):
         self['frame_stains'] = pd.Series(self['frame_stains'],dtype="category")
         self['tissues_present'] = pd.Series(self['tissues_present'],dtype="category")
         self['phenotypes_present'] = pd.Series(self['phenotypes_present'],dtype="category")
+        if 'folder_as_sample' in kw and kw['folder_as_sample']:
+            # fix the name
+            self['sample'] = self['folder']
     def __repr__(self): return 'pig'
     def _repr_html_(self): return pd.DataFrame(self)._repr_html_()
     def copy(self):
@@ -101,10 +105,10 @@ class InFormCellFrame(pd.DataFrame):
         seed.set_mpp(json.loads(h5py.File(path,'r').attrs['mpp']))
         return seed
     @staticmethod
-    def read_inForm(path,mpp=0.496,verbose=False,limit=None,sample_index=1):
+    def read_inForm(path,mpp=0.496,verbose=False,limit=None,sample_index=1,folder_as_sample=False):
         """ path is the location of the folds
             """ 
-        return InFormCellFrame(pythologist.read.SampleSet(path,verbose,limit,sample_index).cells,mpp=mpp)
+        return InFormCellFrame(pythologist.read.SampleSet(path,verbose,limit,sample_index).cells,mpp=mpp,folder_as_sample=folder_as_sample)
     def write_inForm(self,path,overwrite=False):
         """ path is the location of the folds
             """ 
