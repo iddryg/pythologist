@@ -27,7 +27,7 @@ Directory names are infered from the last folder name.  If this is not actually 
 import pythologist
 
 fname = 'data directory'
-raw = pythologist.read_inForm(fname,sample_index=1)
+raw = pythologist.read_inForm(fname,sample_index=2)
 ```
 
 *Use the folder path as the sample name*
@@ -36,13 +36,7 @@ raw = pythologist.read_inForm(fname,sample_index=1)
 import pythologist
 
 fname = 'data directory'
-raw = pythologist.read_inForm(fname)
-# extract a copy of the data frame
-temp = raw.df
-# fix the name
-temp['sample'] = temp['folder']
-# recreate an InFormCellFrame and set your microns per pixel attribute
-raw = pythologist.InFormCellFrame(temp,mpp=raw.mpp)
+raw = pythologist.read_inForm(fname,folder_as_sample=True)
 ```
 
 ### Quality check samples
