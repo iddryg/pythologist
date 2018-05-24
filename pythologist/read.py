@@ -12,6 +12,10 @@ class Frame:
         self._summary = None
         
 
+        ## check if Phenotype is missing, and set it to null if it is
+        if 'Phenotype' not in self._seg:
+            self._seg['Phenotype'] = 'unspecified'
+
         # get the enumeration of the components from a pattern match
         # get the stains and thresholds
         self._stains = OrderedDict() #read into a per-tissue structure
@@ -128,7 +132,8 @@ class Frame:
         df = self._summary.copy()
         mega = df.apply(lambda x: np.nan if float(x['Cell Density (per megapixel)']) == 0 else int(1000000*float(x['Total Cells'])/float(x['Cell Density (per megapixel)'])),1) # cell area in mega pixels
         df['Summary Area Megapixels'] = mega
-
+        # in case phenotype wasn't specified
+        if 'Phenotype' not in df.columns: df['Phenotype'] = 'unspecified'
         # some summary files don't have tissue category
         if 'Tissue Category' in df.columns:
             keepers = ['Tissue Category','Phenotype','Summary Area Megapixels']
