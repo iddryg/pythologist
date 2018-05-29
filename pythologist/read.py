@@ -5,7 +5,8 @@ import numpy as np
 
 _float_decimals = 6
 class Frame:
-    def __init__(self,path,mydir,sample,frame,seg_file,score_file,summary_file):
+    def __init__(self,path,mydir,sample,frame,seg_file,score_file,summary_file,verbose=False):
+        if verbose: sys.stderr.write("FRAME: "+str(seg_file)+"\n")
         ### Read in the files here and create a dataframe
         self._seg = pd.read_csv(seg_file,"\t")
         self._scores = self._read_vectra_score_file(score_file)
@@ -45,12 +46,11 @@ class Frame:
         ##### FINISHED READING IN THINGS NOW OUTPUT THINGS ##########
         keepers = ['Cell ID','Phenotype',
             'Cell X Position',
-            'Cell Y Position',
-            'Entire Cell Area (pixels)']
+            'Cell Y Position']
 
         # Some older versions don't have tissue category
         if 'Tissue Category' in self._seg.columns: keepers.append('Tissue Category')
-
+        if 'Entire Cell Area (pixels)' in self._seg.columns: keepers.append('Entire Cell Area (pixels)')
 
         keepers2 = [x for x in self._seg.columns if re.search('Entire Cell.*\s+\S+ \(Normalized Counts, Total Weighting\)$',x)]
         keepers3 = [x for x in self._seg.columns if re.search('\s+\S+ \(Normalized Counts, Total Weighting\)$',x) and x not in keepers2]
@@ -84,10 +84,11 @@ class Frame:
                 if row[0] not in compartment_areas: compartment_areas[row[0]] = OrderedDict()
                 compartment_areas[row[0]][compartment] = round(row[2],_float_decimals)
         v = self._seg[keepers].copy()
+        if 'Entire Cell Area (pixels)' not in v.columns: v['Entire Cell Area (pixels)'] = np.nan #incase not set
         if 'Tissue Category' not in v.columns: v['Tissue Category'] = 'any'
         v['compartment_areas'] = v.apply(lambda x: compartment_areas[x['Cell ID']],1)
         v['compartment_values'] = v.apply(lambda x: compartments[x['Cell ID']],1)
-        v['entire_cell_values'] = v.apply(lambda x: entire[x['Cell ID']],1)
+        v['entire_cell_values'] = v.apply(lambda x: np.nan if x['Cell ID'] not in entire else entire[x['Cell ID']],1) #sometimes not present
         #v = self._seg[keepers+keepers2]
         v = v.rename(columns = {'Cell ID':'id',
             'Entire Cell Area (pixels)':'cell_area',
@@ -203,13 +204,14 @@ class SampleSet:
             z += 1
             segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
             if len(segs) == 0: continue
+            if verbose: sys.stderr.write("SAMPLE: "+str(p)+"\n")
             s = Sample(p,mydir,verbose,sample_index)
             self._samples.append(s)
             if limit is not None and z >= limit: break
     @property
     def cells(self): 
         if self._cells is not None: return self._cells
-        v = pd.concat([x.cells for x in self._samples],sort=True)
+        v = pd.concat([x.cells for x in self._samples])
         self._cells = v
         return self._cells
 
@@ -236,13 +238,13 @@ class Sample:
                 summary = None
             if not os.path.exists(score):
                 raise ValueError('Missing score file '+score)
-            self._frames[frame] = Frame(path,mydir,sample,frame,data,score,summary)
+            self._frames[frame] = Frame(path,mydir,sample,frame,data,score,summary,verbose)
         if len(snames) > 1:
             raise ValueError('Error multiple samples in folder '+path)
         self._sample_name = list(snames)[0]        
     @property
     def cells(self):
         if self._cells is not None: return self._cells
-        v =  pd.concat([x.cells for x in self._frames.values()],sort=True)
+        v =  pd.concat([x.cells for x in self._frames.values()])
         self._cells = v
         return(v)
