@@ -2,6 +2,14 @@
 
 Read files from inForm software by PerkinElmer.
 
+## Docker quickstart
+
+To start a jupyter notebook in the current working directory on port 8885 you can use the following docker command.
+
+```
+$ docker run --rm -p 8885:8885 -v $(pwd):/home/jovyan vacation/pythologist:latest jupyter notebook --port 8885
+```
+
 ## Install
 
 ```

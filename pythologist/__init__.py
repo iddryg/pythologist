@@ -311,7 +311,7 @@ class InFormCellFrame(pd.DataFrame):
         cnts = cnts.merge(basic,on=['folder','sample','frame','tissue','phenotype'])
         cnts['tissue_area'] = cnts.apply(lambda x: json.loads(x['tissues_present'])[x['tissue']],1)
         # For each frame
-        df = pd.DataFrame(self)[['folder','sample','frame','phenotypes_present','tissues_present']].groupby(['folder','sample','frame']).first().reset_index()
+        df = data[['folder','sample','frame','phenotypes_present','tissues_present']].groupby(['folder','sample','frame']).first().reset_index()
         empty = []
         for frame in df.itertuples(index=False):
             s = pd.Series(frame,df.columns)
