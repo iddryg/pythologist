@@ -78,7 +78,7 @@ class InFormCellFrame(pd.DataFrame):
     def __repr__(self): return 'pig'
     def _repr_html_(self): return pd.DataFrame(self)._repr_html_()
     def copy(self):
-        return InFormCellFrame(pd.DataFrame(self).copy(),mpp=self.mpp)
+        return InFormCellFrame(self.df.copy(),mpp=self.mpp)
     def to_hdf(self,path):
         string_version = self.copy()
         string_version['compartment_values'] = string_version.apply(lambda x: 
@@ -186,7 +186,11 @@ class InFormCellFrame(pd.DataFrame):
 
     @property
     def df(self):
-        return pd.DataFrame(self).copy()
+        output = pd.DataFrame(self).copy()
+        output['frame_stains'] = [x for x in output['frame_stains']]
+        output['tissues_present'] = [x for x in output['tissues_present']]
+        output['phenotypes_present'] = [x for x in output['phenotypes_present']]
+        return output
 
     ### Drop a stain
     def drop_stain(self,stain):
@@ -298,9 +302,9 @@ class InFormCellFrame(pd.DataFrame):
     @property
     def frame_counts(self):
         data = self.df
-        data['tissues_present'] = data['tissues_present'].astype(str)
-        data['frame_stains'] = data['frame_stains'].astype(str)
-        data['phenotypes_present'] = data['phenotypes_present'].astype(str)
+        data['tissues_present'] = pd.Series(data['tissues_present']).astype(str)
+        data['frame_stains'] = pd.Series(data['frame_stains']).astype(str)
+        data['phenotypes_present'] = pd.SEries(data['phenotypes_present']).astype(str)
 
         # Assuming all phenotypes and all tissues could be present in all frames
         basic = data.groupby(['folder','sample','frame','tissue','phenotype']).first().reset_index()[['folder','sample','frame','tissue','phenotype','tissues_present']]
