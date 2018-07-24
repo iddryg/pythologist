@@ -174,7 +174,7 @@ class InFormCellFrame(pd.DataFrame):
         phenotypes = set()
         for pp in self['phenotypes_present'].unique():
             for phenotype in json.loads(pp): phenotypes.add(phenotype)
-        return list(phenotypes)
+        return list(sorted(phenotypes))
     @property
     def tissues(self):
         tissues = set()
@@ -192,6 +192,20 @@ class InFormCellFrame(pd.DataFrame):
         output['phenotypes_present'] = [x for x in output['phenotypes_present']]
         return output
 
+    def refresh_phenotypes_present(self):
+        refreshed = self.df
+        redo = refreshed.groupby(['folder','sample','frame']).\
+            apply(lambda x: json.dumps(sorted(list(x['phenotype'].dropna().unique())))).reset_index().\
+            rename(columns={0:'new_name'})
+        refreshed = refreshed.merge(redo,on=['folder','sample','frame'])
+        refreshed['phenotypes_present'] = refreshed['new_name']
+        self['phenotypes_present'] = pd.Series(self['phenotypes_present'],dtype='category')
+        return InFormCellFrame(refreshed.drop(columns=['new_name']),mpp=self.mpp)
+    def unify_phenotypes_present(self):
+        unified = self.df
+        unified['phenotypes_present'] = json.dumps(self.refresh_phenotypes_present().phenotypes)
+        unified['phenotypes_present'] = pd.Series(unified['phenotypes_present'],dtype='category')
+        return InFormCellFrame(unified,mpp=self.mpp)
     ### Drop a stain
     def drop_stain(self,stain):
         fsd = self.frame_stains_to_dict()
@@ -304,7 +318,7 @@ class InFormCellFrame(pd.DataFrame):
         data = self.df
         data['tissues_present'] = pd.Series(data['tissues_present']).astype(str)
         data['frame_stains'] = pd.Series(data['frame_stains']).astype(str)
-        data['phenotypes_present'] = pd.SEries(data['phenotypes_present']).astype(str)
+        data['phenotypes_present'] = pd.Series(data['phenotypes_present']).astype(str)
 
         # Assuming all phenotypes and all tissues could be present in all frames
         basic = data.groupby(['folder','sample','frame','tissue','phenotype']).first().reset_index()[['folder','sample','frame','tissue','phenotype','tissues_present']]
