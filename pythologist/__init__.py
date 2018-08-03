@@ -15,35 +15,45 @@ import pythologist.spatial
 import pythologist.read
 import pythologist.write
 
-def read_inForm(path,mpp=0.496,verbose=False,limit=None,sample_index=1,folder_as_sample=False):
-    return InFormCellFrame.read_inForm(path,mpp=mpp,verbose=verbose,limit=limit,sample_index=sample_index,folder_as_sample=folder_as_sample)
+def read_inForm(*positional,**keywords):
+    # See the InFormCellFrame for docs
+    return InFormCellFrame.read_inForm(*positional,**keywords)
 
-def _swap(current,phenotypes,name):
-    out = []
-    for p in json.loads(current):
-        if not p in phenotypes:
-            out.append(p)
-            continue
-        out.append(name)
-    return json.dumps(out)
-def _add(current,phenotype,name):
-    out = []
-    for p in json.loads(current):
-        if p != phenotype:
-            out.append(p)
-            continue
-        out.append(phenotype+" "+name+"+")
-        out.append(phenotype+" "+name+"-")
-    return json.dumps(out)
-def _swap_tissue(areas,old_name,new_name):
-    areas = json.loads(areas)
-    v = {}
-    for k in list(areas.keys()):
-        if k == old_name:
-            v[new_name] = areas[k]
-        else:
-            v[k] = areas[k]
-    return json.dumps(v)
+def _collapse_frame_stains(current_tissue,frame_stains_string,input_tissues,output_tissue):
+    # Given one or more tissue names as an input, combine these tissues into a single tissue
+    #     so in addition to renaming you are also combining the areas of the different tissues.
+    #     this helper function collapses the frame stains and will preferentially keep the frame
+    #     stain info stored under the current phenotype assignment for the cell
+    # Input: current_tissue = current tissue assignment for a cell
+    #        frame_stains_string = json string of frame stains for the cell
+    #        input_tissues = list of tissues to combine
+    #        output_tissue = name of tissue after combining
+    # Output: frame_stain for the cell json dumped into a string (what we keep on the dataframe)
+    frame_stains = json.loads(frame_stains_string)
+    keepers = [x for x in frame_stains.keys() if x not in input_tissues]
+    newdata = dict()
+    nonkeepers = [x for x in frame_stains.keys() if x in input_tissues]
+    nonkeeper = []
+    # we can only keep at most one nonkeeper ... preferably the on we are scoring on thats defined as a phenotype
+    if len(nonkeepers) > 1: nonkeeper = [nonkeepers[0]]
+    if current_tissue in nonkeepers: nonkeeper = [current_tissue]
+    newdata = dict()
+    for tissue in nonkeeper:
+        newdata[output_tissue] = frame_stains[tissue]
+    for tissue in keepers:
+        newdata[tissue] = frame_stains[tissue]
+    return(json.dumps(newdata))
+
+def _collapse_tissues_present(tissues_present_string,input_tissues,output_tissue):
+    tissues_present = json.loads(tissues_present_string)
+    keepers = [x for x in tissues_present.keys() if x not in input_tissues]
+    newdata = dict()
+    for tissue in [x for x in tissues_present.keys() if x in input_tissues]:
+        if output_tissue not in newdata: newdata[output_tissue] = 0
+        newdata[output_tissue] += tissues_present[tissue]
+    for keeper in keepers: newdata[keeper] = tissues_present[keeper]
+    return(json.dumps(newdata))
+
 def _modify_phenotypes(phenotypes_present,target,abbrev):
     keep = []
     for phenotype in json.loads(phenotypes_present):
@@ -69,15 +79,13 @@ class InFormCellFrame(pd.DataFrame):
         if 'mpp' in kw: self._mpp = kw['mpp']
         else: self._mpp = None
         #else: self._mpp = InFormCellFrame._default_mpp 
-        self['frame_stains'] = pd.Series(self['frame_stains'],dtype="category")
-        self['tissues_present'] = pd.Series(self['tissues_present'],dtype="category")
-        self['phenotypes_present'] = pd.Series(self['phenotypes_present'],dtype="category")
         if 'folder_as_sample' in kw and kw['folder_as_sample']:
             # fix the name
             self['sample'] = self['folder']
     def __repr__(self): return 'pig'
     def _repr_html_(self): return pd.DataFrame(self)._repr_html_()
     def copy(self):
+        # Return a deep copy of the InFormCellFrame
         return InFormCellFrame(self.df.copy(),mpp=self.mpp)
     def to_hdf(self,path):
         string_version = self.copy()
@@ -105,7 +113,12 @@ class InFormCellFrame(pd.DataFrame):
         seed.set_mpp(json.loads(h5py.File(path,'r').attrs['mpp']))
         return seed
     @staticmethod
-    def read_inForm(path,mpp=0.496,verbose=False,limit=None,sample_index=1,folder_as_sample=False):
+    def read_inForm(path,
+                    mpp=0.496,
+                    verbose=False,
+                    limit=None,
+                    sample_index=1,
+                    folder_as_sample=False):
         """ path is the location of the folds
             """ 
         return InFormCellFrame(pythologist.read.SampleSet(path,verbose,limit,sample_index).cells,mpp=mpp,folder_as_sample=folder_as_sample)
@@ -141,12 +154,12 @@ class InFormCellFrame(pd.DataFrame):
         return df
     def frame_stains_to_dict(self):
         s = OrderedDict()
-        for stain_str in self['frame_stains'].cat.categories:
+        for stain_str in self['frame_stains'].unique():
             s[stain_str] = json.loads(stain_str)
         return s
     def tissues_present_to_dict(self):
         s = OrderedDict()
-        for area_str in self['tissues_present'].cat.categories:
+        for area_str in self['tissues_present'].unique():
             s[area_str] = json.loads(area_str)
         return s
     @property
@@ -199,12 +212,10 @@ class InFormCellFrame(pd.DataFrame):
             rename(columns={0:'new_name'})
         refreshed = refreshed.merge(redo,on=['folder','sample','frame'])
         refreshed['phenotypes_present'] = refreshed['new_name']
-        self['phenotypes_present'] = pd.Series(self['phenotypes_present'],dtype='category')
         return InFormCellFrame(refreshed.drop(columns=['new_name']),mpp=self.mpp)
     def unify_phenotypes_present(self):
         unified = self.df
         unified['phenotypes_present'] = json.dumps(self.refresh_phenotypes_present().phenotypes)
-        unified['phenotypes_present'] = pd.Series(unified['phenotypes_present'],dtype='category')
         return InFormCellFrame(unified,mpp=self.mpp)
     ### Drop a stain
     def drop_stain(self,stain):
@@ -242,7 +253,62 @@ class InFormCellFrame(pd.DataFrame):
             rows.append(s)
         return InFormCellFrame(pd.DataFrame(rows),mpp=self.mpp)
 
+    def percent_positive_frames(self,numerator_phenotypes,denominator_phenotypes):
+        c1 = self.frame_counts
+        c1 = c1[['folder','sample','frame','tissue','phenotype','count']]
+        c1 = c1[c1['phenotype'].isin(numerator_phenotypes)].\
+            groupby(['folder','sample','frame','tissue']).apply(sum)[['count']].reset_index()
+        #print(c1.shape)
+        t1 = self.frame_counts
+        t1 = t1[['folder','sample','frame','tissue','phenotype','count']]
+        t1 = t1[t1['phenotype'].isin(denominator_phenotypes)].\
+            groupby(['folder','sample','frame','tissue']).apply(sum)[['count']].reset_index().rename(columns={'count':'total'})
+        #print(t1.shape)
 
+        ct = c1.merge(t1,on=['folder','sample','frame','tissue'])
+        ct['fraction'] = ct.apply(lambda x: np.nan if x['total']==0 else x['count']/x['total'],1)
+        ct['percent'] = ct.apply(lambda x:x['fraction']*100,1)
+        return ct
+
+    def percent_positive_samples(self,numerator_phenotypes,denominator_phenotypes):
+        # Oututs on frames that have information
+        #    frame_count
+        #    measured_frame_count (non-na frames)
+        # Outputs results averaged across frames for the
+        #    mean_fraction
+        #    stdev_fraction
+        #    stderr_fraction
+        #    mean_percent
+        #    stdev_percent
+        #    stderr_percent
+        # Outputs that are tallied across all frames without averaging
+        #    cumulative_numerator
+        #    cumulative_denominator
+        #    cumulative_fraction
+        #    cumulative_percent
+        ct = self.percent_positive_frames(numerator_phenotypes,denominator_phenotypes)
+        st = ct.groupby(['folder','sample','tissue']).\
+            apply(lambda x:
+             pd.Series(OrderedDict({
+                        'frame_count':len(x['total']),
+                        'measured_frame_count':len([y for y in x['total'] if y > 0]),
+                        'mean_fraction':np.mean(x['fraction']),
+                        'stdev_fraction':np.std(x['fraction']),
+                        'stderr_fraction': np.nan if len([y for y in x['total'] if y > 0]) == 0 else np.std(x['fraction'])/math.sqrt(len([y for y in x['total'] if y > 0])),
+                        'mean_percent':np.mean(x['percent']),
+                        'stdev_percent':np.std(x['percent']),
+                        'stderr_percent': np.nan if len([y for y in x['total'] if y > 0]) == 0 else np.std(x['percent'])/math.sqrt(len([y for y in x['total'] if y > 0])),
+                        'cumulative_numerator': np.sum(x['count']),
+                        'cumulative_denominator': np.sum(x['total']),
+                        'cumulative_fraction': np.sum(x['count'])/np.sum(x['total']),
+                        'cumulative_percent': 100*np.sum(x['count'])/np.sum(x['total'])
+                       }))
+        ).reset_index()
+        st['frame_count'] = st['frame_count'].astype(int)
+        st['measured_frame_count'] = st['measured_frame_count'].astype(int)
+        st['cumulative_numerator'] = st['cumulative_numerator'].astype(int)
+        st['cumulative_denominator'] = st['cumulative_denominator'].astype(int)
+        return st
 
 
     #### Operations to QC an InFormCellFrame
@@ -285,7 +351,15 @@ class InFormCellFrame(pd.DataFrame):
         df['tissues_present'] = df.apply(lambda x: anew[x['tissues_present']],1)
         #print(df['tissues_present'])
         return InFormCellFrame(df,mpp=self.mpp)
-
+    def collapse_tissues(self,input_names,output_name):
+        # First sum together tissues present areas
+        data = self.df
+        data['tissues_present'] = data.apply(lambda x: _collapse_tissues_present(x['tissues_present'],input_names,output_name),1)
+        # Then rename the frame_stains to the new output name, and throw an error if there are more than one score present
+        data['frame_stains'] = data.apply(lambda x: _collapse_frame_stains(x['tissue'],x['frame_stains'],input_names,output_name),1)
+        # Then rename the tissue
+        data['tissue'] = data.apply(lambda x: output_name if x['tissue'] in input_names else x['tissue'],1)
+        return InFormCellFrame(data,mpp=self.mpp)
     def collapse_phenotypes(self,input_names,output_name):
         """ Collapse a list of phenotypes into another name, also removes thresholding """
         v = self.df.copy()
@@ -373,15 +447,16 @@ class InFormCellFrame(pd.DataFrame):
 
         v = fc[fc['tissue_density'].notnull()].groupby(['folder','sample','tissue','phenotype']).\
             count().reset_index()[['folder','sample','tissue','phenotype','tissue_density']].\
-            rename(columns={'tissue_density':'present_count'})
+            rename(columns={'tissue_density':'frames_measured_count'})
         basic = fc.groupby(['folder','sample','tissue','phenotype']).first().reset_index()[['folder','sample','tissue','phenotype']]
         mean = fc.groupby(['folder','sample','tissue','phenotype']).mean().reset_index()[['folder','sample','tissue','phenotype','tissue_density']].rename(columns={'tissue_density':'mean'})
         std = fc.groupby(['folder','sample','tissue','phenotype']).std().reset_index()[['folder','sample','tissue','phenotype','tissue_density']].rename(columns={'tissue_density':'std_dev'})
         cnt =  fc.groupby(['folder','sample','tissue','phenotype']).count().reset_index()[['folder','sample','tissue','phenotype','count']].rename(columns={'count':'frame_count'})
-        out = basic.merge(mean,on=['folder','sample','tissue','phenotype']).merge(std,on=['folder','sample','tissue','phenotype']).merge(cnt,on=['folder','sample','tissue','phenotype'])
+        total =  fc.groupby(['folder','sample','tissue','phenotype']).sum().reset_index()[['folder','sample','tissue','phenotype','count']].rename(columns={'count':'count'})
+        out = basic.merge(mean,on=['folder','sample','tissue','phenotype']).merge(std,on=['folder','sample','tissue','phenotype']).merge(cnt,on=['folder','sample','tissue','phenotype']).merge(total,on=['folder','sample','tissue','phenotype'])
         out = out.merge(v,on=['folder','sample','tissue','phenotype'],how='left')
-        out['present_count'] = out['present_count'].fillna(0).astype(int)
-        out['std_err'] = out.apply(lambda x: np.nan if x['present_count'] == 0 else x['std_dev']/(math.sqrt(x['present_count'])),1)
+        out['frames_measured_count'] = out['frames_measured_count'].fillna(0).astype(int)
+        out['std_err'] = out.apply(lambda x: np.nan if x['frames_measured_count'] == 0 else x['std_dev']/(math.sqrt(x['frames_measured_count'])),1)
         out['mean_mm2'] = out.apply(lambda x: x['mean']/(self.mpp*self.mpp),1)
         out['std_dev_mm2'] = out.apply(lambda x: x['std_dev']/(self.mpp*self.mpp),1)
         out['std_err_mm2'] = out.apply(lambda x: x['std_err']/(self.mpp*self.mpp),1)

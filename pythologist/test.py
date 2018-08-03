@@ -78,15 +78,15 @@ class InFormCellFrameTest:
         count = 0
         result = "PASS"
         about = [] 
-        frames = self._icf.groupby(['folder','sample','frame']).apply(lambda x: x['tissues_present'].unique())
+        frames = self._icf.groupby(['folder','sample','frame']).apply(lambda x: list(x['tissues_present'].unique()))
         all_tissues = set(self._icf.tissues)
         for frame in frames.index:
-            for x in frames[frame][frames[frame].isna()]:
-                total += 1
-                count += 1
-                result = "FAIL"
-                about.append(str(frame)+" no tissue data")
-            for entry in [list(json.loads(x).keys()) for x in frames[frame][frames[frame].notnull()]]:
+            #for x in frames[frame][frames[frame].isna()]:
+            #    total += 1
+            #    count += 1
+            #    result = "FAIL"
+            #    about.append(str(frame)+" no tissue data")
+            for entry in [list(json.loads(x).keys()) for x in frames[frame]]:
                 total += 1
                 if len(all_tissues-set(entry)) > 0:
                     count += 1

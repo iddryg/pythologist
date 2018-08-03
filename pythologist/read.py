@@ -5,7 +5,7 @@ import numpy as np
 
 _float_decimals = 6
 class Frame:
-    def __init__(self,path,mydir,sample,frame,seg_file,score_file,summary_file,verbose=False):
+    def __init__(self,path,mydir,sample,frame,seg_file,score_file,summary_file,binary_seg_maps,verbose=False):
         if verbose: sys.stderr.write("FRAME: "+str(seg_file)+"\n")
         ### Read in the files here and create a dataframe
         self._seg = pd.read_csv(seg_file,"\t")
@@ -104,6 +104,9 @@ class Frame:
 
 
         if self._summary is not None:
+            if 'Phenotype' not in self._summary.columns: 
+                if verbose: sys.stderr.write("missing phenotype column\n")
+                self._summary['Phenotype'] = 'unspecified'
             #### Read our areas from the summary #####
             
             myareas = OrderedDict(self._get_vectra_frame_areas())
@@ -112,6 +115,7 @@ class Frame:
             myarea2 = OrderedDict()
             for tissue in tissues_present:
                 myarea2[tissue] = int(myareas[tissue])
+
 
             # Use 'All' to read total area by default eventually can default to mask
             v['total_area'] = v.apply(lambda x: myareas['any'] if 'All' not in myareas else myareas['All'],1)
@@ -141,6 +145,7 @@ class Frame:
         else:
             keepers = ['Phenotype','Summary Area Megapixels']
         df = df[keepers].copy()
+
         # Set our default tissue name to "any" if none exists
         if 'Tissue Category' not in df.columns: df['Tissue Category'] = 'any'
         df = df.rename(columns={'Tissue Category':'tissue',
@@ -148,7 +153,9 @@ class Frame:
                             'Summary Area Megapixels':'tissue_area'
                            })
         df = df[df['tissue_area'].notna()]
-        return df.loc[(df['phenotype']=='All'),['tissue','tissue_area']].set_index('tissue')['tissue_area'].to_dict()
+        if df[df['phenotype']=='All'].shape[0] > 0:
+            return df.loc[(df['phenotype']=='All'),['tissue','tissue_area']].set_index('tissue')['tissue_area'].to_dict()
+        return df.loc[(df['phenotype']=='unspecified'),['tissue','tissue_area']].set_index('tissue')['tissue_area'].to_dict()
 
     def _get_multi_threshold(self,tissue,stain):
         v = [x for x in self._scores[tissue].keys() if re.search(' Threshold$',x)]
@@ -229,6 +236,7 @@ class Sample:
             m = re.match('(.*)cell_seg_data.txt$',file)
             score = os.path.join(path,m.group(1)+'score_data.txt')
             summary = os.path.join(path,m.group(1)+'cell_seg_data_summary.txt')
+            binary_seg_maps = os.path.join(path,m.group(1)+'binary_seg_maps.tif')
             sample = sample_folder
             snames.add(sample)
             frame = m.group(1).rstrip('_')
@@ -238,7 +246,7 @@ class Sample:
                 summary = None
             if not os.path.exists(score):
                 raise ValueError('Missing score file '+score)
-            self._frames[frame] = Frame(path,mydir,sample,frame,data,score,summary,verbose)
+            self._frames[frame] = Frame(path,mydir,sample,frame,data,score,summary,binary_seg_maps,verbose)
         if len(snames) > 1:
             raise ValueError('Error multiple samples in folder '+path)
         self._sample_name = list(snames)[0]        
