@@ -364,6 +364,24 @@ class InFormCellFrame(pd.DataFrame):
         """ Collapse a list of phenotypes into another name, also removes thresholding """
         v = self.df.copy()
         v.loc[v['phenotype'].isin(input_names),'phenotype'] = output_name
+        # Now fix the 'phenotypes present'
+        def _fix_phenotypes_present(input_names,output_name,phenotypes_present):
+            replacements = []
+            for i,x in enumerate(phenotypes_present):
+                x = json.loads(x)
+                # now for each of the phenotypes in the array fix 
+                new_phenotypes = []
+                for phenotype in x:
+                    if phenotype in input_names:
+                        if output_name not in new_phenotypes: # don't added it twice
+                            new_phenotypes.append(output_name)
+                    else:
+                        new_phenotypes.append(phenotype)
+                x = json.dumps(new_phenotypes)
+                replacements.append(x)
+            return replacements
+        new_phenotypes_present = _fix_phenotypes_present(input_names,output_name,v['phenotypes_present'])
+        v['phenotypes_present'] = new_phenotypes_present
         return InFormCellFrame(v,mpp=self.mpp)
     def threshold(self,stain,phenotype,abbrev):
         pheno = self.df[self['phenotype']==phenotype]
