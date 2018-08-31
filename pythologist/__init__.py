@@ -89,6 +89,8 @@ class InFormCellFrame(pd.DataFrame):
         return InFormCellFrame(self.df.copy(),mpp=self.mpp)
     def to_hdf(self,path):
         string_version = self.copy()
+        string_version['compartment_areas'] = string_version.apply(lambda x: 
+            json.dumps(x['compartment_areas']),1)
         string_version['compartment_values'] = string_version.apply(lambda x: 
             json.dumps(x['compartment_values']),1)
         string_version['entire_cell_values'] = string_version.apply(lambda x: 
@@ -109,6 +111,7 @@ class InFormCellFrame(pd.DataFrame):
         df = pd.read_hdf(path,'self')
         df['compartment_values'] = df.apply(lambda x: json.loads(x['compartment_values']),1)
         df['entire_cell_values'] = df.apply(lambda x: json.loads(x['entire_cell_values']),1)
+        df['compartment_areas'] = df.apply(lambda x: json.loads(x['compartment_areas']),1)
         seed = cls(df)
         seed.set_mpp(json.loads(h5py.File(path,'r').attrs['mpp']))
         return seed

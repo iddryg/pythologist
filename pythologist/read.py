@@ -5,13 +5,15 @@ import numpy as np
 
 _float_decimals = 6
 class Frame:
-    def __init__(self,path,mydir,sample,frame,seg_file,score_file,summary_file,binary_seg_maps,verbose=False):
+    def __init__(self,path,mydir,sample,frame,seg_file,score_file,summary_file,binary_seg_maps,tissue_seg_data,verbose=False):
         if verbose: sys.stderr.write("FRAME: "+str(seg_file)+"\n")
         ### Read in the files here and create a dataframe
         self._seg = pd.read_csv(seg_file,"\t")
         self._scores = self._read_vectra_score_file(score_file)
         self._summary = None
-        
+        self._tissue_seg = None
+        if tissue_seg_data is not None:
+            self._tissue_seg = pd.read_csv(tissue_seg_data,sep='\t')
 
         ## check if Phenotype is missing, and set it to null if it is
         if 'Phenotype' not in self._seg:
@@ -108,7 +110,7 @@ class Frame:
                 if verbose: sys.stderr.write("missing phenotype column\n")
                 self._summary['Phenotype'] = 'unspecified'
             #### Read our areas from the summary #####
-            
+            if verbose: sys.stderr.write(str(self._get_vectra_frame_areas())+"\n")
             myareas = OrderedDict(self._get_vectra_frame_areas())
             ### Now we have our areas read lets put that data into things
             tissues_present = [x for x in myareas.keys() if x != 'All']
@@ -133,6 +135,14 @@ class Frame:
     def cells (self):
         return self._cells
     def _get_vectra_frame_areas(self):
+        # If we have tissue segmentation lets use that
+        if self._tissue_seg is not None:
+            df = self._tissue_seg[['Tissue Category','Region Area (pixels)']].rename(columns={'Tissue Category':'tissue','Region Area (pixels)':'tissue_area'})
+            sum_area = np.sum(df['tissue_area'])
+            df = df.append({'tissue':'All','tissue_area':sum_area},ignore_index=True)
+            return df.set_index('tissue')['tissue_area'].to_dict()
+            
+        # At this point we would need a summary file present to get the areas
         if self._summary is None: raise ValueError("You need summary files present to get areas")
         df = self._summary.copy()
         mega = df.apply(lambda x: np.nan if float(x['Cell Density (per megapixel)']) == 0 else int(1000000*float(x['Total Cells'])/float(x['Cell Density (per megapixel)'])),1) # cell area in mega pixels
@@ -200,6 +210,7 @@ class SampleSet:
     :type path: string
     """
     def __init__(self,path,verbose=False,limit=None,sample_index=1):
+        
         base = os.path.abspath(path)
         path = os.path.abspath(path)
         self._path = path
@@ -237,6 +248,8 @@ class Sample:
             score = os.path.join(path,m.group(1)+'score_data.txt')
             summary = os.path.join(path,m.group(1)+'cell_seg_data_summary.txt')
             binary_seg_maps = os.path.join(path,m.group(1)+'binary_seg_maps.tif')
+            tfile = os.path.join(path,m.group(1)+'tissue_seg_data_summary.txt')
+            tissue_seg_data = tfile if os.path.exists(tfile) else None
             sample = sample_folder
             snames.add(sample)
             frame = m.group(1).rstrip('_')
@@ -246,7 +259,7 @@ class Sample:
                 summary = None
             if not os.path.exists(score):
                 raise ValueError('Missing score file '+score)
-            self._frames[frame] = Frame(path,mydir,sample,frame,data,score,summary,binary_seg_maps,verbose)
+            self._frames[frame] = Frame(path,mydir,sample,frame,data,score,summary,binary_seg_maps,tissue_seg_data,verbose)
         if len(snames) > 1:
             raise ValueError('Error multiple samples in folder '+path)
         self._sample_name = list(snames)[0]        
