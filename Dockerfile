@@ -5,4 +5,4 @@ RUN Rscript -e "install.packages(c('SpatialTools','gplots','spatstat','tiff','da
 RUN Rscript -e 'devtools::install_local("IrisSpatialFeatures")'
 RUN rm -r IrisSpatialFeatures
 RUN Rscript -e "install.packages('tidyverse',repos = 'http://cran.us.r-project.org')"
-RUN pip install pythologist==0.1.9
+RUN pip install pythologist==0.1.10
