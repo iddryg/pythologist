@@ -11,7 +11,6 @@ import os, re, sys, h5py, json, math
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
-import pythologist.spatial
 import pythologist.read
 import pythologist.write
 
@@ -403,9 +402,6 @@ class InFormCellFrame(pd.DataFrame):
         mf2['phenotypes_present'] = mf2.apply(lambda x: _modify_phenotypes(x['phenotypes_present'],phenotype,abbrev),1)
         return InFormCellFrame(mf2.drop(columns=['new_phenotype']),mpp=self.mpp)
 
-    def kNearestNeighborsCross(cf,phenotypes,k=1,threads=1,dlim=None):
-        nn = pythologist.spatial.kNearestNeighborsCross(cf,phenotypes,k=k,threads=threads,dlim=dlim)
-        return pythologist.spatial.CellFrameNearestNeighbors(cf,nn)
     def set_mpp(self,value):
         self._mpp = value
     @property
