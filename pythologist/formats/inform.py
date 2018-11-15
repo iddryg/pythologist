@@ -2,8 +2,231 @@ import os, re, json, sys
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
+from pythologist.cellimage import CellImageDataGeneric, CellImageSetGeneric
+from uuid import uuid4
 
 _float_decimals = 6
+
+class CellImageSetInForm(CellImageSetGeneric):
+    def __init__(self):
+        super().__init__()
+    def read_from_path(self,path,verbose=False,limit=None,sample_index=1):
+        # Put together all the available sets of images recursing through the path
+        #base = os.path.abspath(path)
+        path = os.path.abspath(path)
+        self._path = path
+        rows = []
+        z = 0
+        for p, dirs, files in os.walk(self._path,followlinks=True,topdown=False):
+            mydir = p[len(path):]
+            z += 1
+            segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
+            if len(segs) == 0: continue
+            if verbose: sys.stderr.write("SAMPLE: "+str(p)+"\n")
+            #s = Sample(p,mydir,verbose,sample_index)
+            #self._samples.append(s)
+            #if limit is not None and z >= limit: break
+            files = os.listdir(p)
+            segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
+            sample_folder = p.split(os.sep)[-1*sample_index] #os.path.basename(path)
+            print(sample_folder)
+            self._frames = OrderedDict()
+            snames = set()
+            for file in segs:
+                m = re.match('(.*)cell_seg_data.txt$',file)
+                score = os.path.join(p,m.group(1)+'score_data.txt')
+                summary = os.path.join(p,m.group(1)+'cell_seg_data_summary.txt')
+                binary_seg_maps = os.path.join(p,m.group(1)+'binary_seg_maps.tif')
+                tfile = os.path.join(p,m.group(1)+'tissue_seg_data_summary.txt')
+                tissue_seg_data = tfile if os.path.exists(tfile) else None
+                sample = sample_folder
+                snames.add(sample)
+                frame = m.group(1).rstrip('_')
+                data = os.path.join(p,file)
+                if not os.path.exists(summary):
+                    if verbose: sys.stderr.write('Missing summary file '+summary+"\n")
+                    summary = None
+                if not os.path.exists(score):
+                    raise ValueError('Missing score file '+score)
+                #self._frames[frame] = Frame(path,mydir,sample,frame,data,score,summary,binary_seg_maps,tissue_seg_data,verbose)
+                if verbose: sys.stderr.write('Acquiring frame '+data+"\n")
+                cid = CellImageDataInForm()
+                cid.read_image_data(cell_seg_data_file=data,
+                                    cell_seg_data_summary_file=summary,
+                                    score_data_file=score,
+                                    tissue_seg_data_summary_file=tissue_seg_data,
+                                    verbose=verbose)
+                image_id = str(uuid4())
+                self.images[image_id] = cid
+                rows.append([sample,frame,image_id])
+        return pd.DataFrame(rows)     
+
+
+class CellImageDataInForm(CellImageDataGeneric):
+    """ Store data from a single image from an inForm export
+    """
+    def __init__(self):
+        super().__init__()
+    @property
+    def excluded_channels(self):
+        return ['Autofluorescence','Post-processing']    
+    
+    def read_image_data(self,
+                        cell_seg_data_file,
+                        cell_seg_data_summary_file=None,
+                        score_data_file=None,
+                        tissue_seg_data_summary_file=None,
+                        verbose=False,
+                        null_phenotype=None):
+        """ Read in the image data from a inForm
+
+        :param cell_seg_data_file:
+        :type string:
+
+        """
+        _seg = pd.read_csv(cell_seg_data_file,"\t")
+        if 'Tissue Category' not in _seg: _seg['Tissue Category'] = 'Any'
+
+        ##########
+        # Set the cell_locations
+        self.data['cell_locations'] = _seg.loc[:,['Cell ID','Cell X Position','Cell Y Position']].\
+                              rename(columns={'Cell ID':'cell_index',
+                                              'Cell X Position':'x',
+                                              'Cell Y Position':'y'})
+        self.data['cell_locations'] = self.data['cell_locations'].applymap(int).set_index('cell_index')
+
+        ###########
+        # Set the cell_phenotypes
+        if 'Phenotype' in _seg:
+            # Sometimes inform files won't have a Phenotype columns
+            _phenotypes = _seg.loc[:,['Cell ID','Phenotype']]
+            if null_phenotype: _phenotypes.loc[_phenotypes['Phenotype'].isna(),'Phenotype'] = null_phenotype
+        else:
+            _phenotypes = _seg.loc[:,['Cell ID']]
+            _phenotypes['Phenotype'] = np.nan
+            if null_phenotype: _phenotypes['Phenotype'] = null_phenotype
+        _phenotypes = _phenotypes.rename(columns={'Cell ID':'cell_index','Phenotype':'phenotype_label'})
+        _phenotypes_present = pd.Series(_phenotypes['phenotype_label'].unique()).dropna().tolist()
+        if null_phenotype and null_phenotype not in _phenotypes_present: _phenotypes_present = _phenotypes_present + [null_phenotype] 
+        _phenotype_list = pd.DataFrame({'phenotype_label':_phenotypes_present})
+        _phenotype_list.index.name = 'phenotype_index'
+        _phenotype_list = _phenotype_list.reset_index()
+
+        if cell_seg_data_summary_file is not None:
+             ############
+             # Update the phenotypes table if a cell_seg_data_summary file is present
+            if verbose: sys.stderr.write("cell seg summary file is present so acquire phenotype list from it\n")
+            _segsum = pd.read_csv(cell_seg_data_summary_file,"\t")
+            if 'Phenotype' not in _segsum.columns: 
+                if verbose: sys.stderr.write("missing phenotype column\n")
+                if null_phenotype is None: raise ValueError("Missing phenotype column requires 'null_phenotype' set to a non-null value to specify a label for the blank phenotype")
+                _segsum['Phenotype'] = null_phenotype
+
+            _phenotypes_present = [x for x in sorted(_segsum['Phenotype'].unique().tolist()) if x != 'All']
+            if null_phenotype and null_phenotype not in _phenotypes_present: _phenotypes_present = _phenotypes_present + [null_phenotype] 
+            _phenotype_list = pd.DataFrame({'phenotype_label':_phenotypes_present})
+            _phenotype_list.index.name = 'phenotype_index'
+            _phenotype_list = _phenotype_list.reset_index()
+
+        _phenotypes = _phenotypes.merge(_phenotype_list,on='phenotype_label')
+        self.data['phenotypes'] = _phenotype_list.set_index('phenotype_index')
+        self.data['cell_phenotypes'] = _phenotypes.drop(columns=['phenotype_label']).applymap(int).set_index('cell_index')
+
+
+        ###########
+        # Set the cell_regions
+        if tissue_seg_data_summary_file is not None:
+            raise ValueError("Region summary not implemented")
+        else:
+            _cell_regions = _seg[['Cell ID','Tissue Category']].copy().rename(columns={'Cell ID':'cell_index','Tissue Category':'region_label'})
+            self.data['regions'] = pd.DataFrame({'region_label':_cell_regions['region_label'].unique()})
+            self.data['regions'].index.name = 'region_index'
+            _cell_regions = _cell_regions.merge(self.data['regions'].reset_index(),on='region_label')
+            self.data['cell_regions'] = _cell_regions.drop(columns=['region_label']).set_index('cell_index')
+
+        ###########
+        # Get the intensity measurements
+        keepers = ['Cell ID']
+
+        # Some older versions don't have tissue category
+        if 'Entire Cell Area (pixels)' in _seg.columns: keepers.append('Entire Cell Area (pixels)')
+
+        keepers2 = [x for x in _seg.columns if re.search('Entire Cell.*\s+\S+ \(Normalized Counts, Total Weighting\)$',x)]
+        keepers3 = [x for x in _seg.columns if re.search('\s+\S+ \(Normalized Counts, Total Weighting\)$',x) and x not in keepers2]
+        _intensity1 = []
+        for cname in keepers2:
+            m = re.match('Entire Cell\s+(.*) (Mean|Min|Max|Std Dev|Total) \(Normalized Counts, Total Weighting\)$',cname)
+            stain = m.group(1)
+            v = _seg[['Cell ID',cname]]
+            v.columns = ['Cell ID','value']
+            v = v.copy()
+            for row in v.itertuples(index=False):
+                _intensity1.append([row[0],stain,m.group(2),round(row[1],_float_decimals)])
+        _intensity1 = pd.DataFrame(_intensity1,columns=['cell_index','channel_label','statistic_label','value'])
+        _intensity1['feature_label'] = 'Whole Cell'
+
+        _intensity2 = []
+        _intensity3 = []
+        for cname in keepers3:
+            if re.match('Entire Cell',cname): continue
+            m = re.match('(\S+)\s+(.*) (Mean|Min|Max|Std Dev|Total) \(Normalized Counts, Total Weighting\)$',cname)
+            compartment = m.group(1)
+            stain = m.group(2)
+            v = _seg[['Cell ID',cname,compartment+' Area (pixels)']]
+            v.columns = ['Cell ID','value','value1']
+            v = v.copy()
+            for row in v.itertuples(index=False):
+                _intensity2.append([row[0],stain,compartment,m.group(3),round(row[1],_float_decimals)])
+                _intensity3.append([row[0],'Post-processing',compartment,'Area (pixels)',round(row[2],_float_decimals)])
+
+        _intensity2 = pd.DataFrame(_intensity2,columns=['cell_index','channel_label','feature_label','statistic_label','value'])
+        _intensity3 = pd.DataFrame(_intensity3,columns=['cell_index','channel_label','feature_label','statistic_label','value'])
+
+        _intensities = [_intensity2,_intensity3,_intensity1.loc[:,_intensity2.columns]]
+        if 'Entire Cell Area (pixels)' in _seg:
+            _intensity4 = _seg[['Cell ID','Entire Cell Area (pixels)']].rename(columns={'Cell ID':'cell_index',
+                                                                                 'Entire Cell Area (pixels)':'value',
+                                                                                })
+            _intensity4['channel_label'] = 'Post-processing'
+            _intensity4['feature_label'] = 'Whole Cell'
+            _intensity4['statistic_label'] = 'Area (pixels)'
+            _intensities += [_intensity4.loc[:,_intensity2.columns]]
+        _intensity = pd.concat(_intensities)
+
+        self.data['measurement_channels'] = pd.DataFrame({'channel_label':_intensity['channel_label'].unique()})
+        self.data['measurement_channels'].index.name = 'channel_index'
+        self.data['measurement_statistics'] = pd.DataFrame({'statistic_label':_intensity['statistic_label'].unique()})
+        self.data['measurement_statistics'].index.name = 'statistic_index'
+        self.data['measurement_features'] = pd.DataFrame({'feature_label':_intensity['feature_label'].unique()})
+        self.data['measurement_features'].index.name = 'feature_index'
+        self.data['cell_measurements'] = _intensity.merge(self.data['measurement_channels'].reset_index(),on='channel_label',how='left').\
+                          merge(self.data['measurement_statistics'].reset_index(),on='statistic_label',how='left').\
+                          merge(self.data['measurement_features'].reset_index(),on='feature_label',how='left').\
+                          drop(columns=['channel_label','feature_label','statistic_label']).set_index('cell_index')
+        ###########
+        # Get the thresholds
+        if score_data_file is None: raise ValueError("No rules set for an unscored project")
+        _score_data = pd.read_csv(score_data_file,"\t")
+        if 'Tissue Category' not in _score_data:
+            raise ValueError('cannot read Tissue Category from '+str(score_file))
+        _score_data.loc[_score_data['Tissue Category'].isna(),'Tissue Category'] = 'Any'
+
+        _score_data = _score_data[['Tissue Category','Cell Compartment','Stain Component','Positivity Threshold']].\
+                      rename(columns={'Tissue Category':'region_label',
+                                      'Cell Compartment':'feature_label',
+                                      'Stain Component':'channel_label',
+                                      'Positivity Threshold':'threshold_value'})
+        _score_data.index.name = 'gate_index'
+        _score_data = _score_data.reset_index('gate_index')
+        # We only want to read the 'Mean' statistic for thresholding
+        _mystats = self.data['measurement_statistics']
+        _score_data['statistic_index'] = _mystats[_mystats['statistic_label']=='Mean'].iloc[0].name 
+        self.data['thresholds'] = _score_data.merge(self.data['measurement_features'].reset_index(),on='feature_label').\
+                                  merge(self.data['measurement_channels'].reset_index(),on='channel_label').\
+                                  merge(self.data['regions'],on='region_label').\
+                                  drop(columns=['feature_label','channel_label','region_label'])
+        return
+
 class Frame:
     def __init__(self,path,mydir,sample,frame,seg_file,score_file,summary_file,binary_seg_maps,tissue_seg_data,verbose=False):
         if verbose: sys.stderr.write("FRAME: "+str(seg_file)+"\n")
@@ -87,7 +310,7 @@ class Frame:
                 compartment_areas[row[0]][compartment] = round(row[2],_float_decimals)
         v = self._seg[keepers].copy()
         if 'Entire Cell Area (pixels)' not in v.columns: v['Entire Cell Area (pixels)'] = np.nan #incase not set
-        if 'Tissue Category' not in v.columns: v['Tissue Category'] = 'any'
+        if 'Tissue Category' not in v.columns: v['Tissue Category'] = 'Any'
         v['compartment_areas'] = v.apply(lambda x: compartment_areas[x['Cell ID']],1)
         v['compartment_values'] = v.apply(lambda x: compartments[x['Cell ID']],1)
         v['entire_cell_values'] = v.apply(lambda x: np.nan if x['Cell ID'] not in entire else entire[x['Cell ID']],1) #sometimes not present

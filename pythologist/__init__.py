@@ -1,4 +1,4 @@
-""" These modules are to facilitate reading  PerkinElmer inForm outputs into python
+""" This class is for reading Perkin Elmer Exports
 
 **Example:** reading a group of folders
 
@@ -11,7 +11,7 @@ import os, re, sys, h5py, json, math
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
-import pythologist.read
+#import pythologist.read
 import pythologist.write
 
 def read_inForm(*positional,**keywords):
