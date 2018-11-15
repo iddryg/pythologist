@@ -2,7 +2,7 @@ import os, re, json, sys
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
-from pythologist.cellimage import CellImageDataGeneric, CellImageSetGeneric
+from pythologist.formats import CellImageDataGeneric, CellImageSetGeneric
 from uuid import uuid4
 
 _float_decimals = 6
