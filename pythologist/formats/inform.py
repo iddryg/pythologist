@@ -72,12 +72,12 @@ class CellImageDataInForm(CellImageDataGeneric):
         return ['Autofluorescence','Post-processing']    
     
     def read_image_data(self,
-                        cell_seg_data_file,
+                        cell_seg_data_file=None,
                         cell_seg_data_summary_file=None,
                         score_data_file=None,
                         tissue_seg_data_summary_file=None,
                         verbose=False,
-                        null_phenotype=None):
+                        channel_abbreviations=None):
         """ Read in the image data from a inForm
 
         :param cell_seg_data_file:
@@ -88,26 +88,25 @@ class CellImageDataInForm(CellImageDataGeneric):
         if 'Tissue Category' not in _seg: _seg['Tissue Category'] = 'Any'
 
         ##########
-        # Set the cell_locations
-        self.data['cell_locations'] = _seg.loc[:,['Cell ID','Cell X Position','Cell Y Position']].\
+        # Set the cells
+        _cells = _seg.loc[:,['Cell ID','Cell X Position','Cell Y Position']].\
                               rename(columns={'Cell ID':'cell_index',
                                               'Cell X Position':'x',
                                               'Cell Y Position':'y'})
-        self.data['cell_locations'] = self.data['cell_locations'].applymap(int).set_index('cell_index')
+        _cells = _cells.applymap(int).set_index('cell_index')
 
         ###########
-        # Set the cell_phenotypes
+        # Set the cell phenotypes
+        #    Try to read phenotypes from the summary file if its there because some may be zero counts and won't show up in the cell_seg file
         if 'Phenotype' in _seg:
             # Sometimes inform files won't have a Phenotype columns
             _phenotypes = _seg.loc[:,['Cell ID','Phenotype']]
-            if null_phenotype: _phenotypes.loc[_phenotypes['Phenotype'].isna(),'Phenotype'] = null_phenotype
         else:
             _phenotypes = _seg.loc[:,['Cell ID']]
             _phenotypes['Phenotype'] = np.nan
-            if null_phenotype: _phenotypes['Phenotype'] = null_phenotype
         _phenotypes = _phenotypes.rename(columns={'Cell ID':'cell_index','Phenotype':'phenotype_label'})
-        _phenotypes_present = pd.Series(_phenotypes['phenotype_label'].unique()).dropna().tolist()
-        if null_phenotype and null_phenotype not in _phenotypes_present: _phenotypes_present = _phenotypes_present + [null_phenotype] 
+        _phenotypes_present = pd.Series(_phenotypes['phenotype_label'].unique()).tolist()
+        if np.nan not in _phenotypes_present: _phenotypes_present = _phenotypes_present + [np.nan] 
         _phenotype_list = pd.DataFrame({'phenotype_label':_phenotypes_present})
         _phenotype_list.index.name = 'phenotype_index'
         _phenotype_list = _phenotype_list.reset_index()
@@ -119,18 +118,23 @@ class CellImageDataInForm(CellImageDataGeneric):
             _segsum = pd.read_csv(cell_seg_data_summary_file,"\t")
             if 'Phenotype' not in _segsum.columns: 
                 if verbose: sys.stderr.write("missing phenotype column\n")
-                if null_phenotype is None: raise ValueError("Missing phenotype column requires 'null_phenotype' set to a non-null value to specify a label for the blank phenotype")
-                _segsum['Phenotype'] = null_phenotype
+                _segsum['Phenotype'] = np.nan
 
             _phenotypes_present = [x for x in sorted(_segsum['Phenotype'].unique().tolist()) if x != 'All']
-            if null_phenotype and null_phenotype not in _phenotypes_present: _phenotypes_present = _phenotypes_present + [null_phenotype] 
+            if np.nan not in _phenotypes_present: _phenotypes_present = _phenotypes_present + [np.nan] 
             _phenotype_list = pd.DataFrame({'phenotype_label':_phenotypes_present})
             _phenotype_list.index.name = 'phenotype_index'
             _phenotype_list = _phenotype_list.reset_index()
 
         _phenotypes = _phenotypes.merge(_phenotype_list,on='phenotype_label')
-        self.data['phenotypes'] = _phenotype_list.set_index('phenotype_index')
-        self.data['cell_phenotypes'] = _phenotypes.drop(columns=['phenotype_label']).applymap(int).set_index('cell_index')
+        _phenotype_list = _phenotype_list.set_index('phenotype_index')
+        #Assign 'phenotypes' in a way that ensure we retain the pre-defined column structure
+        self.set_data('phenotypes',_phenotype_list)
+
+        _phenotypes = _phenotypes.drop(columns=['phenotype_label']).applymap(int).set_index('cell_index')
+
+        # Now we can add to cells our phenotype indecies
+        _cells = _cells.merge(_phenotypes,left_index=True,right_index=True,how='left')
 
 
         ###########
@@ -139,13 +143,32 @@ class CellImageDataInForm(CellImageDataGeneric):
             raise ValueError("Region summary not implemented")
         else:
             _cell_regions = _seg[['Cell ID','Tissue Category']].copy().rename(columns={'Cell ID':'cell_index','Tissue Category':'region_label'})
-            self.data['regions'] = pd.DataFrame({'region_label':_cell_regions['region_label'].unique()})
-            self.data['regions'].index.name = 'region_index'
-            _cell_regions = _cell_regions.merge(self.data['regions'].reset_index(),on='region_label')
-            self.data['cell_regions'] = _cell_regions.drop(columns=['region_label']).set_index('cell_index')
+            _regions = pd.DataFrame({'region_label':_cell_regions['region_label'].unique()})
+            _regions.index.name = 'region_index'
+            self.set_data('regions',_regions)
+            _cell_regions = _cell_regions.merge(self.get_data('regions').reset_index(),on='region_label')
+            _cell_regions = _cell_regions.drop(columns=['region_label']).set_index('cell_index')
+
+        # Now we can add to cells our region indecies
+        _cells = _cells.merge(_cell_regions,left_index=True,right_index=True,how='left')
+
+
+        # Assign 'cells' in a way that ensures we retain our pre-defined column structure. Should throw a warning if anything is wrong
+        self.set_data('cells',_cells)
 
         ###########
-        # Get the intensity measurements
+        # Get the intensity measurements - sets 'measurement_channels', 'measurement_statistics', 'measurement_features', and 'cell_measurements'
+        self._parse_measurements(_seg,channel_abbreviations)  
+
+        ###########
+        # Get the thresholds
+        if score_data_file is not None: 
+            self._parse_score_file(score_data_file)
+        return
+
+    def _parse_measurements(self,_seg,channel_abbreviations):   
+        # Parse the cell seg pandas we've already read in to get the cell-level measurements, as well as what features we are measuring
+        # Sets the 'measurement_channels', 'measurement_statistics', 'measurement_features', and 'cell_measurements'
         keepers = ['Cell ID']
 
         # Some older versions don't have tissue category
@@ -193,19 +216,32 @@ class CellImageDataInForm(CellImageDataGeneric):
             _intensities += [_intensity4.loc[:,_intensity2.columns]]
         _intensity = pd.concat(_intensities)
 
-        self.data['measurement_channels'] = pd.DataFrame({'channel_label':_intensity['channel_label'].unique()})
-        self.data['measurement_channels'].index.name = 'channel_index'
-        self.data['measurement_statistics'] = pd.DataFrame({'statistic_label':_intensity['statistic_label'].unique()})
-        self.data['measurement_statistics'].index.name = 'statistic_index'
-        self.data['measurement_features'] = pd.DataFrame({'feature_label':_intensity['feature_label'].unique()})
-        self.data['measurement_features'].index.name = 'feature_index'
-        self.data['cell_measurements'] = _intensity.merge(self.data['measurement_channels'].reset_index(),on='channel_label',how='left').\
-                          merge(self.data['measurement_statistics'].reset_index(),on='statistic_label',how='left').\
-                          merge(self.data['measurement_features'].reset_index(),on='feature_label',how='left').\
-                          drop(columns=['channel_label','feature_label','statistic_label']).set_index('cell_index')
-        ###########
-        # Get the thresholds
-        if score_data_file is None: raise ValueError("No rules set for an unscored project")
+        _measurement_channels = pd.DataFrame({'channel_label':_intensity['channel_label'].unique()})
+        _measurement_channels.index.name = 'channel_index'
+        _measurement_channels['channel_abbreviation'] = _measurement_channels['channel_label']
+        if channel_abbreviations:
+            _measurement_channels['channel_abbreviation'] = \
+                _measurement_channels.apply(lambda x: x['channel_label'] if x['channel_label'] not in channel_abbreviations else channel_abbreviations[x['channel_label']],1)
+        self.set_data('measurement_channels',_measurement_channels)
+
+        _measurement_statistics = pd.DataFrame({'statistic_label':_intensity['statistic_label'].unique()})
+        _measurement_statistics.index.name = 'statistic_index'
+        self.set_data('measurement_statistics',_measurement_statistics)
+
+        _measurement_features = pd.DataFrame({'feature_label':_intensity['feature_label'].unique()})
+        _measurement_features.index.name = 'feature_index'
+        self.set_data('measurement_features',_measurement_features)
+
+        _cell_measurements = _intensity.merge(self.get_data('measurement_channels').reset_index(),on='channel_label',how='left').\
+                          merge(self.get_data('measurement_statistics').reset_index(),on='statistic_label',how='left').\
+                          merge(self.get_data('measurement_features').reset_index(),on='feature_label',how='left').\
+                          drop(columns=['channel_label','feature_label','statistic_label','channel_abbreviation'])
+        _cell_measurements.index.name = 'measurement_index'
+        self.set_data('cell_measurements',_cell_measurements)
+
+
+    def _parse_score_file(self,score_data_file):
+        # Sets the 'thresholds' table by parsing the score file
         _score_data = pd.read_csv(score_data_file,"\t")
         if 'Tissue Category' not in _score_data:
             raise ValueError('cannot read Tissue Category from '+str(score_file))
@@ -219,13 +255,17 @@ class CellImageDataInForm(CellImageDataGeneric):
         _score_data.index.name = 'gate_index'
         _score_data = _score_data.reset_index('gate_index')
         # We only want to read the 'Mean' statistic for thresholding
-        _mystats = self.data['measurement_statistics']
+        _mystats = self.get_data('measurement_statistics')
         _score_data['statistic_index'] = _mystats[_mystats['statistic_label']=='Mean'].iloc[0].name 
-        self.data['thresholds'] = _score_data.merge(self.data['measurement_features'].reset_index(),on='feature_label').\
-                                  merge(self.data['measurement_channels'].reset_index(),on='channel_label').\
-                                  merge(self.data['regions'],on='region_label').\
+        _thresholds = _score_data.merge(self.get_data('measurement_features').reset_index(),on='feature_label').\
+                                  merge(self.get_data('measurement_channels').reset_index(),on='channel_label').\
+                                  merge(self.get_data('regions').reset_index(),on='region_label').\
                                   drop(columns=['feature_label','channel_label','region_label'])
-        return
+        # By default for inform name the gate after the channel abbreviation
+        _thresholds['gate_label'] = _thresholds['channel_abbreviation']
+        _thresholds = _thresholds.drop(columns=['channel_abbreviation'])
+        _thresholds = _thresholds.set_index('gate_index')
+        self.set_data('thresholds',_thresholds)
 
 class Frame:
     def __init__(self,path,mydir,sample,frame,seg_file,score_file,summary_file,binary_seg_maps,tissue_seg_data,verbose=False):
@@ -346,7 +386,7 @@ class Frame:
             v['total_area'] = v.apply(lambda x: myareas['any'] if 'All' not in myareas else myareas['All'],1)
             v['tissues_present'] = v.apply(lambda x: json.dumps(myarea2),1)
             ### Lets the phenotypes that are here
-            phenotypes_present = [x for x in sorted(self._summary['Phenotype'].dropna().unique().tolist()) if x != 'All']
+            phenotypes_present = [x for x in sorted(self._summary['Phenotype'].unique().tolist()) if x != 'All']
             v['phenotypes_present'] = v.apply(lambda x: json.dumps(phenotypes_present),1)
         else:
             # We need to get these values from elsewhere

@@ -1,42 +1,70 @@
+import pandas as pd
 """ These are classes to help deal with cell-level image data """
 class CellImageDataGeneric(object):
     """ A generic CellImageData object
     """
     def __init__(self):
-        self.data_tables = ['cell_locations',
-                            'cell_phenotypes',
-                            'cell_regions',
-                            'cell_regions',
-                            'cell_measurements',
-                            'thresholds',
-                            'measurement_features',
-                            'measurement_channels',
-                            'measurement_statistics',
-                            'phenotypes',
-                            'regions'
-                           ]
-        self.data = {}
-        for x in self.data_tables: self.data[x] = None
+        # Define the column structure of all the tables.  
+        self.data_tables = {'cells':{'index':'cell_index',
+                                     'columns':['x','y','phenotype_index','region_index']},
+                            'cell_tags':{'index':'db_id',
+                                         'columns':['tag_index','cell_index']},
+                            'cell_measurements':{'index':'measurement_index',
+                                                 'columns':['cell_index','statistic_index','feature_index','channel_index','value']},
+                            'thresholds':{'index':'gate_index',
+                                          'columns':['threshold_value','statistic_index','feature_index','channel_index','gate_label','region_index']},
+                            'measurement_features':{'index':'feature_index',
+                                                    'columns':['feature_label']},
+                            'measurement_channels':{'index':'channel_index',
+                                                    'columns':['channel_label','channel_abbreviation']},
+                            'measurement_statistics':{'index':'statistic_index',
+                                                      'columns':['statistic_label']},
+                            'phenotypes':{'index':'phenotype_index',
+                                          'columns':['phenotype_label']},
+                            'regions':{'index':'region_index',
+                                       'columns':['region_label']},
+                            'tags':{'index':'tag_index',
+                                    'columns':['tag_label']}
+                           }
+        self._data = {} # Do not acces directly. Use set_data_table and get_data_table to access.
+        for x in self.data_tables.keys(): 
+            self._data[x] = pd.DataFrame(columns=self.data_tables[x]['columns'])
+            self._data[x].index.name = self.data_tables[x]['index']
+
+    def set_data(self,table_name,table):
+        # Assign data to the standard tables. Do some column name checking to make sure we are getting what we expect
+        if table_name not in self.data_tables: raise ValueError("Error table name doesn't exist in defined formats")
+        if set(list(table.columns)) != set(self.data_tables[table_name]['columns']): raise ValueError("Error column names don't match defined format\n"+\
+                                                                                            str(list(table.columns))+"\n"+\
+                                                                                            str(self.data_tables[table_name]['columns']))
+        if table.index.name != self.data_tables[table_name]['index']: raise ValueError("Error index name doesn't match defined format")
+        self._data[table_name] = table.loc[:,self.data_tables[table_name]['columns']].copy() # Auto-sort, and assign a copy so we aren't ever assigning by reference
+    def get_data(self,table_name): 
+        # copy so we don't ever pass by reference
+        return self._data[table_name].copy()
 
     @property
     def thresholds(self):
         # Print the threhsolds
-        return self.data['thresholds'].merge(self.data['measurement_statistics'],left_on='statistic_index',right_index=True).\
-               merge(self.data['measurement_features'],left_on='feature_index',right_index=True).\
-               merge(self.data['measurement_channels'],left_on='channel_index',right_index=True)
+        return self.get_data('thresholds').merge(self.get_data('measurement_statistics'),left_on='statistic_index',right_index=True).\
+               merge(self.get_data('measurement_features'),left_on='feature_index',right_index=True).\
+               merge(self.get_data('measurement_channels'),left_on='channel_index',right_index=True)
 
     def get_channels(self,all=False):
-        if all: return self.data['measurement_channels']
-        return self.data['measurement_channels'].loc[~self.data['measurement_channels']['channel_label'].isin(self.excluded_channels)]
+        if all: return self.get_data('measurement_channels')
+        d = self.get_data('measurement_channels')
+        return d.loc[~d['channel_label'].isin(self.excluded_channels)]
     
-    def get_raw(self,feature_label,statistic_label,all=False):
-        stats = self.data['measurement_statistics'].reset_index()
+    def get_raw(self,feature_label,statistic_label,region_label,all=False):
+        stats = self.get_data('measurement_statistics').reset_index()
         stats = stats.loc[stats['statistic_label']==statistic_label,'statistic_index'].iloc[0]
-        feat = self.data['measurement_features'].reset_index()
+        feat = self.get_data('measurement_features').reset_index()
         feat = feat.loc[feat['feature_label']==feature_label,'feature_index'].iloc[0]
-        measure = self.data['cell_measurements']
+        region = self.get_data('regions').reset_index()
+        region = region.loc[region['region_label']==region_label,'region_index'].iloc[0]
+        measure = self.get_data('cell_measurements')
         measure = measure.loc[(measure['statistic_index']==stats)&(measure['feature_index']==feat)]
-        channels = self.data['measurement_channels']
+        channels = self.get_data('measurement_channels')
         if not all: channels = channels.loc[~channels['channel_label'].isin(self.excluded_channels)]
         measure = measure.merge(channels,left_on='channel_index',right_index=True)
         return measure.reset_index().pivot(index='cell_index',columns='channel_label',values='value')
@@ -45,13 +73,33 @@ class CellImageDataGeneric(object):
         # Do a deep copy of self
         mytype = type(self)
         them = mytype()
-        for x in self.data_tables:
-            them.data[x] = self.data[x].copy()
+        for x in self.data_tables.keys():
+            them._data[x] = self._data[x].copy()
         return them
 
     @property
     def excluded_channels(self):
         raise ValueError("Must be overidden")
+
+    def gated_cells(self):
+        # generate a table of gating calls with ncols = to the number of gates
+        if self.get_data('thresholds').shape[0] == 0:
+            return None
+        d = self.get_data('thresholds').reset_index().\
+            merge(self.get_data('cell_measurements').reset_index(),on=['statistic_index','feature_index','channel_index'])
+        d['gate'] = d.apply(lambda x: x['value']>=x['threshold_value'],1)
+        d = d.pivot(values='gate',index='cell_index',columns='gate_label').applymap(lambda x: '+' if x else '-')
+        return d
+
+    @property
+    def df(self):
+        # a dataframe that has phenotype and region info, but excludes all raw data
+        return self.get_data('cells').merge(self.get_data('phenotypes'),left_on='phenotype_index',right_index=True,how='left').drop(columns='phenotype_index').\
+                                      merge(self.get_data('regions'),left_on='region_index',right_index=True,how='left').drop(columns='region_index').sort_index()
+
+    def complete_df(self):
+        # a dataframe for every cell that has everything
+        return
 
 """ Hold a group of images from different samples """
 class CellImageSetGeneric(object):
