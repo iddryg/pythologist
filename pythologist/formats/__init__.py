@@ -5,14 +5,13 @@ class CellImageDataGeneric(object):
     """
     def __init__(self):
         # Define the column structure of all the tables.  
+        #   Non-generic CellImageData could define additional data tables
         self.data_tables = {'cells':{'index':'cell_index',
                                      'columns':['x','y','phenotype_index','region_index']},
                             'cell_tags':{'index':'db_id',
                                          'columns':['tag_index','cell_index']},
                             'cell_measurements':{'index':'measurement_index',
                                                  'columns':['cell_index','statistic_index','feature_index','channel_index','value']},
-                            'thresholds':{'index':'gate_index',
-                                          'columns':['threshold_value','statistic_index','feature_index','channel_index','gate_label','region_index']},
                             'measurement_features':{'index':'feature_index',
                                                     'columns':['feature_label']},
                             'measurement_channels':{'index':'channel_index',
@@ -45,10 +44,7 @@ class CellImageDataGeneric(object):
 
     @property
     def thresholds(self):
-        # Print the threhsolds
-        return self.get_data('thresholds').merge(self.get_data('measurement_statistics'),left_on='statistic_index',right_index=True).\
-               merge(self.get_data('measurement_features'),left_on='feature_index',right_index=True).\
-               merge(self.get_data('measurement_channels'),left_on='channel_index',right_index=True)
+        raise ValueError('Override this to use it.')
 
     def get_channels(self,all=False):
         if all: return self.get_data('measurement_channels')
@@ -81,15 +77,16 @@ class CellImageDataGeneric(object):
     def excluded_channels(self):
         raise ValueError("Must be overidden")
 
+    @property
     def gated_cells(self):
-        # generate a table of gating calls with ncols = to the number of gates
-        if self.get_data('thresholds').shape[0] == 0:
-            return None
-        d = self.get_data('thresholds').reset_index().\
-            merge(self.get_data('cell_measurements').reset_index(),on=['statistic_index','feature_index','channel_index'])
-        d['gate'] = d.apply(lambda x: x['value']>=x['threshold_value'],1)
-        d = d.pivot(values='gate',index='cell_index',columns='gate_label').applymap(lambda x: '+' if x else '-')
-        return d
+        # Default to just gating on mutually exclusive phenotypes
+        phenotypes = self.get_data('phenotypes')['phenotype_label'].dropna().tolist()
+        temp = pd.DataFrame(index=self.get_data('cells').index,columns=phenotypes)
+        temp = temp.fillna('-')
+        temp = temp.merge(self.df[['phenotype_label']],left_index=True,right_index=True)
+        for phenotype in phenotypes:
+            temp.loc[temp['phenotype_label']==phenotype,phenotype]='+'
+        return temp.drop(columns='phenotype_label')
 
     @property
     def df(self):
