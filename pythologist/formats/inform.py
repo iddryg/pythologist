@@ -2,7 +2,10 @@ import os, re, json, sys
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
-from pythologist.formats import CellImageDataGeneric, CellImageSetGeneric
+from pythologist.formats import CellImageDataGeneric, CellImageSetGeneric, CellImageRaw
+from uuid import uuid4
+from pythologist.formats.utilities import read_tiff_stack
+import xml.etree.ElementTree as ET
 from uuid import uuid4
 
 _float_decimals = 6
@@ -29,7 +32,6 @@ class CellImageSetInForm(CellImageSetGeneric):
             files = os.listdir(p)
             segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
             sample_folder = p.split(os.sep)[-1*sample_index] #os.path.basename(path)
-            print(sample_folder)
             self._frames = OrderedDict()
             snames = set()
             for file in segs:
@@ -61,17 +63,114 @@ class CellImageSetInForm(CellImageSetGeneric):
                 rows.append([sample,frame,image_id])
         return pd.DataFrame(rows)     
 
-class CellImageDataInFormGeneric(CellImageDataGeneric):
-    """ Store data from a single inform experiment
-    """
-    def __init__(self):
+class CellImageRawInForm(CellImageRaw):
+    """ Store the raw image data that makes up a single frame from InForm """
+    def __init__(self,binary_seg_image_file=None,component_image_file=None):
+        # Start with the binary seg image file because if it has a processed image area,
+        # that will be applied to all other masks and we can get that segmentation right away
         super().__init__()
+        self._storage_type = np.float16
+        self._mask_key = None
+        self._segmentation_key = None
+
+        # Now we've read in whatever we've got fromt he binary seg image
+        self._read_component_image(component_image_file)
+
+        if binary_seg_image_file is not None:
+            self._read_binary_seg_image(binary_seg_image_file)
+            # if we have a ProcessedImage we can use that for an 'Any' region
+            m = self._mask_key.set_index('mask_label')
+            if 'ProcessRegionImage' in m.index:
+                # we have a ProcessedImage
+                print('have a processedimage')
+                self._processed_id = m.loc['ProcessRegionImage']['image_id']
+                self._images[self._processed_id] = self._images[self._processed_id].astype(np.int8)
+            elif 'TissueClassMap' in m.index:
+                # We can build a ProcessedImage from the TissueClassMap
+                img = self._images[m.loc['TissueClassMap']['image_id']]
+                self._processed_id = uuid4().hex
+                self._images[self._processed_id] = np.array(pd.DataFrame(img).applymap(lambda x: 0 if x==255 else 1)).astype(np.int8)
+
+        if self._processed_id is None and self._channel_key.shape[0]>0:
+                # We have nothing so we assume the entire image is processed until we have some reason to update this
+                dim = self._images[self._channel_key.iloc[0,1]].shape
+                self._processed_id = uuid4().hex
+                self._images[self._processed_id] = np.ones(dim,dtype=np.int8)
+
+        if self._processed_id is None:
+            raise ValueError("Nothing to set determine size of images")
+
+        # Now we can set the regions if we have them set intrinsically
+        m = self._mask_key.set_index('mask_label')
+        if 'TissueClassMap' in m.index:
+            img = self._images[m.loc['TissueClassMap']['image_id']]
+            regions = pd.DataFrame(img.astype(int)).stack().unique()
+            regions = [x for x in regions if x != 255]
+            region_key = []
+            for region in regions:
+                image_id = uuid4().hex
+                region_key.append([region,image_id])
+                self._images[image_id] = np.array(pd.DataFrame(img.astype(int)).applymap(lambda x: 1 if x==region else 0)).astype(np.int8)
+            df = pd.DataFrame(region_key,columns=['region_index','image_id']).set_index('region_index')
+            df['region_size'] = df.apply(lambda x:
+                    self._images[x['image_id']].sum()
+                ,1)
+            self._region_key = df
+
+        # If we don't have any regions set then we can just use the processed image
+        if self._region_key is None:
+            img = self._images[self._processed_id].copy()
+            region_id = uuid4().hex
+            self._images[region_id] = img
+            self._region_key = pd.DataFrame(pd.Series({'region_index':0,'image_id':region_id,'region_size':img.sum()})).T.set_index('region_index')
+
     @property
-    def excluded_channels(self):
-        return ['Autofluorescence','Post-processing']    
+    def region_sizes(self):
+        ### return region sizes
+        return self._masks
+    
+    def _read_component_image(self,filename):
+        stack = read_tiff_stack(filename)
+        channels = []
+        for raw in stack:
+            meta = raw['raw_meta']
+            image_type, image_description = _parse_image_description(meta['ImageDescription'])
+            if 'Name' not in image_description: continue
+            channel_label = image_description['Name']
+            image_id = uuid4().hex
+            self._images[image_id] = raw['raw_image'].astype(self._storage_type)
+            channels.append((channel_label,image_id))
+        self._channel_key = pd.DataFrame(channels,columns=['channel_label','image_id'])
+        return
 
+    def _read_binary_seg_image(self,filename):
+        stack = read_tiff_stack(filename)
+        mask_names = []
+        segmentation_names = []
+        for raw in stack:
+            meta = raw['raw_meta']
+            image_type, image_description = _parse_image_description(meta['ImageDescription'])
+            image_id = uuid4().hex
+            if image_type == 'SegmentationImage':
+                ### Handle if its a segmentation
+                self._images[image_id] = raw['raw_image'].astype(self._storage_type)
+                segmentation_names.append([image_description['CompartmentType'],image_id])
+            else:
+                ### Otherwise it is a mask
+                self._images[image_id] = raw['raw_image'].astype(self._storage_type)
+                mask_names.append([image_type,image_id])
+        self._mask_key = pd.DataFrame(mask_names,columns=['mask_label','image_id'])
+        self._segmentation_key = pd.DataFrame(segmentation_names,columns=['segmentation_label','image_id'])
 
-class CellImageDataInFormScored(CellImageDataInFormGeneric):
+    def add_custom_mask(self,filename,mask_label):
+        return
+
+def _parse_image_description(metatext):
+    root = ET.fromstring(metatext)
+    d = dict([(child.tag,child.text) for child in root])
+    return root.tag, d
+
+class CellImageDataInForm(CellImageDataGeneric):
     """ Store data from a single image from an inForm export
     """
     def __init__(self):
@@ -80,6 +179,9 @@ class CellImageDataInFormScored(CellImageDataInFormGeneric):
         #thresh = 'thresholds':
         self.data_tables['thresholds'] = {'index':'gate_index',
                  'columns':['threshold_value','statistic_index','feature_index','channel_index','gate_label','region_index']}
+    @property
+    def excluded_channels(self):
+        return ['Autofluorescence','Post-processing']    
 
     @property
     def thresholds(self):
@@ -120,6 +222,7 @@ class CellImageDataInFormScored(CellImageDataInFormGeneric):
                         cell_seg_data_file=None,
                         cell_seg_data_summary_file=None,
                         score_data_file=None,
+                        tissue_seg_data_file=None,
                         tissue_seg_data_summary_file=None,
                         verbose=False,
                         channel_abbreviations=None):
@@ -184,15 +287,20 @@ class CellImageDataInFormScored(CellImageDataInFormGeneric):
 
         ###########
         # Set the cell_regions
-        if tissue_seg_data_summary_file is not None:
-            raise ValueError("Region summary not implemented")
+        _cell_regions = _seg[['Cell ID','Tissue Category']].copy().rename(columns={'Cell ID':'cell_index','Tissue Category':'region_label'})
+        if tissue_seg_data_file:
+            _regions = pd.read_csv(tissue_seg_data_file,sep="\t")
+            _regions = _regions[['Region ID','Tissue Category']].\
+                rename(columns={'Region ID':'region_index','Tissue Category':'region_label'}).set_index('region_index')
+            self.set_data('regions',_regions)
+            #raise ValueError("Region summary not implemented")
         else:
-            _cell_regions = _seg[['Cell ID','Tissue Category']].copy().rename(columns={'Cell ID':'cell_index','Tissue Category':'region_label'})
+            #_cell_regions = _seg[['Cell ID','Tissue Category']].copy().rename(columns={'Cell ID':'cell_index','Tissue Category':'region_label'})
             _regions = pd.DataFrame({'region_label':_cell_regions['region_label'].unique()})
             _regions.index.name = 'region_index'
             self.set_data('regions',_regions)
-            _cell_regions = _cell_regions.merge(self.get_data('regions').reset_index(),on='region_label')
-            _cell_regions = _cell_regions.drop(columns=['region_label']).set_index('cell_index')
+        _cell_regions = _cell_regions.merge(self.get_data('regions').reset_index(),on='region_label')
+        _cell_regions = _cell_regions.drop(columns=['region_label']).set_index('cell_index')
 
         # Now we can add to cells our region indecies
         _cells = _cells.merge(_cell_regions,left_index=True,right_index=True,how='left')
@@ -291,12 +399,37 @@ class CellImageDataInFormScored(CellImageDataInFormGeneric):
         if 'Tissue Category' not in _score_data:
             raise ValueError('cannot read Tissue Category from '+str(score_file))
         _score_data.loc[_score_data['Tissue Category'].isna(),'Tissue Category'] = 'Any'
-
-        _score_data = _score_data[['Tissue Category','Cell Compartment','Stain Component','Positivity Threshold']].\
+        ### We need to be careful how we parse this because there could be one or multiple stains in this file
+        if 'Stain Component' in _score_data.columns:
+            # We have the single stain case
+            _score_data = _score_data[['Tissue Category','Cell Compartment','Stain Component','Positivity Threshold']].\
                       rename(columns={'Tissue Category':'region_label',
                                       'Cell Compartment':'feature_label',
                                       'Stain Component':'channel_label',
                                       'Positivity Threshold':'threshold_value'})
+        elif 'First Stain Component' in _score_data.columns and 'Second Stain Component' in _score_data.columns:
+            # lets break this into two tables and then merge them
+            first_name = _score_data['First Stain Component'].iloc[0]
+            second_name = _score_data['Second Stain Component'].iloc[0]
+            table1 = _score_data[['Tissue Category','First Cell Compartment','First Stain Component',first_name+' Threshold']].\
+                rename(columns ={
+                    'Tissue Category':'region_label',
+                    'First Cell Compartment':'feature_label',
+                    'First Stain Component':'channel_label',
+                    first_name+' Threshold':'threshold_value'
+                    })
+            table2 = _score_data[['Tissue Category','Second Cell Compartment','Second Stain Component',second_name+' Threshold']].\
+                rename(columns ={
+                    'Tissue Category':'region_label',
+                    'Second Cell Compartment':'feature_label',
+                    'Second Stain Component':'channel_label',
+                    second_name+' Threshold':'threshold_value'
+                    })
+            _score_data = pd.concat([table1,table2]).reset_index(drop=True)
+        else:
+            # The above formats are the only known to exist in current exports
+            raise ValueError("unknown score format")
+
         _score_data.index.name = 'gate_index'
         _score_data = _score_data.reset_index('gate_index')
         # We only want to read the 'Mean' statistic for thresholding

@@ -1,5 +1,13 @@
 import pandas as pd
 """ These are classes to help deal with cell-level image data """
+
+class CellImageGeneric(object):
+    """ A generic CellImage that combines the raw and data
+    """
+    def __init__(self):
+        self.data = None
+        self.images = None
+
 class CellImageDataGeneric(object):
     """ A generic CellImageData object
     """
@@ -51,7 +59,7 @@ class CellImageDataGeneric(object):
         d = self.get_data('measurement_channels')
         return d.loc[~d['channel_label'].isin(self.excluded_channels)]
     
-    def get_raw(self,feature_label,statistic_label,region_label,all=False):
+    def get_raw(self,feature_label,statistic_label,region_label,all=False,channel_abbreviation=True):
         stats = self.get_data('measurement_statistics').reset_index()
         stats = stats.loc[stats['statistic_label']==statistic_label,'statistic_index'].iloc[0]
         feat = self.get_data('measurement_features').reset_index()
@@ -63,7 +71,11 @@ class CellImageDataGeneric(object):
         channels = self.get_data('measurement_channels')
         if not all: channels = channels.loc[~channels['channel_label'].isin(self.excluded_channels)]
         measure = measure.merge(channels,left_on='channel_index',right_index=True)
-        return measure.reset_index().pivot(index='cell_index',columns='channel_label',values='value')
+        measure = measure.reset_index().pivot(index='cell_index',columns='channel_label',values='value')
+        if not channel_abbreviation: return measure
+        temp = dict(zip(self.get_data('measurement_channels')['channel_label'],
+                        self.get_data('measurement_channels')['channel_abbreviation']))
+        return measure.rename(columns=temp)
 
     def copy(self):
         # Do a deep copy of self
@@ -103,3 +115,16 @@ class CellImageSetGeneric(object):
     def __init__(self):
         self.images = {}
         return
+
+""" Hold the raw images that represent the data """
+class CellImageRaw(object):
+    def __init__(self):
+        self._images = {} # database of all images
+        self._channel_key = None # match channels to images
+        self._region_key = None # match regions to image masks and region sizes
+        self._processed_id = None # base processed image mask
+        return
+    @property
+    def channel_key(self):
+        return self._channel_key
+   
