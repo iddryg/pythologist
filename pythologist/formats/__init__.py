@@ -7,6 +7,8 @@ class CellImageGeneric(object):
     def __init__(self):
         self.data = None
         self.images = None
+        self.sample = None
+        self.frame = None
 
 class CellImageDataGeneric(object):
     """ A generic CellImageData object
@@ -14,24 +16,30 @@ class CellImageDataGeneric(object):
     def __init__(self):
         # Define the column structure of all the tables.  
         #   Non-generic CellImageData could define additional data tables
-        self.data_tables = {'cells':{'index':'cell_index',
-                                     'columns':['x','y','phenotype_index','region_index']},
-                            'cell_tags':{'index':'db_id',
-                                         'columns':['tag_index','cell_index']},
-                            'cell_measurements':{'index':'measurement_index',
-                                                 'columns':['cell_index','statistic_index','feature_index','channel_index','value']},
-                            'measurement_features':{'index':'feature_index',
-                                                    'columns':['feature_label']},
-                            'measurement_channels':{'index':'channel_index',
-                                                    'columns':['channel_label','channel_abbreviation']},
-                            'measurement_statistics':{'index':'statistic_index',
-                                                      'columns':['statistic_label']},
-                            'phenotypes':{'index':'phenotype_index',
-                                          'columns':['phenotype_label']},
-                            'regions':{'index':'region_index',
-                                       'columns':['region_label']},
-                            'tags':{'index':'tag_index',
-                                    'columns':['tag_label']}
+        self._processed_image_id = None
+        self._images = {}                                  # Database of Images
+        self._sample_name = None                                     # Sample name
+        self._frame_name = None                                      # Individual image name from within a sample
+        self.data_tables = {
+        'cells':{'index':'cell_index',            
+                  'columns':['x','y','phenotype_index',
+                             'region_index']},
+        'cell_tags':{'index':'db_id',            
+                     'columns':['tag_index','cell_index']},
+        'cell_measurements':{'index':'measurement_index', 
+                             'columns':['cell_index','statistic_index','feature_index','channel_index','value']},
+        'measurement_features':{'index':'feature_index',
+                                'columns':['feature_label']},
+        'measurement_channels':{'index':'channel_index',
+                                'columns':['channel_label','channel_abbreviation','image_id']},
+        'measurement_statistics':{'index':'statistic_index',
+                                  'columns':['statistic_label']},
+        'phenotypes':{'index':'phenotype_index',
+                      'columns':['phenotype_label']},
+        'regions':{'index':'region_index',
+                   'columns':['region_label','region_size','image_id']},
+        'tags':{'index':'tag_index',
+                'columns':['tag_label']}
                            }
         self._data = {} # Do not acces directly. Use set_data_table and get_data_table to access.
         for x in self.data_tables.keys(): 
