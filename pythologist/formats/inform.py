@@ -2,7 +2,7 @@ import os, re, json, sys
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
-from pythologist.formats import CellImageDataGeneric, CellImageSetGeneric, CellImageRaw
+from pythologist.formats import CellImageGeneric
 from uuid import uuid4
 from pythologist.formats.utilities import read_tiff_stack
 import xml.etree.ElementTree as ET
@@ -10,7 +10,7 @@ from uuid import uuid4
 
 _float_decimals = 6
 
-class CellImageSetInForm(CellImageSetGeneric):
+class CellImageSetInForm(object):
     def __init__(self):
         super().__init__()
     def read_from_path(self,path,verbose=False,limit=None,sample_index=1):
@@ -63,86 +63,28 @@ class CellImageSetInForm(CellImageSetGeneric):
                 rows.append([sample,frame,image_id])
         return pd.DataFrame(rows)     
 
-class CellImageRawInForm(CellImageRaw):
-    """ Store the raw image data that makes up a single frame from InForm """
-    def __init__(self,binary_seg_image_file=None,component_image_file=None):
-        # Start with the binary seg image file because if it has a processed image area,
-        # that will be applied to all other masks and we can get that segmentation right away
-        super().__init__()
-        self._storage_type = np.float16
-        self._mask_key = None
-        self._segmentation_key = None
 
-        # Now we've read in whatever we've got fromt he binary seg image
-        self._read_component_image(component_image_file)
-
-        if binary_seg_image_file is not None:
-            self._read_binary_seg_image(binary_seg_image_file)
-            # if we have a ProcessedImage we can use that for an 'Any' region
-            m = self._mask_key.set_index('mask_label')
-            if 'ProcessRegionImage' in m.index:
-                # we have a ProcessedImage
-                print('have a processedimage')
-                self._processed_image_id = m.loc['ProcessRegionImage']['image_id']
-                self._images[self._processed_image_id] = self._images[self._processed_image_id].astype(np.int8)
-            elif 'TissueClassMap' in m.index:
-                # We can build a ProcessedImage from the TissueClassMap
-                img = self._images[m.loc['TissueClassMap']['image_id']]
-                self._processed_image_id = uuid4().hex
-                self._images[self._processed_image_id] = np.array(pd.DataFrame(img).applymap(lambda x: 0 if x==255 else 1)).astype(np.int8)
-
-        if self._processed_image_id is None and self._channel_key.shape[0]>0:
-                # We have nothing so we assume the entire image is processed until we have some reason to update this
-                dim = self._images[self._channel_key.iloc[0,1]].shape
-                self._processed_image_id = uuid4().hex
-                self._images[self._processed_image_id] = np.ones(dim,dtype=np.int8)
-
-        if self._processed_image_id is None:
-            raise ValueError("Nothing to set determine size of images")
-
-        # Now we can set the regions if we have them set intrinsically
-        m = self._mask_key.set_index('mask_label')
-        if 'TissueClassMap' in m.index:
-            img = self._images[m.loc['TissueClassMap']['image_id']]
-            regions = pd.DataFrame(img.astype(int)).stack().unique()
-            regions = [x for x in regions if x != 255]
-            region_key = []
-            for region in regions:
-                image_id = uuid4().hex
-                region_key.append([region,image_id])
-                self._images[image_id] = np.array(pd.DataFrame(img.astype(int)).applymap(lambda x: 1 if x==region else 0)).astype(np.int8)
-            df = pd.DataFrame(region_key,columns=['region_index','image_id']).set_index('region_index')
-            df['region_size'] = df.apply(lambda x:
-                    self._images[x['image_id']].sum()
-                ,1)
-            self._region_key = df
-
-        # If we don't have any regions set then we can just use the processed image
-        if self._region_key is None:
-            img = self._images[self._processed_image_id].copy()
-            region_id = uuid4().hex
-            self._images[region_id] = img
-            self._region_key = pd.DataFrame(pd.Series({'region_index':0,'image_id':region_id,'region_size':img.sum()})).T.set_index('region_index')
-
-    @property
-    def region_sizes(self):
-        ### return region sizes
-        return self._masks
-    
-
-    def add_custom_mask(self,filename,mask_label):
-        return
-
-def _parse_image_description(metatext):
-    root = ET.fromstring(metatext)
-    d = dict([(child.tag,child.text) for child in root])
-    return root.tag, d
-
-class CellImageDataInForm(CellImageDataGeneric):
+class CellImageInForm(CellImageGeneric):
     """ Store data from a single image from an inForm export
+
+        This is a CellImage object that contains data and images from one image frame
     """
-    def __init__(self):
+    def __init__(self,
+                 sample_name=None,
+                 frame_name=None,
+                 cell_seg_data_file=None,
+                 cell_seg_data_summary_file=None,
+                 score_data_file=None,
+                 tissue_seg_data_file=None,
+                 binary_seg_image_file=None,
+                 component_image_file=None,
+                 verbose=False,
+                 channel_abbreviations=None):
+        self.verbose = verbose
         super().__init__()
+
+        self._sample_name = sample_name
+        self._frame_name = frame_name
         self._storage_type = np.float16
 
         ### Define extra InForm-specific data tables
@@ -152,6 +94,17 @@ class CellImageDataInForm(CellImageDataGeneric):
                  'columns':['segmentation_label','image_id']}
         self.data_tables['mask_images'] = {'index':'db_id',
                  'columns':['mask_label','image_id']}
+
+        ### Read in the data for our object
+        self._read_data(cell_seg_data_file,
+                   cell_seg_data_summary_file,
+                   score_data_file,
+                   tissue_seg_data_file,
+                   verbose,
+                   channel_abbreviations)
+        self._read_images(binary_seg_image_file,
+                   component_image_file)
+    
     @property
     def excluded_channels(self):
         return ['Autofluorescence','Post-processing']    
@@ -163,36 +116,36 @@ class CellImageDataInForm(CellImageDataGeneric):
                merge(self.get_data('measurement_features'),left_on='feature_index',right_index=True).\
                merge(self.get_data('measurement_channels'),left_on='channel_index',right_index=True)
 
-    @property
-    def gated_cells(self):
+    def binary_calls(self):
         # generate a table of gating calls with ncols = to the number of gates + phenotypes
 
         # start by getting the phenotypes
         phenotypes = self.get_data('phenotypes')['phenotype_label'].dropna().tolist()
         temp = pd.DataFrame(index=self.get_data('cells').index,columns=phenotypes)
-        temp = temp.fillna('-')
+        temp = temp.fillna(0)
         temp = temp.merge(self.df[['phenotype_label']],left_index=True,right_index=True)
         for phenotype in phenotypes:
-            temp.loc[temp['phenotype_label']==phenotype,phenotype]='+'
+            temp.loc[temp['phenotype_label']==phenotype,phenotype]=1
         temp = temp.drop(columns='phenotype_label')
 
         if self.get_data('thresholds').shape[0] == 0:
-            return temp
-        return temp.merge(self._scored_gated_cells(),left_index=True,right_index=True)
+            return temp.astype(np.int8)
+        return temp.merge(self._scored_gated_cells(),left_index=True,right_index=True).astype(np.int8)
+
 
     def _scored_gated_cells(self):
         d = self.get_data('thresholds').reset_index().\
             merge(self.get_data('cell_measurements').reset_index(),on=['statistic_index','feature_index','channel_index'])
         d['gate'] = d.apply(lambda x: x['value']>=x['threshold_value'],1)
-        d = d.pivot(values='gate',index='cell_index',columns='gate_label').applymap(lambda x: '+' if x else '-')
+        d = d.pivot(values='gate',index='cell_index',columns='gate_label').applymap(lambda x: 1 if x else 0)
         return d
     
-    def read_data(self,
+
+    def _read_data(self,
                         cell_seg_data_file=None,
                         cell_seg_data_summary_file=None,
                         score_data_file=None,
                         tissue_seg_data_file=None,
-                        tissue_seg_data_summary_file=None,
                         verbose=False,
                         channel_abbreviations=None):
         """ Read in the image data from a inForm
@@ -272,7 +225,6 @@ class CellImageDataInForm(CellImageDataGeneric):
             _regions['region_size'] = np.nan # We don't have size available yet
             _regions['image_id'] = np.nan
             self.set_data('regions',_regions)
-        print(self.get_data('regions'))
         _cell_regions = _cell_regions.merge(self.get_data('regions')[['region_label']].reset_index(),on='region_label')
         _cell_regions = _cell_regions.drop(columns=['region_label']).set_index('cell_index')
 
@@ -421,7 +373,7 @@ class CellImageDataInForm(CellImageDataGeneric):
         self.set_data('thresholds',_thresholds)
 
     ### Lets work with image files now
-    def read_images(self,binary_seg_image_file=None,component_image_file=None):
+    def _read_images(self,binary_seg_image_file=None,component_image_file=None):
         # Start with the binary seg image file because if it has a processed image area,
         # that will be applied to all other masks and we can get that segmentation right away
 
@@ -434,7 +386,7 @@ class CellImageDataInForm(CellImageDataGeneric):
             m = self.get_data('mask_images').set_index('mask_label')
             if 'ProcessRegionImage' in m.index:
                 # we have a ProcessedImage
-                print('have a processedimage')
+                #print('have a processedimage')
                 self._processed_image_id = m.loc['ProcessRegionImage']['image_id']
                 self._images[self._processed_image_id] = self._images[self._processed_image_id].astype(np.int8)
             elif 'TissueClassMap' in m.index:
@@ -447,8 +399,8 @@ class CellImageDataInForm(CellImageDataGeneric):
         _channel_key_with_images = _channel_key[~_channel_key['image_id'].isna()]
         if self._processed_image_id is None and _channel_key_with_images.shape[0]>0:
                 # We have nothing so we assume the entire image is processed until we have some reason to update this
-                dim = self._images[_channel_key_with_images.iloc[0]['image_id']].shape
-                print(dim)
+                if self.verbose: sys.stderr.write("No mask present so setting entire image area to be processed area.")
+                dim = self._images[_channel_key_with_images.iloc[0]['image_id']].shape                
                 self._processed_image_id = uuid4().hex
                 self._images[self._processed_image_id] = np.ones(dim,dtype=np.int8)
 
@@ -522,4 +474,9 @@ class CellImageDataInForm(CellImageDataGeneric):
         _segmentation_key = pd.DataFrame(segmentation_names,columns=['segmentation_label','image_id'])
         _segmentation_key.index.name = 'db_id'
         self.set_data('segmentation_images',_segmentation_key)
+
+def _parse_image_description(metatext):
+    root = ET.fromstring(metatext)
+    d = dict([(child.tag,child.text) for child in root])
+    return root.tag, d
 

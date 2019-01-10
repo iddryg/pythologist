@@ -1,25 +1,19 @@
 import pandas as pd
+import h5py, os
+from uuid import uuid4
 """ These are classes to help deal with cell-level image data """
 
 class CellImageGeneric(object):
-    """ A generic CellImage that combines the raw and data
-    """
-    def __init__(self):
-        self.data = None
-        self.images = None
-        self.sample = None
-        self.frame = None
-
-class CellImageDataGeneric(object):
     """ A generic CellImageData object
     """
     def __init__(self):
         # Define the column structure of all the tables.  
-        #   Non-generic CellImageData could define additional data tables
+        #   Non-generic CellImageData may define additional data tables
         self._processed_image_id = None
         self._images = {}                                  # Database of Images
         self._sample_name = None                                     # Sample name
         self._frame_name = None                                      # Individual image name from within a sample
+        self._id = uuid4().hex
         self.data_tables = {
         'cells':{'index':'cell_index',            
                   'columns':['x','y','phenotype_index',
@@ -45,7 +39,18 @@ class CellImageDataGeneric(object):
         for x in self.data_tables.keys(): 
             self._data[x] = pd.DataFrame(columns=self.data_tables[x]['columns'])
             self._data[x].index.name = self.data_tables[x]['index']
-
+    @property
+    def id(self):
+        return self._id
+    @property
+    def sample_name(self):
+        return self._sample_name
+    @property
+    def frame_name(self):
+        return self._frame_name
+    @property
+    def sample_name(self):
+       return self._sample_name
     def set_data(self,table_name,table):
         # Assign data to the standard tables. Do some column name checking to make sure we are getting what we expect
         if table_name not in self.data_tables: raise ValueError("Error table name doesn't exist in defined formats")
@@ -97,16 +102,15 @@ class CellImageDataGeneric(object):
     def excluded_channels(self):
         raise ValueError("Must be overidden")
 
-    @property
-    def gated_cells(self):
+    def binary_calls(self):
         # Default to just gating on mutually exclusive phenotypes
         phenotypes = self.get_data('phenotypes')['phenotype_label'].dropna().tolist()
         temp = pd.DataFrame(index=self.get_data('cells').index,columns=phenotypes)
-        temp = temp.fillna('-')
+        temp = temp.fillna(0)
         temp = temp.merge(self.df[['phenotype_label']],left_index=True,right_index=True)
         for phenotype in phenotypes:
-            temp.loc[temp['phenotype_label']==phenotype,phenotype]='+'
-        return temp.drop(columns='phenotype_label')
+            temp.loc[temp['phenotype_label']==phenotype,phenotype]=1
+        return temp.drop(columns='phenotype_label').astype(np.int8)
 
     @property
     def df(self):
@@ -119,20 +123,125 @@ class CellImageDataGeneric(object):
         return
 
 """ Hold a group of images from different samples """
-class CellImageSetGeneric(object):
-    def __init__(self):
-        self.images = {}
-        return
+class CellImageSet(object):
+    # Store a collection of CellImage data objects
+    # This object can be created 'w', read/written as a mutable object 'r+', or read-only 'r'
+    def __init__(self,h5_db_filename,mode='r+'):
+        if not mode in ['r','r+','w']: raise ValueError("Invalide mode selected "+mode)
 
-""" Hold the raw images that represent the data """
-class CellImageRaw(object):
-    def __init__(self):
-        self._images = {} # database of all images
-        self._channel_key = None # match channels to images
-        self._region_key = None # match regions to image masks and region sizes
-        self._processed_id = None # base processed image mask
-        return
+        self._fn = h5_db_filename
+        self._id = None
+        self._mode = mode
+
+        if 'id' in [x for x in h5py.File(self._fn,'r')] and self._mode != 'w':
+            # We are doing some kind of reading
+            self._id = pd.read_hdf(self._fn,'id').iloc[0,0]
+        elif self._mode in ['r+','w']:
+            # There is no id table so we will create a new database
+            self._id = uuid4().hex
+            df = pd.DataFrame(pd.Series({'id':self._id})).T
+            df.to_hdf(self._fn,'id',mode='w',format='table')
+        else:
+            raise ValueError("CellImageSet has not been created yet, and is not in a redable format")
+        return   
+
     @property
-    def channel_key(self):
-        return self._channel_key
-   
+    def id(self):
+        return self._id
+    
+    def get_data(self,table_name):
+        return pd.read_hdf(self._fn,table_name)
+
+    def add_data(self,cellimage):
+        if self._mode == 'r': raise ValueError("cannot add in read-only mode")
+ 
+        # Add a CellImage to the samples and return the index of this cellimage
+        new_samples, cellimage_index = self._add_to_samples(cellimage)
+
+        # update the cells and save the new index
+        new_cells = self._add_to_cells(cellimage,cellimage_index)
+        
+        new_cell_measurements = self._add_to_cell_measurements(cellimage,cellimage_index,new_cells)
+
+
+        # Write the changes
+        new_samples.to_hdf(self._fn,'samples',mode='r+',format='table',complib='zlib',complevel=9)
+        new_cells.to_hdf(self._fn,'cells',mode='r+',format='table',complib='zlib',complevel=9)
+        new_cell_measurements.to_hdf(self._fn,'cell_measurements',mode='r+',format='table',complib='zlib',complevel=9)
+
+    def _add_to_cell_measurements(self,cellimage,cellimage_index,new_cells):
+        # the measurement index is not particularly important its fine if we reset it
+        newdata = cellimage.get_data('cell_measurements')
+        newdata['cellimage_index'] = cellimage_index
+        if 'cell_measurements' in [x for x in h5py.File(self._fn,'r')]:
+            #print(self.get_data('cells')[['cell_index','cellimage_index']].reset_index())
+            olddata = self.get_data('cell_measurements').\
+                merge(self.get_data('cells')[['cell_index','cellimage_index']],left_on='cell_dbid',right_index=True).\
+                drop(columns='cell_dbid')
+            newdata = pd.concat([olddata[newdata.columns],newdata]).reset_index(drop=True)
+        newdata = newdata.merge(new_cells[['cell_index','cellimage_index']].reset_index(),on=['cell_index','cellimage_index']).\
+            drop(columns=['cell_index','cellimage_index'])
+        newdata.index.name = 'measurement_index'
+        return newdata
+
+    def _add_to_cells(self,cellimage,cellimage_index):
+        newdata = cellimage.get_data('cells').reset_index()
+        newdata['cellimage_index'] = cellimage_index
+        if 'cells' in [x for x in h5py.File(self._fn,'r')]:
+            olddata = self.get_data('cells')
+            newdata = pd.concat([olddata[newdata.columns],newdata]).reset_index(drop=True)
+        newdata.index.name='cell_dbid'
+        return newdata
+
+    def _add_binary_calls(self,cellimage,cellimage_index):
+        newdata = cellimage.binary_calls().reset_index()
+        newdata['cellimage_index'] = cellimage_index
+        if 'binary_calls' in [x for x in h5py.File(self._fn,'r')]:
+            olddata = self.get_data('binary_calls')
+            newdata = pd.concat([olddata,newdata]).reset_index(drop=True)
+        newdata = newdata.merge(self.get_data('cells')[['cell_index','cellimage_index']].reset_index(),on=['cell_index','cellimage_index']).\
+            drop(columns=['cell_index','cellimage_index']).set_index('cell_dbid')
+        newdata.to_hdf(self._fn,'binary_calls',mode='r+',format='table',complib='zlib',complevel=9)
+
+    def _add_cellindex_to_table(self,cellimage,cellimage_index,table_name,indexname=None):
+        # check if there is a regions table and create one if it doesn't already exist
+        newdata = cellimage.get_data(table_name).reset_index()
+        newdata['cellimage_index'] = cellimage_index
+        if table_name in [x for x in h5py.File(self._fn,'r')]:
+            regions = self.get_data(table_name)
+            newdata = pd.concat([regions,newdata]).reset_index(drop=True)
+        if indexname is not None:
+            newdata.index.name = indexname
+        newdata.to_hdf(self._fn,table_name,mode='r+',format='table',complib='zlib',complevel=9)
+
+            
+
+    def _add_to_samples(self,cellimage):
+        # check if there is a sample table and create one if it doesn't already exist
+        # return the cellimage index
+        if not 'samples' in [x for x in h5py.File(self._fn,'r')]:
+            # Table doesn't even exist
+            samples_df = pd.DataFrame(pd.Series({'sample_name':cellimage.sample_name,
+                                                'frame_name':cellimage.frame_name,
+                                                'cellimage_id':cellimage.id})).T
+            samples_df.index.name = 'cellimage_index'
+            number = list(samples_df.index)[0]
+        else:
+            # We already have a samples table so add this data to our table
+            samples_df = pd.read_hdf(self._fn,'samples')
+            # check if this has already been added
+            temp = samples_df[samples_df['cellimage_id']==cellimage.id]
+            if temp.shape[0] > 0: raise ValueError("Error: cannot add the same cellimage twice")
+            newdata = pd.DataFrame(pd.Series({'sample_name':cellimage.sample_name,
+                                              'frame_name':cellimage.frame_name,
+                                              'cellimage_id':cellimage.id})).T
+            newdata.index.name = 'cellimage_index'
+            number = samples_df.index.max()+1
+            newdata.index = [number]
+            samples_df = pd.concat([samples_df,newdata])
+            samples_df.index.name = 'cellimage_index'
+        return samples_df,number
+
+
+        
+        
