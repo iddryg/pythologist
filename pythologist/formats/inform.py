@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from pythologist.formats import CellImageGeneric
 from uuid import uuid4
-from pythologist.formats.utilities import read_tiff_stack
+from pythologist.formats.utilities import read_tiff_stack, map_image_ids, flood_fill
 import xml.etree.ElementTree as ET
 from uuid import uuid4
 
@@ -70,8 +70,6 @@ class CellImageInForm(CellImageGeneric):
         This is a CellImage object that contains data and images from one image frame
     """
     def __init__(self,
-                 sample_name=None,
-                 frame_name=None,
                  cell_seg_data_file=None,
                  cell_seg_data_summary_file=None,
                  score_data_file=None,
@@ -83,15 +81,13 @@ class CellImageInForm(CellImageGeneric):
         self.verbose = verbose
         super().__init__()
 
-        self._sample_name = sample_name
-        self._frame_name = frame_name
         self._storage_type = np.float16
 
         ### Define extra InForm-specific data tables
         self.data_tables['thresholds'] = {'index':'gate_index',
-                 'columns':['threshold_value','statistic_index','feature_index','channel_index','gate_label','region_index']}
-        self.data_tables['segmentation_images'] = {'index':'db_id',
-                 'columns':['segmentation_label','image_id']}
+                 'columns':['threshold_value','statistic_index',
+                            'feature_index','channel_index',
+                            'gate_label','region_index']}
         self.data_tables['mask_images'] = {'index':'db_id',
                  'columns':['mask_label','image_id']}
 
@@ -104,17 +100,25 @@ class CellImageInForm(CellImageGeneric):
                    channel_abbreviations)
         self._read_images(binary_seg_image_file,
                    component_image_file)
+
     
     @property
     def excluded_channels(self):
-        return ['Autofluorescence','Post-processing']    
+        return ['Autofluorescence','Post-processing','DAPI']    
 
     @property
     def thresholds(self):
         # Print the threhsolds
-        return self.get_data('thresholds').merge(self.get_data('measurement_statistics'),left_on='statistic_index',right_index=True).\
-               merge(self.get_data('measurement_features'),left_on='feature_index',right_index=True).\
-               merge(self.get_data('measurement_channels'),left_on='channel_index',right_index=True)
+        return self.get_data('thresholds').merge(self.get_data('measurement_statistics'),
+                                                 left_on='statistic_index',
+                                                 right_index=True).\
+               merge(self.get_data('measurement_features'),
+                     left_on='feature_index',
+                     right_index=True).\
+               merge(self.get_data('measurement_channels'),
+                     left_on='channel_index',
+                     right_index=True)
+
 
     def binary_calls(self):
         # generate a table of gating calls with ncols = to the number of gates + phenotypes
@@ -243,6 +247,7 @@ class CellImageInForm(CellImageGeneric):
         # Get the thresholds
         if score_data_file is not None: 
             self._parse_score_file(score_data_file)
+
         return
 
     def _parse_measurements(self,_seg,channel_abbreviations):   
@@ -394,6 +399,10 @@ class CellImageInForm(CellImageGeneric):
                 img = self._images[m.loc['TissueClassMap']['image_id']]
                 self._processed_image_id = uuid4().hex
                 self._images[self._processed_image_id] = np.array(pd.DataFrame(img).applymap(lambda x: 0 if x==255 else 1)).astype(np.int8)
+            segmentation_images = self.get_data('segmentation_images').set_index('segmentation_label')
+            if 'Nucleus' in segmentation_images.index and \
+               'Membrane' in segmentation_images.index:
+                self._make_cell_map()
 
         _channel_key = self.get_data('measurement_channels')
         _channel_key_with_images = _channel_key[~_channel_key['image_id'].isna()]
@@ -474,6 +483,62 @@ class CellImageInForm(CellImageGeneric):
         _segmentation_key = pd.DataFrame(segmentation_names,columns=['segmentation_label','image_id'])
         _segmentation_key.index.name = 'db_id'
         self.set_data('segmentation_images',_segmentation_key)
+    def _make_cell_map(self):
+        #### Get the cell map according to this ####
+        #
+        # Pre: Requires both a Nucleus and Membrane map
+        # Post: Sets a 'cell_map' in the 'segmentation_images' 
+        segmentation_images = self.get_data('segmentation_images').set_index('segmentation_label')
+        nucid = segmentation_images.loc['Nucleus','image_id']
+        memid = segmentation_images.loc['Membrane','image_id']
+        nuc = self.get_image(nucid)
+        nmap = map_image_ids(nuc)
+        mem = self.get_image(memid)
+        mmap = map_image_ids(mem)
+        overlap = nmap.rename(columns={'id':'nuc'}).\
+                       merge(mmap.rename(columns={'id':'mem'}),on=['x','y'])
+        overlap = set(overlap.apply(lambda x: (x['x'],x['y']),1))
+        nmap2 = nmap.loc[~nmap.apply(lambda x: (x['x'],x['y']),1).isin(overlap)]
+        centery = nmap2.groupby(['id']).apply(lambda x: 
+                    pd.Series(dict(zip(
+                              ['y'],
+                              [x['y'].tolist()[int(len(x['y'])/2)]]                    
+                          )))
+                    ).reset_index()
+        center = nmap2.merge(centery,on=['id','y']).groupby(['id','y']).apply(lambda x: 
+                    pd.Series(dict(zip(
+                              ['x'],
+                              [x['x'].tolist()[int(len(x['x'])/2)]]                    
+                          )))
+                    ).reset_index().set_index('id')
+        im = mem.copy()
+        im2 = mem.copy()
+        orig = pd.DataFrame(mem.copy())
+        b1 = orig.iloc[0,:].sum()
+        b2 = orig.iloc[:,0].sum()
+        b3 = orig.iloc[orig.shape[0]-1,:].sum()
+        b4 = orig.iloc[:,orig.shape[1]-1].sum()
+        total = b1+b2+b3+b4
+        border_trim = 0
+        if total  == 0:
+            border_trim = 1
+        for x in center.index:
+            coord = (center.loc[x]['x'],center.loc[x]['y'])
+            num = flood_fill(im,coord[0],coord[1],lambda x: x!=0,max_depth=3000,border_trim=border_trim)
+            if len(num) < 2000: 
+                #print('----')
+                #print(x)
+                #print(len(num))
+                for v in num: 
+                    im2[v[1]][v[0]] = x
+        cell_map_id  = uuid4().hex
+        self._images[cell_map_id] = im2.copy()
+        increment  = self.get_data('segmentation_images').index.max()+1
+        extra = pd.DataFrame(pd.Series(dict({'db_id':increment,
+                                             'segmentation_label':'cell_map',
+                                             'image_id':cell_map_id}))).T
+        extra = pd.concat([self.get_data('segmentation_images'),extra.set_index('db_id')])
+        self.set_data('segmentation_images',extra)
 
 def _parse_image_description(metatext):
     root = ET.fromstring(metatext)
