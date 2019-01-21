@@ -10,59 +10,6 @@ from uuid import uuid4
 
 _float_decimals = 6
 
-class CellImageSetInForm(object):
-    def __init__(self):
-        super().__init__()
-    def read_from_path(self,path,verbose=False,limit=None,sample_index=1):
-        # Put together all the available sets of images recursing through the path
-        #base = os.path.abspath(path)
-        path = os.path.abspath(path)
-        self._path = path
-        rows = []
-        z = 0
-        for p, dirs, files in os.walk(self._path,followlinks=True,topdown=False):
-            mydir = p[len(path):]
-            z += 1
-            segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
-            if len(segs) == 0: continue
-            if verbose: sys.stderr.write("SAMPLE: "+str(p)+"\n")
-            #s = Sample(p,mydir,verbose,sample_index)
-            #self._samples.append(s)
-            #if limit is not None and z >= limit: break
-            files = os.listdir(p)
-            segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
-            sample_folder = p.split(os.sep)[-1*sample_index] #os.path.basename(path)
-            self._frames = OrderedDict()
-            snames = set()
-            for file in segs:
-                m = re.match('(.*)cell_seg_data.txt$',file)
-                score = os.path.join(p,m.group(1)+'score_data.txt')
-                summary = os.path.join(p,m.group(1)+'cell_seg_data_summary.txt')
-                binary_seg_maps = os.path.join(p,m.group(1)+'binary_seg_maps.tif')
-                tfile = os.path.join(p,m.group(1)+'tissue_seg_data_summary.txt')
-                tissue_seg_data = tfile if os.path.exists(tfile) else None
-                sample = sample_folder
-                snames.add(sample)
-                frame = m.group(1).rstrip('_')
-                data = os.path.join(p,file)
-                if not os.path.exists(summary):
-                    if verbose: sys.stderr.write('Missing summary file '+summary+"\n")
-                    summary = None
-                if not os.path.exists(score):
-                    raise ValueError('Missing score file '+score)
-                #self._frames[frame] = Frame(path,mydir,sample,frame,data,score,summary,binary_seg_maps,tissue_seg_data,verbose)
-                if verbose: sys.stderr.write('Acquiring frame '+data+"\n")
-                cid = CellImageDataInForm()
-                cid.read_image_data(cell_seg_data_file=data,
-                                    cell_seg_data_summary_file=summary,
-                                    score_data_file=score,
-                                    tissue_seg_data_summary_file=tissue_seg_data,
-                                    verbose=verbose)
-                image_id = str(uuid4())
-                self.images[image_id] = cid
-                rows.append([sample,frame,image_id])
-        return pd.DataFrame(rows)     
-
 
 class CellImageInForm(CellImageGeneric):
     """ Store data from a single image from an inForm export
@@ -84,7 +31,6 @@ class CellImageInForm(CellImageGeneric):
                  'columns':['mask_label','image_id']}
 
 
-    
     @property
     def excluded_channels(self):
         return ['Autofluorescence','Post-processing','DAPI']    
@@ -132,7 +78,7 @@ class CellImageInForm(CellImageGeneric):
         phenotypes = self.get_data('phenotypes')['phenotype_label'].dropna().tolist()
         temp = pd.DataFrame(index=self.get_data('cells').index,columns=phenotypes)
         temp = temp.fillna(0)
-        temp = temp.merge(self.df[['phenotype_label']],left_index=True,right_index=True)
+        temp = temp.merge(self.cell_df()[['phenotype_label']],left_index=True,right_index=True)
         for phenotype in phenotypes:
             temp.loc[temp['phenotype_label']==phenotype,phenotype]=1
         temp = temp.drop(columns='phenotype_label')
@@ -410,7 +356,7 @@ class CellImageInForm(CellImageGeneric):
             elif 'TissueClassMap' in m.index:
                 # We can build a ProcessedImage from the TissueClassMap
                 img = self._images[m.loc['TissueClassMap']['image_id']]
-                self._processed_image_id = uuid4().hex
+                self._processed_image_id =uuid4 ().hex
                 self._images[self._processed_image_id] = np.array(pd.DataFrame(img).applymap(lambda x: 0 if x==255 else 1)).astype(np.int8)
             segmentation_images = self.get_data('segmentation_images').set_index('segmentation_label')
             if 'Nucleus' in segmentation_images.index and \
@@ -421,13 +367,15 @@ class CellImageInForm(CellImageGeneric):
                 if verbose: sys.stderr.write("Making edge-map.\n")
                 self._make_edge_map(verbose=verbose)
                 if verbose: sys.stderr.write("Finished edge-map.\n")
+                if verbose: sys.stderr.write("Set interaction map if appropriate")
+                self.set_interaction_map(touch_distance=1)
             if verbose: sys.stderr.write("Finished reading seg file present.\n")
 
         _channel_key = self.get_data('measurement_channels')
         _channel_key_with_images = _channel_key[~_channel_key['image_id'].isna()]
         if self._processed_image_id is None and _channel_key_with_images.shape[0]>0:
             # We have nothing so we assume the entire image is processed until we have some reason to update this
-            if verbose: sys.stderr.write("No mask present so setting entire image area to be processed area.")
+            if verbose: sys.stderr.write("No mask present so setting entire image area to be processed area.\n")
             dim = self._images[_channel_key_with_images.iloc[0]['image_id']].shape                
             self._processed_image_id = uuid4().hex
             self._images[self._processed_image_id] = np.ones(dim,dtype=np.int8)
