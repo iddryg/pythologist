@@ -58,24 +58,36 @@ class CellImageGeneric(object):
     def cell_map(self):
         if 'cell_map' not in list(self.get_data('segmentation_images')['segmentation_label']): return None
         cmid = self.get_data('segmentation_images').set_index('segmentation_label').loc['cell_map','image_id']
-        return map_image_ids(self.get_image(cmid))
+        return map_image_ids(self.get_image(cmid)).rename(columns={'id':'cell_index'}).set_index('cell_index')
 
+    def edge_map(self):
+        if 'edge_map' not in list(self.get_data('segmentation_images')['segmentation_label']): return None
+        cmid = self.get_data('segmentation_images').set_index('segmentation_label').loc['edge_map','image_id']
+        return map_image_ids(self.get_image(cmid)).\
+                   rename(columns={'id':'cell_index'}).set_index('cell_index')
+
+    def segmentation_info(self):
+        return self.edge_map().reset_index().groupby(['cell_index']).count()[['x']].rename(columns={'x':'edge_pixels'}).\
+            merge(self.cell_map().reset_index().groupby(['cell_index']).count()[['x']].rename(columns={'x':'area_pixels'}),
+                  left_index=True,
+                  right_index=True).reset_index().set_index('cell_index')
 
     def interaction_map(self,touch_distance=1):
-        if self.cell_map() is None: return None
-        d1 = self.cell_map()
+        full = self.cell_map()
+        edge = self.edge_map()
+        if full is None or edge is None: return None
+        d1 = edge.reset_index()
         d1['key'] = 1
-        d2 = pd.DataFrame({'mod':[-1*touch_distance,touch_distance]})
+        d2 = pd.DataFrame({'mod':[-1*touch_distance,0,touch_distance]})
         d2['key'] = 1
         d3 = d1.merge(d2,on='key').merge(d2,on='key')
         d3['x'] = d3.apply(lambda x: x['x']+x['mod_x'],1)
         d3['y'] = d3.apply(lambda x: x['y']+x['mod_y'],1)
-        d3 = d3[['x','y','id']]
-        reduced = d1.merge(d3,on=['x','y','id'],how='right')
-        reduced = reduced[reduced['key'].isna()].drop(columns='key').rename(columns={'id':'id2'})
-        neighbors = reduced.merge(d1.rename(columns={'id':'id1'}),on=['x','y']).\
-            query('id1!=id2')[['id1','id2']].drop_duplicates()
-        return neighbors
+        d3 = d3[['x','y','cell_index','key']].rename(columns={'cell_index':'neighbor_cell_index'})
+        return full.reset_index().merge(d3,on=['x','y']).\
+            query('cell_index!=neighbor_cell_index').\
+            drop_duplicates().groupby(['cell_index','neighbor_cell_index']).count()[['key']].reset_index().\
+            rename(columns={'key':'pixel_count'})
 
     @property
     def thresholds(self):

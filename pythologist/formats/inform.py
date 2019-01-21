@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from pythologist.formats import CellImageGeneric
 from uuid import uuid4
-from pythologist.formats.utilities import read_tiff_stack, map_image_ids, flood_fill
+from pythologist.formats.utilities import read_tiff_stack, map_image_ids, flood_fill, image_edges
 import xml.etree.ElementTree as ET
 from uuid import uuid4
 
@@ -92,14 +92,17 @@ class CellImageInForm(CellImageGeneric):
                  'columns':['mask_label','image_id']}
 
         ### Read in the data for our object
+        if verbose: sys.stderr.write("Reading text data.\n")
         self._read_data(cell_seg_data_file,
                    cell_seg_data_summary_file,
                    score_data_file,
                    tissue_seg_data_file,
                    verbose,
                    channel_abbreviations)
+        if verbose: sys.stderr.write("Reading image data.\n")
         self._read_images(binary_seg_image_file,
-                   component_image_file)
+                   component_image_file,
+                   verbose=verbose)
 
     
     @property
@@ -188,10 +191,10 @@ class CellImageInForm(CellImageGeneric):
         if cell_seg_data_summary_file is not None:
              ############
              # Update the phenotypes table if a cell_seg_data_summary file is present
-            if verbose: sys.stderr.write("cell seg summary file is present so acquire phenotype list from it\n")
+            if verbose: sys.stderr.write("Cell seg summary file is present so acquire phenotype list from it.\n")
             _segsum = pd.read_csv(cell_seg_data_summary_file,"\t")
             if 'Phenotype' not in _segsum.columns: 
-                if verbose: sys.stderr.write("missing phenotype column\n")
+                if verbose: sys.stderr.write("Missing phenotype column so set to NaN.\n")
                 _segsum['Phenotype'] = np.nan
 
             _phenotypes_present = [x for x in sorted(_segsum['Phenotype'].unique().tolist()) if x != 'All']
@@ -204,6 +207,7 @@ class CellImageInForm(CellImageGeneric):
         _phenotype_list = _phenotype_list.set_index('phenotype_index')
         #Assign 'phenotypes' in a way that ensure we retain the pre-defined column structure
         self.set_data('phenotypes',_phenotype_list)
+        if verbose: sys.stderr.write("Finished assigning phenotype list.\n")
 
         _phenotypes = _phenotypes.drop(columns=['phenotype_label']).applymap(int).set_index('cell_index')
 
@@ -215,6 +219,7 @@ class CellImageInForm(CellImageGeneric):
         # Set the cell_regions
         _cell_regions = _seg[['Cell ID','Tissue Category']].copy().rename(columns={'Cell ID':'cell_index','Tissue Category':'region_label'})
         if tissue_seg_data_file:
+            if verbose: sys.stderr.write("Tissue seg file is present.\n")
             _regions = pd.read_csv(tissue_seg_data_file,sep="\t")
             _regions = _regions[['Region ID','Tissue Category','Region Area (pixels)']].\
                 rename(columns={'Region ID':'region_index','Tissue Category':'region_label','Region Area (pixels)':'region_size'}).set_index('region_index')
@@ -223,7 +228,7 @@ class CellImageInForm(CellImageGeneric):
             self.set_data('regions',_regions)
             #raise ValueError("Region summary not implemented")
         else:
-            #_cell_regions = _seg[['Cell ID','Tissue Category']].copy().rename(columns={'Cell ID':'cell_index','Tissue Category':'region_label'})
+            if verbose: sys.stderr.write("Tissue seg file is present.\n")
             _regions = pd.DataFrame({'region_label':_cell_regions['region_label'].unique()})
             _regions.index.name = 'region_index'
             _regions['region_size'] = np.nan # We don't have size available yet
@@ -235,18 +240,19 @@ class CellImageInForm(CellImageGeneric):
         # Now we can add to cells our region indecies
         _cells = _cells.merge(_cell_regions,left_index=True,right_index=True,how='left')
 
-
         # Assign 'cells' in a way that ensures we retain our pre-defined column structure. Should throw a warning if anything is wrong
         self.set_data('cells',_cells)
+        if verbose: sys.stderr.write("Finished setting the cell list regions are set.\n")
 
         ###########
         # Get the intensity measurements - sets 'measurement_channels', 'measurement_statistics', 'measurement_features', and 'cell_measurements'
         self._parse_measurements(_seg,channel_abbreviations)  
-
+        if verbose: sys.stderr.write("Finished setting the measurements.\n")
         ###########
         # Get the thresholds
         if score_data_file is not None: 
             self._parse_score_file(score_data_file)
+            if verbose: sys.stderr.write("Finished reading score.\n")
 
         return
 
@@ -378,14 +384,17 @@ class CellImageInForm(CellImageGeneric):
         self.set_data('thresholds',_thresholds)
 
     ### Lets work with image files now
-    def _read_images(self,binary_seg_image_file=None,component_image_file=None):
+    def _read_images(self,binary_seg_image_file=None,component_image_file=None,verbose=False):
         # Start with the binary seg image file because if it has a processed image area,
         # that will be applied to all other masks and we can get that segmentation right away
 
         # Now we've read in whatever we've got fromt he binary seg image
+        if verbose: sys.stderr.write("Reading component images.\n")
         self._read_component_image(component_image_file)
+        if verbose: sys.stderr.write("Finished reading component images.\n")
 
         if binary_seg_image_file is not None:
+            if verbose: sys.stderr.write("Binary seg file present.\n")
             self._read_binary_seg_image(binary_seg_image_file)
             # if we have a ProcessedImage we can use that for an 'Any' region
             m = self.get_data('mask_images').set_index('mask_label')
@@ -402,16 +411,22 @@ class CellImageInForm(CellImageGeneric):
             segmentation_images = self.get_data('segmentation_images').set_index('segmentation_label')
             if 'Nucleus' in segmentation_images.index and \
                'Membrane' in segmentation_images.index:
+                if verbose: sys.stderr.write("Making cell-map filled-in.\n")
                 self._make_cell_map()
+                if verbose: sys.stderr.write("Finished cell-map.\n")
+                if verbose: sys.stderr.write("Making edge-map.\n")
+                self._make_edge_map(verbose=verbose)
+                if verbose: sys.stderr.write("Finished edge-map.\n")
+            if verbose: sys.stderr.write("Finished reading seg file present.\n")
 
         _channel_key = self.get_data('measurement_channels')
         _channel_key_with_images = _channel_key[~_channel_key['image_id'].isna()]
         if self._processed_image_id is None and _channel_key_with_images.shape[0]>0:
-                # We have nothing so we assume the entire image is processed until we have some reason to update this
-                if self.verbose: sys.stderr.write("No mask present so setting entire image area to be processed area.")
-                dim = self._images[_channel_key_with_images.iloc[0]['image_id']].shape                
-                self._processed_image_id = uuid4().hex
-                self._images[self._processed_image_id] = np.ones(dim,dtype=np.int8)
+            # We have nothing so we assume the entire image is processed until we have some reason to update this
+            if verbose: sys.stderr.write("No mask present so setting entire image area to be processed area.")
+            dim = self._images[_channel_key_with_images.iloc[0]['image_id']].shape                
+            self._processed_image_id = uuid4().hex
+            self._images[self._processed_image_id] = np.ones(dim,dtype=np.int8)
 
         if self._processed_image_id is None:
             raise ValueError("Nothing to set determine size of images")
@@ -483,6 +498,25 @@ class CellImageInForm(CellImageGeneric):
         _segmentation_key = pd.DataFrame(segmentation_names,columns=['segmentation_label','image_id'])
         _segmentation_key.index.name = 'db_id'
         self.set_data('segmentation_images',_segmentation_key)
+
+    def _make_edge_map(self,verbose=False):
+        #### Get the edges
+        segmentation_images = self.get_data('segmentation_images').set_index('segmentation_label')
+        cellid = segmentation_images.loc['cell_map','image_id']
+        cm = self.get_image(cellid)
+        memid = segmentation_images.loc['Membrane','image_id']
+        mem = self.get_image(memid)
+        em = image_edges(cm,verbose=verbose)
+        em_id  = uuid4().hex
+        self._images[em_id] = em.copy()
+        increment  = self.get_data('segmentation_images').index.max()+1
+        extra = pd.DataFrame(pd.Series(dict({'db_id':increment,
+                                             'segmentation_label':'edge_map',
+                                             'image_id':em_id}))).T
+        extra = pd.concat([self.get_data('segmentation_images'),extra.set_index('db_id')])
+        self.set_data('segmentation_images',extra)
+        return em
+
     def _make_cell_map(self):
         #### Get the cell map according to this ####
         #
