@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import h5py, os
 from uuid import uuid4
 from pythologist.formats.utilities import map_image_ids
@@ -51,9 +52,43 @@ class CellImageGeneric(object):
                                                                                             str(self.data_tables[table_name]['columns']))
         if table.index.name != self.data_tables[table_name]['index']: raise ValueError("Error index name doesn't match defined format")
         self._data[table_name] = table.loc[:,self.data_tables[table_name]['columns']].copy() # Auto-sort, and assign a copy so we aren't ever assigning by reference
+
     def get_data(self,table_name): 
         # copy so we don't ever pass by reference
         return self._data[table_name].copy()
+
+    def read_hdf(self,h5file,location=''):
+        if location != '': location = location.split('/')
+        f = h5py.File(h5file,'r')
+        subgroup = f
+        for x in location:
+            subgroup = subgroup[x]
+        table_names = [x for x in subgroup['data']]
+        for table_name in table_names:
+            self.set_data(table_name,pd.read_hdf(h5file,'/'.join(location+['data',table_name])))
+        # now get images
+        image_names = [x for x in subgroup['images']]
+        for image_name in image_names:
+            self._images[image_name] = np.array(subgroup['images'][image_name])
+        return
+
+    def to_hdf(self,h5file,location='',mode='w'):
+        f = h5py.File(h5file,mode)
+        f.create_group(location+'/data')
+        f.create_group(location+'/images')
+        f.close()
+        for table_name in self.data_tables.keys():
+            data_table = self.get_data(table_name)
+            data_table.to_hdf(h5file,
+                              location+'/data/'+table_name,
+                              mode='r+',
+                              format='table',
+                              complib='zlib',
+                              complevel=9)
+        f = h5py.File(h5file,'a')
+        for image_id in self._images.keys():
+            f.create_dataset(location+'/images/'+image_id,data=self._images[image_id],compression='gzip')
+        f.close()
 
     def cell_map(self):
         if 'cell_map' not in list(self.get_data('segmentation_images')['segmentation_label']): return None

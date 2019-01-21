@@ -69,16 +69,8 @@ class CellImageInForm(CellImageGeneric):
 
         This is a CellImage object that contains data and images from one image frame
     """
-    def __init__(self,
-                 cell_seg_data_file=None,
-                 cell_seg_data_summary_file=None,
-                 score_data_file=None,
-                 tissue_seg_data_file=None,
-                 binary_seg_image_file=None,
-                 component_image_file=None,
-                 verbose=False,
-                 channel_abbreviations=None):
-        self.verbose = verbose
+    def __init__(self):
+        self.verbose = False
         super().__init__()
 
         self._storage_type = np.float16
@@ -91,18 +83,6 @@ class CellImageInForm(CellImageGeneric):
         self.data_tables['mask_images'] = {'index':'db_id',
                  'columns':['mask_label','image_id']}
 
-        ### Read in the data for our object
-        if verbose: sys.stderr.write("Reading text data.\n")
-        self._read_data(cell_seg_data_file,
-                   cell_seg_data_summary_file,
-                   score_data_file,
-                   tissue_seg_data_file,
-                   verbose,
-                   channel_abbreviations)
-        if verbose: sys.stderr.write("Reading image data.\n")
-        self._read_images(binary_seg_image_file,
-                   component_image_file,
-                   verbose=verbose)
 
     
     @property
@@ -122,6 +102,28 @@ class CellImageInForm(CellImageGeneric):
                      left_on='channel_index',
                      right_index=True)
 
+    def read_raw(self,
+                 cell_seg_data_file=None,
+                 cell_seg_data_summary_file=None,
+                 score_data_file=None,
+                 tissue_seg_data_file=None,
+                 binary_seg_image_file=None,
+                 component_image_file=None,
+                 verbose=False,
+                 channel_abbreviations=None):
+        ### Read in the data for our object
+        if verbose: sys.stderr.write("Reading text data.\n")
+        self._read_data(cell_seg_data_file,
+                   cell_seg_data_summary_file,
+                   score_data_file,
+                   tissue_seg_data_file,
+                   verbose,
+                   channel_abbreviations)
+        if verbose: sys.stderr.write("Reading image data.\n")
+        self._read_images(binary_seg_image_file,
+                   component_image_file,
+                   verbose=verbose)
+        return
 
     def binary_calls(self):
         # generate a table of gating calls with ncols = to the number of gates + phenotypes
@@ -279,7 +281,7 @@ class CellImageInForm(CellImageGeneric):
         _intensity1['feature_label'] = 'Whole Cell'
 
         _intensity2 = []
-        _intensity3 = []
+        #_intensity3 = []
         for cname in keepers3:
             if re.match('Entire Cell',cname): continue
             m = re.match('(\S+)\s+(.*) (Mean|Min|Max|Std Dev|Total) \(Normalized Counts, Total Weighting\)$',cname)
@@ -290,20 +292,22 @@ class CellImageInForm(CellImageGeneric):
             v = v.copy()
             for row in v.itertuples(index=False):
                 _intensity2.append([row[0],stain,compartment,m.group(3),round(row[1],_float_decimals)])
-                _intensity3.append([row[0],'Post-processing',compartment,'Area (pixels)',round(row[2],_float_decimals)])
+                #_intensity3.append([row[0],'Post-processing',compartment,'Area (pixels)',round(row[2],_float_decimals)])
 
         _intensity2 = pd.DataFrame(_intensity2,columns=['cell_index','channel_label','feature_label','statistic_label','value'])
-        _intensity3 = pd.DataFrame(_intensity3,columns=['cell_index','channel_label','feature_label','statistic_label','value'])
+        #_intensity3 = pd.DataFrame(_intensity3,columns=['cell_index','channel_label','feature_label','statistic_label','value'])
 
-        _intensities = [_intensity2,_intensity3,_intensity1.loc[:,_intensity2.columns]]
-        if 'Entire Cell Area (pixels)' in _seg:
-            _intensity4 = _seg[['Cell ID','Entire Cell Area (pixels)']].rename(columns={'Cell ID':'cell_index',
-                                                                                 'Entire Cell Area (pixels)':'value',
-                                                                                })
-            _intensity4['channel_label'] = 'Post-processing'
-            _intensity4['feature_label'] = 'Whole Cell'
-            _intensity4['statistic_label'] = 'Area (pixels)'
-            _intensities += [_intensity4.loc[:,_intensity2.columns]]
+        _intensities = [_intensity2,
+                        #_intensity3,
+                        _intensity1.loc[:,_intensity2.columns]]
+        #if 'Entire Cell Area (pixels)' in _seg:
+        #    _intensity4 = _seg[['Cell ID','Entire Cell Area (pixels)']].rename(columns={'Cell ID':'cell_index',
+        #                                                                         'Entire Cell Area (pixels)':'value',
+        #                                                                        })
+        #    _intensity4['channel_label'] = 'Post-processing'
+        #    _intensity4['feature_label'] = 'Whole Cell'
+        #    _intensity4['statistic_label'] = 'Area (pixels)'
+        #    _intensities += [_intensity4.loc[:,_intensity2.columns]]
         _intensity = pd.concat(_intensities)
 
         _measurement_channels = pd.DataFrame({'channel_label':_intensity['channel_label'].unique()})
@@ -447,6 +451,7 @@ class CellImageInForm(CellImageGeneric):
                     self._images[x['image_id']].sum()
                 ,1)
             temp = self.get_data('regions').drop(columns=['image_id','region_size']).merge(df,left_index=True,right_index=True,how='right')
+            temp['region_size'] = temp['region_size'].astype(float)
             self.set_data('regions',temp)
 
         # If we don't have any regions set and all we have is 'Any' then we can just use the processed image
@@ -458,6 +463,7 @@ class CellImageInForm(CellImageGeneric):
             self._images[region_id] = img
             df = pd.DataFrame(pd.Series({'region_index':0,'image_id':region_id,'region_size':img.sum()})).T.set_index('region_index')
             temp = self.get_data('regions').drop(columns=['image_id','region_size']).merge(df,left_index=True,right_index=True,how='right')
+            temp['region_size'] = temp['region_size'].astype(float)
             self.set_data('regions',temp)
 
     def _read_component_image(self,filename):
