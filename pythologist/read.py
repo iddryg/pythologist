@@ -163,6 +163,8 @@ class Frame:
                             'Summary Area Megapixels':'tissue_area'
                            })
         df = df[df['tissue_area'].notna()]
+        if df.loc[df['phenotype'].isna()].shape[0] == 1 and df.shape[0]==1:
+            df.loc[df['phenotype'].isna(),'phenotype'] = 'All'
         if df[df['phenotype']=='All'].shape[0] > 0:
             return df.loc[(df['phenotype']=='All'),['tissue','tissue_area']].set_index('tissue')['tissue_area'].to_dict()
         return df.loc[(df['phenotype']=='unspecified'),['tissue','tissue_area']].set_index('tissue')['tissue_area'].to_dict()
