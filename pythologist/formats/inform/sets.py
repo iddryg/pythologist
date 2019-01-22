@@ -1,14 +1,55 @@
-import os, re, sys
-from pythologist.formats.inform.image import CellImageInForm
-from pythologist.formats import CellSampleGeneric
+import os, re, sys, h5py
+from pythologist.formats.inform.frame import CellFrameInForm
+from pythologist.formats import CellSampleGeneric, CellProjectGeneric
 from uuid import uuid4
 import pandas as pd
+
+class CellProjectInForm(CellProjectGeneric):
+    def __init__(self,h5path,mode='r'):
+        super().__init__(h5path,mode)
+        return
+
+    def create_cell_sample_class(self):
+        return CellSampleInForm()
+
+    def read_path(self,path,verbose=False):
+        if self.mode == 'r': raise ValueError("Error: cannot write to a path in read-only mode.")
+        # read all terminal folders as sample_names unless there is none then the sample name is blank
+        abspath = os.path.abspath(path)
+        if not os.path.isdir(abspath): raise ValueError("Error project path must be a directory")
+        sample_dirs = set()
+        for root, dirs, files in os.walk(abspath):
+            if len(dirs) > 0: continue
+            sample_dirs.add(root)
+        for s in sample_dirs:
+            sid = self.add_sample_path(s,verbose=verbose)
+            if verbose: sys.stderr.write("Added sample "+sid+"\n")
+
+    def add_sample_path(self,path,verbose=False):
+        if self.mode == 'r': raise ValueError("Error: cannot write to a path in read-only mode.")
+        sid = uuid4().hex
+        if verbose: sys.stderr.write("Reading sample "+path+"\n")
+        cellsample = self.create_cell_sample_class()
+        #print(type(cellsample))
+        cellsample.read_path(path,verbose=verbose)
+        cellsample.to_hdf(self.h5path,location='samples/'+sid,mode='a')
+        current = self.key
+        if current is None:
+            current = pd.DataFrame([{'sample_id':sid,'sample_path':path,'sample_name':os.path.split(path)[-1]}])
+            current.index.name = 'db_id'
+        else:
+            iteration = max(current.index)+1
+            addition = pd.DataFrame([{'db_id':iteration,'sample_id':sid,'sample_path':path,'sample_name':os.path.split(path)[-1]}]).set_index('db_id')
+            current = pd.concat([current,addition])
+        current.to_hdf(self.h5path,'meta',mode='r+',complib='zlib',complevel=9,format='table')
+        return sid
+
 class CellSampleInForm(CellSampleGeneric):
     def __init__(self):
         super().__init__()
-    @staticmethod
-    def create_cell_image_class():
-        return CellImageInForm()
+
+    def create_cell_frame_class(self):
+        return CellFrameInForm()
     def read_path(self,path,verbose=False):
         # Read in a folder of inform cell images
         #
@@ -45,7 +86,7 @@ class CellSampleInForm(CellSampleGeneric):
             if not os.path.exists(score):
                     raise ValueError('Missing score file '+score)
             if verbose: sys.stderr.write('Acquiring frame '+data+"\n")
-            cid = CellImageInForm()
+            cid = CellFrameInForm()
             cid.read_raw(cell_seg_data_file=data,
                          cell_seg_data_summary_file=summary,
                          score_data_file=score,

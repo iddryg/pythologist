@@ -2,7 +2,7 @@ import os, re, json, sys
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
-from pythologist.formats import CellImageGeneric
+from pythologist.formats import CellFrameGeneric
 from uuid import uuid4
 from pythologist.formats.utilities import read_tiff_stack, map_image_ids, flood_fill, image_edges
 import xml.etree.ElementTree as ET
@@ -11,10 +11,10 @@ from uuid import uuid4
 _float_decimals = 6
 
 
-class CellImageInForm(CellImageGeneric):
+class CellFrameInForm(CellFrameGeneric):
     """ Store data from a single image from an inForm export
 
-        This is a CellImage object that contains data and images from one image frame
+        This is a CellFrame object that contains data and images from one image frame
     """
     def __init__(self):
         self.verbose = False
@@ -29,6 +29,10 @@ class CellImageInForm(CellImageGeneric):
                             'gate_label','region_index']}
         self.data_tables['mask_images'] = {'index':'db_id',
                  'columns':['mask_label','image_id']}
+        for x in self.data_tables.keys():
+            if x in self._data: continue
+            self._data[x] = pd.DataFrame(columns=self.data_tables[x]['columns'])
+            self._data[x].index.name = self.data_tables[x]['index']
 
 
     @property
@@ -74,19 +78,33 @@ class CellImageInForm(CellImageGeneric):
     def binary_calls(self):
         # generate a table of gating calls with ncols = to the number of gates + phenotypes
 
-        # start by getting the phenotypes
-        phenotypes = self.get_data('phenotypes')['phenotype_label'].dropna().tolist()
-        temp = pd.DataFrame(index=self.get_data('cells').index,columns=phenotypes)
-        temp = temp.fillna(0)
-        temp = temp.merge(self.cell_df()[['phenotype_label']],left_index=True,right_index=True)
-        for phenotype in phenotypes:
-            temp.loc[temp['phenotype_label']==phenotype,phenotype]=1
-        temp = temp.drop(columns='phenotype_label')
-
+        ## start by getting the phenotypes
+        #phenotypes = self.get_data('phenotypes')['phenotype_label'].dropna().tolist()
+        #temp = pd.DataFrame(index=self.get_data('cells').index,columns=phenotypes)
+        #temp = temp.fillna(0)
+        #temp = temp.merge(self.cell_df()[['phenotype_label']],left_index=True,right_index=True)
+        #for phenotype in phenotypes:
+        #    temp.loc[temp['phenotype_label']==phenotype,phenotype]=1
+        #temp = temp.drop(columns='phenotype_label')
+        temp = self.phenotype_calls()
         if self.get_data('thresholds').shape[0] == 0:
             return temp.astype(np.int8)
         return temp.merge(self._scored_gated_cells(),left_index=True,right_index=True).astype(np.int8)
 
+    def binary_df(self):
+        temp1 = self.phenotype_calls().stack().reset_index().\
+            rename(columns={'level_1':'binary_phenotype',0:'score'})
+        temp1.loc[temp1['score']==1,'score'] = '+'
+        temp1.loc[temp1['score']==0,'score'] = '-'
+        temp1['gated'] = 0
+        temp2 = self._scored_gated_cells().stack().reset_index().\
+            rename(columns={'gate_label':'binary_phenotype',0:'score'})
+        temp2.loc[temp2['score']==1,'score'] = '+'
+        temp2.loc[temp2['score']==0,'score'] = '-'
+        temp2['gated'] = 1
+        output = pd.concat([temp1,temp2])
+        output.index.name = 'db_id'
+        return output
 
     def _scored_gated_cells(self):
         d = self.get_data('thresholds').reset_index().\
@@ -201,7 +219,7 @@ class CellImageInForm(CellImageGeneric):
         if score_data_file is not None: 
             self._parse_score_file(score_data_file)
             if verbose: sys.stderr.write("Finished reading score.\n")
-
+        #self.set_data('binary_calls',self.binary_df())
         return
 
     def _parse_measurements(self,_seg,channel_abbreviations):   

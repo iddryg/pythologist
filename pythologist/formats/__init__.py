@@ -5,12 +5,12 @@ from uuid import uuid4
 from pythologist.formats.utilities import map_image_ids
 """ These are classes to help deal with cell-level image data """
 
-class CellImageGeneric(object):
-    """ A generic CellImageData object
+class CellFrameGeneric(object):
+    """ A generic CellFrameData object
     """
     def __init__(self):
         # Define the column structure of all the tables.  
-        #   Non-generic CellImageData may define additional data tables
+        #   Non-generic CellFrameData may define additional data tables
         self._processed_image_id = None
         self._images = {}                      # Database of Images
         self._id = uuid4().hex
@@ -38,6 +38,7 @@ class CellImageGeneric(object):
                              'columns':['cell_index','neighbor_cell_index','pixel_count','touch_distance']},
         'tags':{'index':'tag_index',
                 'columns':['tag_label']}
+
                            }
         self._data = {} # Do not acces directly. Use set_data_table and get_data_table to access.
         for x in self.data_tables.keys(): 
@@ -175,6 +176,9 @@ class CellImageGeneric(object):
         raise ValueError("Must be overidden")
 
     def binary_calls(self):
+        return phenotype_calls()
+
+    def phenotype_calls(self):
         # Default to just gating on mutually exclusive phenotypes
         phenotypes = self.get_data('phenotypes')['phenotype_label'].dropna().tolist()
         temp = pd.DataFrame(index=self.get_data('cells').index,columns=phenotypes)
@@ -191,12 +195,13 @@ class CellImageGeneric(object):
     #                                  merge(self.get_data('regions'),left_on='region_index',right_index=True,how='left').drop(columns='region_index').sort_index()
 
     def binary_df(self):
-        binarydf = self.binary_calls().stack().reset_index().\
-            rename(columns={'level_1':'phenotype',0:'score'})
-        binarydf.loc[binarydf['score']==0,'score'] = '-'
-        binarydf.loc[binarydf['score']==1,'score'] = '+'
-        binarydf['score'] = binarydf['score'].astype(str)
-        return binarydf
+        temp1 = self.phenotype_calls().stack().reset_index().\
+            rename(columns={'level_1':'binary_phenotype',0:'score'})
+        temp1.loc[temp1['score']==1,'score'] = '+'
+        temp1.loc[temp1['score']==0,'score'] = '-'
+        temp1['gated'] = 0
+        temp1.index.name = 'db_id'
+        return temp1
 
     def cell_df(self):
         celldf = self.get_data('cells').\
@@ -205,7 +210,7 @@ class CellImageGeneric(object):
                   right_index=True).\
             merge(self.get_data('phenotypes'),left_on='phenotype_index',right_index=True).\
             merge(self.segmentation_info(),left_index=True,right_index=True,how='left')
-        return celldf
+        return celldf.drop(columns=['phenotype_index','region_index'])
 
     def complete_df(self):
         # a dataframe for every cell that has everything
@@ -220,13 +225,12 @@ class CellSampleGeneric(object):
         self._key = None
         return
 
-    @staticmethod
-    def create_cell_image_class():
-        return CellImageGeneric()
+    def create_cell_frame_class(self):
+        return CellFrameGeneric()
 
     @property
-    def sample_names(self):
-        return list(self._frames.keys())
+    def frame_ids(self):
+        return sorted(list(self._frames.keys()))
 
     @property
     def key(self):
@@ -240,7 +244,7 @@ class CellSampleGeneric(object):
         f.create_group(location+'/frames')
         #f.create_group(location+'/meta')
         f.close()
-        for frame_id in self._frames.keys():
+        for frame_id in self.frame_ids:
             frame = self._frames[frame_id]
             frame.to_hdf(h5file,
                          location+'/frames/'+frame_id,
@@ -256,10 +260,11 @@ class CellSampleGeneric(object):
             subgroup = subgroup[x]
         frame_ids = [x for x in subgroup['frames']]
         for frame_id in frame_ids:
-            cellimage = self.create_cell_image_class()
+            cellframe = self.create_cell_frame_class()
             loc = '/'.join(location+['frames',frame_id])
             #print(loc)
-            self._frames[frame_id] = cellimage.read_hdf(h5file,location=loc)
+            cellframe.read_hdf(h5file,location=loc)
+            self._frames[frame_id] = cellframe
         loc = '/'.join(location+['meta'])
         #print(loc)
         self._key = pd.read_hdf(h5file,loc)
@@ -267,7 +272,7 @@ class CellSampleGeneric(object):
 
     def cell_df(self):
         frames = []
-        for frame_id in sorted(list(self.key['frame_id'])):
+        for frame_id in self.frame_ids:
             frame = self.get_frame(frame_id).cell_df().reset_index()
             key_line = self.key.set_index('frame_id').loc[[frame_id]].reset_index()
             key_line['key'] = 1
@@ -275,13 +280,13 @@ class CellSampleGeneric(object):
             frame = key_line.merge(frame,on='key').drop(columns = 'key')
             frames.append(frame)
         frames = pd.concat(frames).reset_index(drop=True)
-        frames.index.name = 'frame_cell_index'
+        frames.index.name = 'sample_cell_index'
         return frames
 
     def binary_df(self):
         fc = self.cell_df()[['frame_id','cell_index']].reset_index()
         frames = []
-        for frame_id in self.key['frame_id']:
+        for frame_id in self.frame_ids:
             frame = self.get_frame(frame_id).binary_df()
             key_line = self.key.set_index('frame_id').loc[[frame_id]].reset_index()
             key_line['key'] = 1
@@ -293,7 +298,7 @@ class CellSampleGeneric(object):
     def interaction_map(self):
         fc = self.cell_df()[['frame_id','cell_index']].reset_index()
         frames = []
-        for frame_id in self.key['frame_id']:
+        for frame_id in self.frame_ids:
             frame = self.get_frame(frame_id).interaction_map()
             key_line = self.key.set_index('frame_id').loc[[frame_id]].reset_index()
             key_line['key'] = 1
@@ -302,7 +307,89 @@ class CellSampleGeneric(object):
             frames.append(frame)
         frames = pd.concat(frames).reset_index(drop=True)
         return frames.merge(fc,on=['frame_id','cell_index']).\
-                      merge(fc.rename(columns={'frame_cell_index':'neighbor_frame_cell_index',
+                      merge(fc.rename(columns={'sample_cell_index':'neighbor_sample_cell_index',
                                                'cell_index':'neighbor_cell_index'}),
                             on=['frame_id','neighbor_cell_index'])
+
+class CellProjectGeneric(object):
+    def __init__(self,h5path,mode='r'):
+        self._key = None
+        self.h5path = h5path
+        self.mode = mode
+        if mode == 'w' or mode == 'r+':
+            f = h5py.File(self.h5path,mode)
+            f.create_group('/samples')
+            f.close()
+        if mode == 'r' or mode == 'r+':
+            f = h5py.File(self.h5path,'r')
+            if 'meta' in [x for x in f]: 
+                self._key = pd.read_hdf(self.h5path,'meta')
+        return
+
+    def cell_df(self):
+        samples = []
+        for sample_id in self.sample_ids:
+            sample = self.get_sample(sample_id).cell_df().reset_index()
+            key_line = self.key.set_index('sample_id').loc[[sample_id]].reset_index()
+            key_line['key'] = 1
+            sample['key'] = 1
+            sample = key_line.merge(sample,on='key').drop(columns = 'key')
+            samples.append(sample)
+        samples = pd.concat(samples).reset_index(drop=True)
+        samples.index.name = 'project_cell_index'
+        return samples
+
+    def binary_df(self):
+        fc = self.cell_df()[['sample_id','frame_id','cell_index']].reset_index()
+        samples = []
+        for sample_id in self.sample_ids:
+            sample = self.get_sample(sample_id).binary_df()
+            key_line = self.key.set_index('sample_id').loc[[sample_id]].reset_index()
+            key_line['key'] = 1
+            sample['key'] = 1
+            sample = key_line.merge(sample,on='key').drop(columns = 'key')
+            samples.append(sample)
+        return fc.merge(pd.concat(samples).reset_index(drop=True),on=['sample_id','frame_id','cell_index'])
+    
+    def interaction_map(self):
+        fc = self.cell_df()[['sample_id','frame_id','cell_index']].reset_index()
+        samples = []
+        for sample_id in self.sample_ids:
+            sample = self.get_sample(sample_id).interaction_map()
+            key_line = self.key.set_index('sample_id').loc[[sample_id]].reset_index()
+            key_line['key'] = 1
+            sample['key'] = 1
+            sample = key_line.merge(sample,on='key').drop(columns = 'key')
+            samples.append(sample)
+        samples = pd.concat(samples).reset_index(drop=True)
+        return samples.merge(fc,on=['sample_id','frame_id','cell_index']).\
+                       merge(fc.rename(columns={'project_cell_index':'neighbor_project_cell_index',
+                                               'cell_index':'neighbor_cell_index'}),
+                             on=['sample_id','frame_id','neighbor_cell_index'])
+
+
+    def create_cell_sample_class(self):
+        return CellSampleGeneric()
+
+    @property
+    def key(self):
+        return self._key
+    
+    @property
+    def sample_ids(self):
+        return sorted(list(self.key['sample_id']))
+
+    def get_sample(self,sample_id):
+        sample = self.create_cell_sample_class()
+        sample.read_hdf(self.h5path,'samples/'+sample_id)
+        return sample
+
+    @property
+    def key(self):
+        f = h5py.File(self.h5path,'r')
+        val = False
+        if 'meta' in [x for x in f]: val = True
+        f.close()
+        return None if not val else pd.read_hdf(self.h5path,'meta')
+
     
