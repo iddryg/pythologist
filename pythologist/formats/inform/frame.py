@@ -53,6 +53,7 @@ class CellFrameInForm(CellFrameGeneric):
                      right_index=True)
 
     def read_raw(self,
+                 frame_name = None,
                  cell_seg_data_file=None,
                  cell_seg_data_summary_file=None,
                  score_data_file=None,
@@ -61,6 +62,7 @@ class CellFrameInForm(CellFrameGeneric):
                  component_image_file=None,
                  verbose=False,
                  channel_abbreviations=None):
+        self.frame_name = frame_name
         ### Read in the data for our object
         if verbose: sys.stderr.write("Reading text data.\n")
         self._read_data(cell_seg_data_file,
@@ -75,21 +77,17 @@ class CellFrameInForm(CellFrameGeneric):
                    verbose=verbose)
         return
 
+    def default_raw(self):
+        return self.get_raw(feature_label='Whole Cell',statistic_label='Mean')
+
     def binary_calls(self):
         # generate a table of gating calls with ncols = to the number of gates + phenotypes
 
-        ## start by getting the phenotypes
-        #phenotypes = self.get_data('phenotypes')['phenotype_label'].dropna().tolist()
-        #temp = pd.DataFrame(index=self.get_data('cells').index,columns=phenotypes)
-        #temp = temp.fillna(0)
-        #temp = temp.merge(self.cell_df()[['phenotype_label']],left_index=True,right_index=True)
-        #for phenotype in phenotypes:
-        #    temp.loc[temp['phenotype_label']==phenotype,phenotype]=1
-        #temp = temp.drop(columns='phenotype_label')
         temp = self.phenotype_calls()
         if self.get_data('thresholds').shape[0] == 0:
             return temp.astype(np.int8)
-        return temp.merge(self._scored_gated_cells(),left_index=True,right_index=True).astype(np.int8)
+        return temp.merge(self.scored_calls(),left_index=True,right_index=True).astype(np.int8)
+
 
     def binary_df(self):
         temp1 = self.phenotype_calls().stack().reset_index().\
@@ -106,12 +104,12 @@ class CellFrameInForm(CellFrameGeneric):
         output.index.name = 'db_id'
         return output
 
-    def _scored_gated_cells(self):
+    def scored_calls(self):
         d = self.get_data('thresholds').reset_index().\
             merge(self.get_data('cell_measurements').reset_index(),on=['statistic_index','feature_index','channel_index'])
         d['gate'] = d.apply(lambda x: x['value']>=x['threshold_value'],1)
         d = d.pivot(values='gate',index='cell_index',columns='gate_label').applymap(lambda x: 1 if x else 0)
-        return d
+        return d.astype(np.int8)
     
 
     def _read_data(self,

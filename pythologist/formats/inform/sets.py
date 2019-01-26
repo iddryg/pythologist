@@ -12,7 +12,8 @@ class CellProjectInForm(CellProjectGeneric):
     def create_cell_sample_class(self):
         return CellSampleInForm()
 
-    def read_path(self,path,verbose=False):
+    def read_path(self,path,project_name=None,name_index=None,verbose=False):
+        if project_name is not None: self.set_project_name(project_name)
         if self.mode == 'r': raise ValueError("Error: cannot write to a path in read-only mode.")
         # read all terminal folders as sample_names unless there is none then the sample name is blank
         abspath = os.path.abspath(path)
@@ -22,27 +23,32 @@ class CellProjectInForm(CellProjectGeneric):
             if len(dirs) > 0: continue
             sample_dirs.add(root)
         for s in sample_dirs:
-            sid = self.add_sample_path(s,verbose=verbose)
+            sname = None
+            if name_index is None: sname = s
+            else: sname  = os.path.split(s)[name_index]
+            sid = self.add_sample_path(s,sample_name=sname,verbose=verbose)
             if verbose: sys.stderr.write("Added sample "+sid+"\n")
 
-    def add_sample_path(self,path,verbose=False):
+    def add_sample_path(self,path,sample_name=None,verbose=False):
         if self.mode == 'r': raise ValueError("Error: cannot write to a path in read-only mode.")
-        sid = uuid4().hex
         if verbose: sys.stderr.write("Reading sample "+path+"\n")
         cellsample = self.create_cell_sample_class()
         #print(type(cellsample))
-        cellsample.read_path(path,verbose=verbose)
-        cellsample.to_hdf(self.h5path,location='samples/'+sid,mode='a')
+        cellsample.read_path(path,sample_name=sample_name,verbose=verbose)
+        cellsample.to_hdf(self.h5path,location='samples/'+cellsample.id,mode='a')
         current = self.key
         if current is None:
-            current = pd.DataFrame([{'sample_id':sid,'sample_path':path,'sample_name':os.path.split(path)[-1]}])
+            current = pd.DataFrame([{'sample_id':cellsample.id,
+                                     'sample_name':cellsample.sample_name}])
             current.index.name = 'db_id'
         else:
             iteration = max(current.index)+1
-            addition = pd.DataFrame([{'db_id':iteration,'sample_id':sid,'sample_path':path,'sample_name':os.path.split(path)[-1]}]).set_index('db_id')
+            addition = pd.DataFrame([{'db_id':iteration,
+                                      'sample_id':cellsample.id,
+                                      'sample_name':cellsample.sample_name}]).set_index('db_id')
             current = pd.concat([current,addition])
-        current.to_hdf(self.h5path,'meta',mode='r+',complib='zlib',complevel=9,format='table')
-        return sid
+        current.to_hdf(self.h5path,'info',mode='r+',complib='zlib',complevel=9,format='table')
+        return cellsample.id
 
 class CellSampleInForm(CellSampleGeneric):
     def __init__(self):
@@ -50,7 +56,7 @@ class CellSampleInForm(CellSampleGeneric):
 
     def create_cell_frame_class(self):
         return CellFrameInForm()
-    def read_path(self,path,verbose=False):
+    def read_path(self,path,sample_name=None,verbose=False):
         # Read in a folder of inform cell images
         #
         # These image should be in a format with a image frame name prefix*
@@ -61,6 +67,7 @@ class CellSampleInForm(CellSampleGeneric):
         #        *binary_seg_maps.tif
         #        *component.tif
         #
+        if sample_name is None: sample_name = path
         if not os.path.isdir(path):
             raise ValueError('Path input must be a directory')
         absdir = os.path.abspath(path)
@@ -87,15 +94,17 @@ class CellSampleInForm(CellSampleGeneric):
                     raise ValueError('Missing score file '+score)
             if verbose: sys.stderr.write('Acquiring frame '+data+"\n")
             cid = CellFrameInForm()
-            cid.read_raw(cell_seg_data_file=data,
+            cid.read_raw(frame_name = frame,
+                         cell_seg_data_file=data,
                          cell_seg_data_summary_file=summary,
                          score_data_file=score,
                          tissue_seg_data_file=tissue_seg_data,
                          binary_seg_image_file=binary_seg_maps,
                          component_image_file=component_image,
                          verbose=verbose)
-            frame_id = uuid4().hex
+            frame_id = cid.id
             self._frames[frame_id]=cid
             frames.append({'frame_id':frame_id,'frame_name':frame,'frame_path':absdir})
         self._key = pd.DataFrame(frames)
         self._key.index.name = 'db_id'
+        self.sample_name = sample_name #os.path.split(path)[-1]

@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import h5py, os
+import h5py, os, json
 from uuid import uuid4
 from pythologist.formats.utilities import map_image_ids
 """ These are classes to help deal with cell-level image data """
@@ -14,6 +14,7 @@ class CellFrameGeneric(object):
         self._processed_image_id = None
         self._images = {}                      # Database of Images
         self._id = uuid4().hex
+        self.frame_name = None
         self.data_tables = {
         'cells':{'index':'cell_index',            
                   'columns':['x','y','phenotype_index',
@@ -38,7 +39,6 @@ class CellFrameGeneric(object):
                              'columns':['cell_index','neighbor_cell_index','pixel_count','touch_distance']},
         'tags':{'index':'tag_index',
                 'columns':['tag_label']}
-
                            }
         self._data = {} # Do not acces directly. Use set_data_table and get_data_table to access.
         for x in self.data_tables.keys(): 
@@ -47,6 +47,11 @@ class CellFrameGeneric(object):
     @property
     def id(self):
         return self._id
+
+    @property
+    def table_names(self):
+        return list(self.data_tables.keys())
+
     def set_data(self,table_name,table):
         # Assign data to the standard tables. Do some column name checking to make sure we are getting what we expect
         if table_name not in self.data_tables: raise ValueError("Error table name doesn't exist in defined formats")
@@ -76,12 +81,15 @@ class CellFrameGeneric(object):
         image_names = [x for x in subgroup['images']]
         for image_name in image_names:
             self._images[image_name] = np.array(subgroup['images'][image_name])
+        self.frame_name = subgroup['meta'].attrs['frame_name']
+        self._id = subgroup['meta'].attrs['id']
         return
 
     def to_hdf(self,h5file,location='',mode='w'):
         f = h5py.File(h5file,mode)
         f.create_group(location+'/data')
         f.create_group(location+'/images')
+        #f.create_group(location+'/meta')
         f.close()
         for table_name in self.data_tables.keys():
             data_table = self.get_data(table_name)
@@ -94,6 +102,13 @@ class CellFrameGeneric(object):
         f = h5py.File(h5file,'a')
         for image_id in self._images.keys():
             f.create_dataset(location+'/images/'+image_id,data=self._images[image_id],compression='gzip')
+        dset = f.create_dataset(location+'/meta', (100,), dtype=h5py.special_dtype(vlen=str))
+        dset.attrs['frame_name'] = self.frame_name
+        dset.attrs['id'] = self._id
+        #f.create_dataset(location+'/meta/frame_name',(len(self.frame_name),),dtype='S10')
+        #f[location+'meta/frame_name'].attrs['frame_name'] = self.frame_name
+        #f.create_dataset(location+'/meta/id',data=self.id)
+        
         f.close()
 
     def cell_map(self):
@@ -145,13 +160,13 @@ class CellFrameGeneric(object):
     def get_regions(self):
         return self.get_data('regions')
     
-    def get_raw(self,feature_label,statistic_label,region_label,all=False,channel_abbreviation=True):
+    def get_raw(self,feature_label,statistic_label,all=False,channel_abbreviation=True):
         stats = self.get_data('measurement_statistics').reset_index()
         stats = stats.loc[stats['statistic_label']==statistic_label,'statistic_index'].iloc[0]
         feat = self.get_data('measurement_features').reset_index()
         feat = feat.loc[feat['feature_label']==feature_label,'feature_index'].iloc[0]
-        region = self.get_data('regions').reset_index()
-        region = region.loc[region['region_label']==region_label,'region_index'].iloc[0]
+        #region = self.get_data('regions').reset_index()
+        #region = region.loc[region['region_label']==region_label,'region_index'].iloc[0]
         measure = self.get_data('cell_measurements')
         measure = measure.loc[(measure['statistic_index']==stats)&(measure['feature_index']==feat)]
         channels = self.get_data('measurement_channels')
@@ -163,6 +178,10 @@ class CellFrameGeneric(object):
                         self.get_data('measurement_channels')['channel_abbreviation']))
         return measure.rename(columns=temp)
 
+    def default_raw(self):
+        # override this
+        return None
+
     def copy(self):
         # Do a deep copy of self
         mytype = type(self)
@@ -173,7 +192,7 @@ class CellFrameGeneric(object):
 
     @property
     def excluded_channels(self):
-        raise ValueError("Must be overidden")
+        raise ValueError("Must be overridden")
 
     def binary_calls(self):
         return phenotype_calls()
@@ -188,11 +207,62 @@ class CellFrameGeneric(object):
             temp.loc[temp['phenotype_label']==phenotype,phenotype]=1
         return temp.drop(columns='phenotype_label').astype(np.int8)
 
-    #@property
-    #def df(self):
-    #    # a dataframe that has phenotype and region info, but excludes all raw data
-    #    return self.get_data('cells').merge(self.get_data('phenotypes'),left_on='phenotype_index',right_index=True,how='left').drop(columns='phenotype_index').\
-    #                                  merge(self.get_data('regions'),left_on='region_index',right_index=True,how='left').drop(columns='region_index').sort_index()
+    def scored_calls(self):
+        # Must be overridden
+        return None
+        
+
+    @property
+    def df(self):
+        # a minimum useful dataframe
+        temp1 = self.get_data('cells').merge(self.get_data('phenotypes'),
+                             left_on='phenotype_index',
+                             right_index=True).drop(columns='phenotype_index').\
+                       merge(self.get_data('regions'),
+                             left_on='region_index',
+                             right_index=True).drop(columns=['image_id','region_index'])
+        temp2 = self.scored_calls()
+        if temp2  is not None:
+            temp2 = temp2.apply(lambda x:
+                json.dumps(dict(zip(
+                    list(x.index),
+                    list(x)
+                 )))
+            ,1).reset_index().rename(columns={0:'scored_calls'}).set_index('cell_index')
+            temp1 = temp1.merge(temp2,left_index=True,right_index=True)
+        else:
+            temp1['scored_calls'] = np.nan
+        temp3 = self.phenotype_calls().apply(lambda x:
+                json.dumps(dict(zip(
+                    list(x.index),
+                    list(x)
+                )))
+            ,1).reset_index().rename(columns={0:'phenotype_calls'}).set_index('cell_index')
+        temp1 = temp1.merge(temp3,left_index=True,right_index=True)
+        temp4 = self.default_raw()
+        if temp4 is not None:
+            temp4 = temp4.apply(lambda x:
+                json.dumps(dict(zip(
+                    list(x.index),
+                    list(x)
+                )))
+            ,1).reset_index().rename(columns={0:'channel_values'}).set_index('cell_index')
+            temp1 = temp1.merge(temp4,left_index=True,right_index=True)
+        else:
+            temp1['channel_values'] = np.nan
+
+        temp5 = self.interaction_map().groupby('cell_index').\
+            apply(lambda x: list(sorted(x['neighbor_cell_index']))).reset_index().\
+            rename(columns={0:'neighbor_cell_index'}).set_index('cell_index')
+
+        temp1 = temp1.merge(temp5,left_index=True,right_index=True,how='left')
+        temp1.loc[temp1['neighbor_cell_index'].isna(),'neighbor_cell_index'] = json.dumps([])
+
+
+        temp1['frame_name'] = self.frame_name
+        temp1['frame_id'] = self.id
+        temp1  = temp1.reset_index()
+        return temp1
 
     def binary_df(self):
         temp1 = self.phenotype_calls().stack().reset_index().\
@@ -223,7 +293,13 @@ class CellSampleGeneric(object):
     def __init__(self):
         self._frames = {}
         self._key = None
+        self._id = uuid4().hex
+        self.sample_name = np.nan
         return
+
+    @property
+    def id(self):
+        return self._id
 
     def create_cell_frame_class(self):
         return CellFrameGeneric()
@@ -239,17 +315,36 @@ class CellSampleGeneric(object):
     def get_frame(self,frame_id):
         return self._frames[frame_id]
 
+    @property
+    def df(self):
+        output = []
+        for frame_id in self.frame_ids:
+            temp = self.get_frame(frame_id).df
+            temp['sample_name'] = self.sample_name
+            temp['sample_id'] = self.id
+            output.append(temp)
+        output = pd.concat(output).reset_index(drop=True)
+        output.index.name = 'db_id'
+        return output
+
+
     def to_hdf(self,h5file,location='',mode='w'):
         f = h5py.File(h5file,mode)
-        f.create_group(location+'/frames')
         #f.create_group(location+'/meta')
+        #f.create_dataset(location+'/meta/id',data=self.id)
+        #f.create_dataset(location+'/meta/sample_name',data=self.sample_name)
+        dset = f.create_dataset(location+'/meta', (100,), dtype=h5py.special_dtype(vlen=str))
+        dset.attrs['sample_name'] = self.sample_name
+        dset.attrs['id'] = self._id
+        f.create_group(location+'/frames')
         f.close()
         for frame_id in self.frame_ids:
             frame = self._frames[frame_id]
             frame.to_hdf(h5file,
                          location+'/frames/'+frame_id,
                           mode='a')
-        self._key.to_hdf(h5file,location+'/meta',mode='r+',format='table',complib='zlib',complevel=9)
+        self._key.to_hdf(h5file,location+'/info',mode='r+',format='table',complib='zlib',complevel=9)
+
 
     def read_hdf(self,h5file,location=''):
         if location != '': location = location.split('/')
@@ -258,6 +353,8 @@ class CellSampleGeneric(object):
         subgroup = f
         for x in location:
             subgroup = subgroup[x]
+        self._id = subgroup['meta'].attrs['id']
+        self.sample_name = subgroup['meta'].attrs['sample_name']
         frame_ids = [x for x in subgroup['frames']]
         for frame_id in frame_ids:
             cellframe = self.create_cell_frame_class()
@@ -265,9 +362,12 @@ class CellSampleGeneric(object):
             #print(loc)
             cellframe.read_hdf(h5file,location=loc)
             self._frames[frame_id] = cellframe
-        loc = '/'.join(location+['meta'])
+            #self.frame_name = str(subgroup['frames'][frame_id]['meta']['frame_name'])
+            #self._id = str(subgroup['frames'][frame_id]['meta']['id'])
+        loc = '/'.join(location+['info'])
         #print(loc)
         self._key = pd.read_hdf(h5file,loc)
+        f.close()
         return
 
     def cell_df(self):
@@ -319,12 +419,57 @@ class CellProjectGeneric(object):
         if mode == 'w' or mode == 'r+':
             f = h5py.File(self.h5path,mode)
             f.create_group('/samples')
+            dset = f.create_dataset('/meta', (100,), dtype=h5py.special_dtype(vlen=str))
+            dset.attrs['project_name'] = np.nan
+            dset.attrs['id'] = uuid4().hex
             f.close()
+
         if mode == 'r' or mode == 'r+':
             f = h5py.File(self.h5path,'r')
-            if 'meta' in [x for x in f]: 
-                self._key = pd.read_hdf(self.h5path,'meta')
+            if 'info' in [x for x in f]: 
+                self._key = pd.read_hdf(self.h5path,'info')
+            self.project_name = f['meta'].attrs['project_name']
+            self._id = f['meta'].attrs['id']
+            f.close()
         return
+
+    @property
+    def id(self):
+        f = h5py.File(self.h5path,'r')
+        name = f['meta'].attrs['id']
+        f.close()
+        return name
+
+    @property 
+    def project_name(self):
+        f = h5py.File(self.h5path,'r')
+        name = f['meta'].attrs['project_name']
+        f.close()
+        return name
+
+    def set_project_name(self,name):
+        f = h5py.File(self.h5path,'r+')
+        #dset = f.create_dataset('/meta', (100,), dtype=h5py.special_dtype(vlen=str))
+        f['meta'].attrs['project_name'] = name
+        f.close()
+
+    def set_id(self,name):
+        f = h5py.File(self.h5path,'r+')
+        #dset = f.create_dataset('/meta', (100,), dtype=h5py.special_dtype(vlen=str))
+        f['meta'].attrs['id'] = name
+        f.close()
+
+    @property
+    def df(self):
+        output = []
+        for sample_id in self.sample_ids:
+            temp = self.get_sample(sample_id).df
+            temp['project_name'] = self.project_name
+            temp['project_id'] = self.id
+            output.append(temp)
+        output = pd.concat(output).reset_index(drop=True)
+        output.index.name = 'db_id'
+        return output
 
     def cell_df(self):
         samples = []
@@ -388,8 +533,8 @@ class CellProjectGeneric(object):
     def key(self):
         f = h5py.File(self.h5path,'r')
         val = False
-        if 'meta' in [x for x in f]: val = True
+        if 'info' in [x for x in f]: val = True
         f.close()
-        return None if not val else pd.read_hdf(self.h5path,'meta')
+        return None if not val else pd.read_hdf(self.h5path,'info')
 
     
