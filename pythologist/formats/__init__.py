@@ -325,7 +325,7 @@ class CellFrameGeneric(object):
             temp1['channel_values'] = np.nan
 
         temp5 = self.interaction_map().groupby('cell_index').\
-            apply(lambda x: list(sorted(x['neighbor_cell_index']))).reset_index().\
+            apply(lambda x: json.dumps(list(sorted(x['neighbor_cell_index'])))).reset_index().\
             rename(columns={0:'neighbor_cell_index'}).set_index('cell_index')
 
         temp1 = temp1.merge(temp5,left_index=True,right_index=True,how='left')
