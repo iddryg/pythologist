@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import h5py, os, json
+import h5py, os, json, sys
 from uuid import uuid4
 from pythologist.formats.utilities import map_image_ids
 """ These are classes to help deal with cell-level image data """
@@ -49,6 +49,15 @@ class CellFrameGeneric(object):
         return self._id
 
     @property
+    def processed_image_id(self):
+        return self._processed_image_id
+    @property
+    def processed_image(self):
+        return self._images[self._processed_image_id].copy()
+    def set_processed_image_id(self,image_id):
+        self._processed_image_id = image_id
+
+    @property
     def table_names(self):
         return list(self.data_tables.keys())
 
@@ -60,6 +69,62 @@ class CellFrameGeneric(object):
                                                                                             str(self.data_tables[table_name]['columns']))
         if table.index.name != self.data_tables[table_name]['index']: raise ValueError("Error index name doesn't match defined format")
         self._data[table_name] = table.loc[:,self.data_tables[table_name]['columns']].copy() # Auto-sort, and assign a copy so we aren't ever assigning by reference
+
+    def set_regions(self,regions,use_processed_region=True,unset_label='undefined'):
+        """
+        Alter the regions in the frame
+
+        regions: a dictionary of mutually exclusive region labels and binary masks
+                 if a region does not cover all the workable areas then it will be the only label
+                 and the unused area will get the 'unset_label' as a different region
+        """
+        
+        # delete our current regions
+        regions = regions.copy()
+        image_ids = list(self.get_data('mask_images')['image_id'])
+        for image_id in image_ids: del self._images[image_id]
+
+        labels = list(regions.keys())
+        ids = [uuid4().hex for x in labels]
+        sizes = [regions[x].sum() for x in labels]
+        remainder = np.ones(self.processed_image.shape)
+        if use_processed_region: remainder = self.processed_image
+
+        for i,label in enumerate(labels):
+            my_image = regions[label]
+            if use_processed_region: my_image = my_image&self.processed_image
+            self._images[ids[i]] = my_image
+            remainder = remainder & (~my_image)
+
+        sys.stderr.write("Remaining areas after setting are "+str(remainder.sum())+"\n")
+
+        if remainder.sum() > 0:
+            labels += [unset_label]
+            sizes += [remainder.sum()]
+            ids += [uuid4().hex]
+            self._images[ids[-1]] = remainder
+            regions[unset_label] = remainder
+
+        regions2 = pd.DataFrame({'region_label':labels,
+                                 'region_size':sizes,
+                                 'image_id':ids
+                                })
+        regions2.index.name = 'region_index'
+        self.set_data('regions',regions2)
+
+        def get_label(x,y):
+            for label in regions:
+                if regions[label][y][x] == 1: return label
+            raise ValueError("Coordinate is out of bounds for all regions.")
+        recode = self.get_data('cells').copy()
+        recode['new_region_label'] = recode.apply(lambda x: get_label(x['x'],x['y']),1)
+        recode = recode.drop(columns='region_index').reset_index().\
+            merge(regions2[['region_label']].reset_index(),
+                  left_on='new_region_label',right_on='region_label').\
+            drop(columns=['region_label','new_region_label']).set_index('cell_index')
+        self.set_data('cells',recode)
+        return
+
 
     def get_data(self,table_name): 
         # copy so we don't ever pass by reference
@@ -83,6 +148,7 @@ class CellFrameGeneric(object):
             self._images[image_name] = np.array(subgroup['images'][image_name])
         self.frame_name = subgroup['meta'].attrs['frame_name']
         self._id = subgroup['meta'].attrs['id']
+        self.set_processed_image_id(subgroup['meta'].attrs['processed_image_id'])
         return
 
     def to_hdf(self,h5file,location='',mode='w'):
@@ -138,8 +204,8 @@ class CellFrameGeneric(object):
         d2 = pd.DataFrame({'mod':[-1*touch_distance,0,touch_distance]})
         d2['key'] = 1
         d3 = d1.merge(d2,on='key').merge(d2,on='key')
-        d3['x'] = d3.apply(lambda x: x['x']+x['mod_x'],1)
-        d3['y'] = d3.apply(lambda x: x['y']+x['mod_y'],1)
+        d3['x'] = d3['x'].add(d3['mod_x'])
+        d3['y'] = d3['y'].add(d3['mod_y'])
         d3 = d3[['x','y','cell_index','key']].rename(columns={'cell_index':'neighbor_cell_index'})
         im = full.reset_index().merge(d3,on=['x','y']).\
             query('cell_index!=neighbor_cell_index').\
@@ -215,12 +281,15 @@ class CellFrameGeneric(object):
     @property
     def df(self):
         # a minimum useful dataframe
+        # get our region sizes
+        region_sizes = self.get_data('regions').set_index('region_label')['region_size'].to_dict()
         temp1 = self.get_data('cells').merge(self.get_data('phenotypes'),
                              left_on='phenotype_index',
                              right_index=True).drop(columns='phenotype_index').\
                        merge(self.get_data('regions'),
                              left_on='region_index',
-                             right_index=True).drop(columns=['image_id','region_index'])
+                             right_index=True).drop(columns=['image_id','region_index','region_size'])
+        temp1['regions'] = json.dumps(region_sizes)
         temp2 = self.scored_calls()
         if temp2  is not None:
             temp2 = temp2.apply(lambda x:
@@ -262,7 +331,7 @@ class CellFrameGeneric(object):
         temp1['frame_name'] = self.frame_name
         temp1['frame_id'] = self.id
         temp1  = temp1.reset_index()
-        return temp1
+        return temp1.sort_values('cell_index')
 
     def binary_df(self):
         temp1 = self.phenotype_calls().stack().reset_index().\

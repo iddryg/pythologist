@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from pythologist.formats import CellFrameGeneric
 from uuid import uuid4
-from pythologist.formats.utilities import read_tiff_stack, map_image_ids, flood_fill, image_edges
+from pythologist.formats.utilities import read_tiff_stack, map_image_ids, flood_fill, image_edges, watershed_image
 import xml.etree.ElementTree as ET
 from uuid import uuid4
 
@@ -17,7 +17,6 @@ class CellFrameInForm(CellFrameGeneric):
         This is a CellFrame object that contains data and images from one image frame
     """
     def __init__(self):
-        self.verbose = False
         super().__init__()
 
         self._storage_type = np.float16
@@ -152,20 +151,20 @@ class CellFrameInForm(CellFrameGeneric):
         _phenotype_list.index.name = 'phenotype_index'
         _phenotype_list = _phenotype_list.reset_index()
 
-        if cell_seg_data_summary_file is not None:
-             ############
-             # Update the phenotypes table if a cell_seg_data_summary file is present
-            if verbose: sys.stderr.write("Cell seg summary file is present so acquire phenotype list from it.\n")
-            _segsum = pd.read_csv(cell_seg_data_summary_file,"\t")
-            if 'Phenotype' not in _segsum.columns: 
-                if verbose: sys.stderr.write("Missing phenotype column so set to NaN.\n")
-                _segsum['Phenotype'] = np.nan
+        #if cell_seg_data_summary_file is not None:
+        #     ############
+        #     # Update the phenotypes table if a cell_seg_data_summary file is present
+        #    if verbose: sys.stderr.write("Cell seg summary file is present so acquire phenotype list from it.\n")
+        #    _segsum = pd.read_csv(cell_seg_data_summary_file,"\t")
+        #    if 'Phenotype' not in _segsum.columns: 
+        #        if verbose: sys.stderr.write("Missing phenotype column so set to NaN.\n")
+        #        _segsum['Phenotype'] = np.nan
 
-            _phenotypes_present = [x for x in sorted(_segsum['Phenotype'].unique().tolist()) if x != 'All']
-            if np.nan not in _phenotypes_present: _phenotypes_present = _phenotypes_present + [np.nan] 
-            _phenotype_list = pd.DataFrame({'phenotype_label':_phenotypes_present})
-            _phenotype_list.index.name = 'phenotype_index'
-            _phenotype_list = _phenotype_list.reset_index()
+        #    _phenotypes_present = [x for x in sorted(_segsum['Phenotype'].unique().tolist()) if x != 'All']
+        #    if np.nan not in _phenotypes_present: _phenotypes_present = _phenotypes_present + [np.nan] 
+        #    _phenotype_list = pd.DataFrame({'phenotype_label':_phenotypes_present})
+        #    _phenotype_list.index.name = 'phenotype_index'
+        #    _phenotype_list = _phenotype_list.reset_index()
 
         _phenotypes = _phenotypes.merge(_phenotype_list,on='phenotype_label')
         _phenotype_list = _phenotype_list.set_index('phenotype_index')
@@ -378,7 +377,13 @@ class CellFrameInForm(CellFrameGeneric):
             if 'Nucleus' in segmentation_images.index and \
                'Membrane' in segmentation_images.index:
                 if verbose: sys.stderr.write("Making cell-map filled-in.\n")
-                self._make_cell_map()
+                ## See if we are a legacy membrane map
+                mem = self._images[self.get_data('segmentation_images').\
+                          set_index('segmentation_label').loc['Membrane','image_id']]
+                if len(pd.DataFrame(mem).unstack().reset_index()[0].unique()) == 2:
+                    self._make_cell_map_legacy()
+                else:
+                    self._make_cell_map()
                 if verbose: sys.stderr.write("Finished cell-map.\n")
                 if verbose: sys.stderr.write("Making edge-map.\n")
                 self._make_edge_map(verbose=verbose)
@@ -419,7 +424,7 @@ class CellFrameInForm(CellFrameGeneric):
             self.set_data('regions',temp)
 
         # If we don't have any regions set and all we have is 'Any' then we can just use the processed image
-        _region = self.get_data('regions').query('region_label!="Any"')
+        _region = self.get_data('regions').query('region_label!="Any"').query('region_label!="any"')
         if _region.shape[0] ==0:
             if self.get_data('regions').shape[0] == 0: raise ValueError("Expected an 'Any' region")
             img = self._images[self._processed_image_id].copy()
@@ -487,6 +492,44 @@ class CellFrameInForm(CellFrameGeneric):
         self.set_data('segmentation_images',extra)
         return em
 
+    def _make_cell_map_legacy(self):
+        #raise ValueError("legacy")
+
+
+        segmentation_images = self.get_data('segmentation_images').set_index('segmentation_label')
+        memid = segmentation_images.loc['Membrane','image_id']
+        mem = self.get_image(memid)
+        mem = pd.DataFrame(mem).astype(float).applymap(lambda x: 9999999 if x > 0 else x)
+        mem = np.array(mem)
+        points = self.get_data('cells')[['x','y']]
+        output = np.zeros(mem.shape)
+        for cell_index,v in points.iterrows():
+            xi = v['x']
+            yi = v['y']
+            nums = flood_fill(mem,xi,yi,lambda x: x!=0,max_depth=1000,border_trim=1)
+            if len(nums) >= 2000: continue
+            for num in nums:
+                if output[num[1]][num[0]] != 0: 
+                    sys.stderr.write("Warning: skipping cell index overalap\n")
+                    break 
+                output[num[1]][num[0]] =  cell_index
+        # Now fill out one point on all non-zeros into the zeros with watershed
+        v = map_image_ids(output,remove_zero=False)
+        zeros = v.loc[v['id']==0]
+        zeros = list(zip(zeros['x'],zeros['y']))
+        start = v.loc[v['id']!=0]
+        start = list(zip(start['x'],start['y']))
+        output = watershed_image(output,start,zeros,steps=1,border=1)
+
+        cell_map_id  = uuid4().hex
+        self._images[cell_map_id] = output.copy()
+        increment  = self.get_data('segmentation_images').index.max()+1
+        extra = pd.DataFrame(pd.Series(dict({'db_id':increment,
+                                             'segmentation_label':'cell_map',
+                                             'image_id':cell_map_id}))).T
+        extra = pd.concat([self.get_data('segmentation_images'),extra.set_index('db_id')])
+        self.set_data('segmentation_images',extra)
+
     def _make_cell_map(self):
         #### Get the cell map according to this ####
         #
@@ -496,9 +539,12 @@ class CellFrameInForm(CellFrameGeneric):
         nucid = segmentation_images.loc['Nucleus','image_id']
         memid = segmentation_images.loc['Membrane','image_id']
         nuc = self.get_image(nucid)
-        nmap = map_image_ids(nuc)
         mem = self.get_image(memid)
+
+
+        nmap = map_image_ids(nuc)
         mmap = map_image_ids(mem)
+
         overlap = nmap.rename(columns={'id':'nuc'}).\
                        merge(mmap.rename(columns={'id':'mem'}),on=['x','y'])
         overlap = set(overlap.apply(lambda x: (x['x'],x['y']),1))
@@ -516,7 +562,7 @@ class CellFrameInForm(CellFrameGeneric):
                           )))
                     ).reset_index().set_index('id')
         im = mem.copy()
-        im2 = mem.copy()
+        im2 = mem #np.zeros(mem.shape) #mem.copy()
         orig = pd.DataFrame(mem.copy())
         b1 = orig.iloc[0,:].sum()
         b2 = orig.iloc[:,0].sum()
@@ -526,15 +572,21 @@ class CellFrameInForm(CellFrameGeneric):
         border_trim = 0
         if total  == 0:
             border_trim = 1
-        for x in center.index:
-            coord = (center.loc[x]['x'],center.loc[x]['y'])
+        for cell_index in center.index:
+            coord = (center.loc[cell_index]['x'],center.loc[cell_index]['y'])
             num = flood_fill(im,coord[0],coord[1],lambda x: x!=0,max_depth=3000,border_trim=border_trim)
-            if len(num) < 2000: 
-                #print('----')
-                #print(x)
-                #print(len(num))
-                for v in num: 
-                    im2[v[1]][v[0]] = x
+            if len(num) >= 2000: continue 
+            for v in num: 
+                if im2[v[1]][v[0]] != 0 and im2[v[1]][v[0]] != cell_index: 
+                    sys.stderr.write("Warning: skipping cell index overlap\n")
+                    break 
+                im2[v[1]][v[0]] = cell_index
+
+        c1 = map_image_ids(im2).reset_index().rename(columns={'id':'cell_index_1'})
+        c2 = map_image_ids(im2).reset_index().rename(columns={'id':'cell_index_2'})
+        overlap = c1.merge(c2,on=['x','y']).query('cell_index_1!=cell_index_2')
+        if overlap.shape[0] > 0: raise ValueError("need to handle overlap")
+
         cell_map_id  = uuid4().hex
         self._images[cell_map_id] = im2.copy()
         increment  = self.get_data('segmentation_images').index.max()+1
@@ -544,8 +596,11 @@ class CellFrameInForm(CellFrameGeneric):
         extra = pd.concat([self.get_data('segmentation_images'),extra.set_index('db_id')])
         self.set_data('segmentation_images',extra)
 
+
 def _parse_image_description(metatext):
     root = ET.fromstring(metatext)
     d = dict([(child.tag,child.text) for child in root])
     return root.tag, d
+
+
 

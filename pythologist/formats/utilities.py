@@ -3,6 +3,50 @@ import numpy as np
 import pandas as pd
 import sys
 
+def watershed_image(np_array,starting_points,valid_target_points,steps=1,border=1):
+    output = np_array.copy()
+    for i in range(0,steps):
+        output,filled_points = _watershed_image_step(output,starting_points,valid_target_points)
+        starting_points = filled_points
+        valid_target_points = list(set(valid_target_points)-set(filled_points))
+    return output
+def _watershed_image_step(np_array,starting_points,valid_target_points,border=1):
+    mod = pd.DataFrame({'mod':[-1,0,1]})
+    mod['key'] = 1
+    starting = pd.DataFrame(starting_points,columns=['x','y']).\
+        merge(map_image_ids(np_array,remove_zero=False),on=['x','y'])
+    starting['key'] = 1
+    n = starting.merge(mod,on='key').merge(mod,on='key')
+    n['x'] = n['x'].add(n['mod_x'])
+    n['y'] = n['y'].add(n['mod_y'])
+    n = n.drop(columns=['mod_x','mod_y','key'])
+    targets = pd.DataFrame(valid_target_points,columns=['x','y'])
+    n = n.merge(targets,on=['x','y']).sample(frac=1).reset_index(drop=True).\
+        groupby(['x','y']).first().reset_index()
+    full = np_array.copy()
+
+    for i,r in n.iterrows():
+        x = r['x']
+        y = r['y']
+        if x < 0+border or x > np_array.shape[1]-border: continue
+        if y < 0+border or y > np_array.shape[0]-border: continue
+        full[y][x] = r['id']
+    return full,list(zip(n['x'],n['y']))
+
+def split_color_image_array(np_array):
+    if len(np_array.shape) == 2: return [np_array]
+    images = []
+    for i in range(0,np_array.shape[2]):
+        image = np.array([[y[0] for y in x] for x in np_array])
+        images.append(image)
+    return np.array(images)
+
+def make_binary_image_array(np_array):
+    np_array = np.nan_to_num(np_array)
+    if len(np_array.shape) == 2: return np.array([[1 if y > 0 else 0 for y in x] for x in np_array])
+    return np.array([[1 if np.nanmax([z for z in y]) > 0 else 0 for y in x] for x in np_array]).astype(np.int8)
+
+
 def read_tiff_stack(filename):
     data = []
     with TiffFile(filename) as tif:

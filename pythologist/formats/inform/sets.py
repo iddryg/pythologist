@@ -4,6 +4,7 @@ from pythologist.formats import CellSampleGeneric, CellProjectGeneric
 from uuid import uuid4
 import pandas as pd
 
+
 class CellProjectInForm(CellProjectGeneric):
     def __init__(self,h5path,mode='r'):
         super().__init__(h5path,mode)
