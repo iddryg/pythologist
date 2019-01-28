@@ -105,46 +105,79 @@ def image_edges(image,seek_distance=1,verbose=False):
     if verbose: sys.stderr.write("Making dataframe of possible neighbors.\n")
     cmap = map_image_ids(image)
     edge_image = np.zeros(image.shape)
+    if verbose: sys.stderr.write("Testing for edge.\n")
+    # cmap
+    #print(cmap.head())
+    mod = pd.DataFrame({'mod':[-1,0,1]})
+    mod['key'] = 1
+    mod = mod.merge(mod,on='key')
+    mod['keep'] = mod.apply(lambda x: 1 if abs(x['mod_x'])+abs(x['mod_y'])==1 else 0,1)
+    mod = mod[mod['keep']==1].copy()
+
+    full = map_image_ids(image,remove_zero=False)
+    attempt = full.rename(columns={'id':'next_id',
+                                  'x':'mod_x',
+                                  'y':'mod_y'})
+    testedge = cmap.copy()
+    testedge['key'] = 1
+    testedge = testedge.merge(mod,on='key')
+    testedge['mod_x'] = testedge['x'].add(testedge['mod_x'])
+    testedge['mod_y'] = testedge['y'].add(testedge['mod_y'])
+    testedge = testedge.merge(attempt,on=['mod_x','mod_y']).query('id!=next_id')
+    testedge = testedge.loc[(testedge['x']>0)&\
+                             (testedge['y']>0)&\
+                             (testedge['x']<image.shape[1])&\
+                             (testedge['y']<image.shape[0])]
+    testedge = testedge[['x','y','key']].drop_duplicates()
+    testedge = full.merge(testedge,on=['x','y'],how='left')
+    #testedge['edge_id'] = testedge['id']
+    testedge['edge_id'] = 0
+    testedge.loc[testedge['key']==1,'edge_id'] = testedge.loc[testedge['key']==1,'id']
+    #print(testedge.shape)
+    #print(testedge.head())
+    return np.array(testedge.pivot(columns='x',index='y',values='edge_id').astype(np.float16))
+
     cmap['is_edge'] = cmap.apply(lambda x: _test_edge(image,x['x'],x['y'],x['id']),1)
     edge_image = np.zeros(image.shape)
     orig = map_image_ids(edge_image,remove_zero=False)
     edge_image = orig[['x','y']].merge(cmap[cmap['is_edge']==True],on=['x','y'],how='left').\
         pivot(columns='x',index='y',values='id').fillna(0)
+    if verbose: sys.stderr.write("Finished making edge image.\n")
     return np.array(edge_image)
-    for index, row in cmap.iterrows():
-        for x_iter in range(-1,2,1):
-            xcoord = row['x']+x_iter
-            if xcoord <=0: continue
-            if xcoord >= image.shape[1]-1: continue
-            for y_iter in range(-1,2,1):
-                ycoord = row['y']+y_iter
-                if ycoord <=0: continue
-                if ycoord >= image.shape[0]-1: continue
-                if x_iter==0 and y_iter==0: continue
-                if row['id']!=image[ycoord][xcoord]: edge_image[row['y']][row['x']] = row['id']
-    return edge_image
-    d1 = cmap.copy()
-    d1['key'] = 1
-    d2 = pd.DataFrame({'mod':[-1*seek_distance,0,1*seek_distance]})
-    d2['key'] = 1
-    d1 = d1.merge(d2,on='key').merge(d2,on='key')
-    d1['new_x'] = d1.apply(lambda x: x['x']+x['mod_x'],1)
-    d1['new_y'] = d1.apply(lambda x: x['y']+x['mod_y'],1)
-    if verbose: sys.stderr.write("Finished dataframe of possible neighbors.")
-    if verbose: sys.stderr.write("Making original file to match against.")
-    neighbor = map_image_ids(image,remove_zero=False).\
-        rename(columns={'id':'neighbor_id','x':'new_x','y':'new_y'})
-    neighbor = neighbor[neighbor['new_x']>0]
-    neighbor = neighbor[neighbor['new_y']>0]
-    neighbor = neighbor[neighbor['new_x']<image.shape[1]-1]
-    neighbor = neighbor[neighbor['new_y']<image.shape[0]-1]
-    if verbose: sys.stderr.write("Finished original file to match against.")
-    edge = d1.merge(neighbor,on=['new_x','new_y']).query('id!=neighbor_id')[['x','y','id']].drop_duplicates()
-    edge_image = np.zeros(image.shape)
-    orig = map_image_ids(edge_image,remove_zero=False)
-    orig = orig.drop(columns='id').merge(edge,on=['x','y'],how='left').fillna(0)
+    #for index, row in cmap.iterrows():
+    #    for x_iter in range(-1,2,1):
+    #        xcoord = row['x']+x_iter
+    #        if xcoord <=0: continue
+    #        if xcoord >= image.shape[1]-1: continue
+    #        for y_iter in range(-1,2,1):
+    #            ycoord = row['y']+y_iter
+    #            if ycoord <=0: continue
+    #            if ycoord >= image.shape[0]-1: continue
+    #            if x_iter==0 and y_iter==0: continue
+    #            if row['id']!=image[ycoord][xcoord]: edge_image[row['y']][row['x']] = row['id']
+    #return edge_image
+    #d1 = cmap.copy()
+    #d1['key'] = 1
+    #d2 = pd.DataFrame({'mod':[-1*seek_distance,0,1*seek_distance]})
+    #d2['key'] = 1
+    #d1 = d1.merge(d2,on='key').merge(d2,on='key')
+    #d1['new_x'] = d1.apply(lambda x: x['x']+x['mod_x'],1)
+    #d1['new_y'] = d1.apply(lambda x: x['y']+x['mod_y'],1)
+    #if verbose: sys.stderr.write("Finished dataframe of possible neighbors.")
+    #if verbose: sys.stderr.write("Making original file to match against.")
+    #neighbor = map_image_ids(image,remove_zero=False).\
+    #    rename(columns={'id':'neighbor_id','x':'new_x','y':'new_y'})
+    #neighbor = neighbor[neighbor['new_x']>0]
+    #neighbor = neighbor[neighbor['new_y']>0]
+    #neighbor = neighbor[neighbor['new_x']<image.shape[1]-1]
+    #neighbor = neighbor[neighbor['new_y']<image.shape[0]-1]
+    #if verbose: sys.stderr.write("Finished original file to match against.")
+    #edge = d1.merge(neighbor,on=['new_x','new_y']).query('id!=neighbor_id')[['x','y','id']].drop_duplicates()
+    #edge_image = np.zeros(image.shape)
+    #orig = map_image_ids(edge_image,remove_zero=False)
+    #orig = orig.drop(columns='id').merge(edge,on=['x','y'],how='left').fillna(0)
     #for index,row in edge.iterrows():
     #    edge_image[row['y']][row['x']] = row['id']
-    edge_image = edge.pivot(index='y',columns='x',values='id').astype(float)
+    #edge_image = edge.pivot(index='y',columns='x',values='id').astype(float)
     #edge_image.shape
-    return np.array(edge_image.astype(np.float16))
+    #return np.array(edge_image.astype(np.float16))

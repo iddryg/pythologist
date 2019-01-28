@@ -282,7 +282,7 @@ class CellFrameGeneric(object):
     def df(self):
         # a minimum useful dataframe
         # get our region sizes
-        region_sizes = self.get_data('regions').set_index('region_label')['region_size'].to_dict()
+        region_sizes = self.get_data('regions').set_index('region_label')['region_size'].astype(int).to_dict()
         temp1 = self.get_data('cells').merge(self.get_data('phenotypes'),
                              left_on='phenotype_index',
                              right_index=True).drop(columns='phenotype_index').\
@@ -301,13 +301,17 @@ class CellFrameGeneric(object):
             temp1 = temp1.merge(temp2,left_index=True,right_index=True)
         else:
             temp1['scored_calls'] = np.nan
-        temp3 = self.phenotype_calls().apply(lambda x:
-                json.dumps(dict(zip(
-                    list(x.index),
-                    list(x)
-                )))
-            ,1).reset_index().rename(columns={0:'phenotype_calls'}).set_index('cell_index')
-        temp1 = temp1.merge(temp3,left_index=True,right_index=True)
+        #temp3 = self.phenotype_calls().apply(lambda x:
+        #        json.dumps(dict(zip(
+        #            list(x.index),
+        #            list(x)
+        #        )))
+        #    ,1).reset_index().rename(columns={0:'phenotype_calls'}).set_index('cell_index')
+        #
+        #temp1 = temp1.merge(temp3,left_index=True,right_index=True)
+        temp1['phenotypes_present'] = json.dumps(list(
+                sorted([x for x in self.get_data('phenotypes')['phenotype_label'] if x is not np.nan])
+            ))
         temp4 = self.default_raw()
         if temp4 is not None:
             temp4 = temp4.apply(lambda x:
@@ -331,7 +335,7 @@ class CellFrameGeneric(object):
         temp1['frame_name'] = self.frame_name
         temp1['frame_id'] = self.id
         temp1  = temp1.reset_index()
-        return temp1.sort_values('cell_index')
+        return temp1.sort_values('cell_index').reset_index(drop=True)
 
     def binary_df(self):
         temp1 = self.phenotype_calls().stack().reset_index().\

@@ -548,19 +548,24 @@ class CellFrameInForm(CellFrameGeneric):
         overlap = nmap.rename(columns={'id':'nuc'}).\
                        merge(mmap.rename(columns={'id':'mem'}),on=['x','y'])
         overlap = set(overlap.apply(lambda x: (x['x'],x['y']),1))
-        nmap2 = nmap.loc[~nmap.apply(lambda x: (x['x'],x['y']),1).isin(overlap)]
-        centery = nmap2.groupby(['id']).apply(lambda x: 
-                    pd.Series(dict(zip(
-                              ['y'],
-                              [x['y'].tolist()[int(len(x['y'])/2)]]                    
-                          )))
-                    ).reset_index()
-        center = nmap2.merge(centery,on=['id','y']).groupby(['id','y']).apply(lambda x: 
-                    pd.Series(dict(zip(
-                              ['x'],
-                              [x['x'].tolist()[int(len(x['x'])/2)]]                    
-                          )))
-                    ).reset_index().set_index('id')
+        #nmap2 = nmap.loc[~nmap.apply(lambda x: (x['x'],x['y']),1).isin(overlap)]
+        #print(nmap2)
+        #sys.stderr.write("locate the thing 1\n")
+        #centery = nmap2.groupby(['id']).apply(lambda x: 
+        #            pd.Series(dict(zip(
+        #                      ['y'],
+        #                      [x['y'].tolist()[int(len(x['y'])/2)]]                    
+        #                  )))
+        #            ).reset_index()
+        #sys.stderr.write("locate the thing 2\n")
+        #center = nmap2.merge(centery,on=['id','y']).groupby(['id','y']).apply(lambda x: 
+        #            pd.Series(dict(zip(
+        #                      ['x'],
+        #                      [x['x'].tolist()[int(len(x['x'])/2)]]                    
+        #                  )))
+        #            ).reset_index().set_index('id')
+        #print(center.head())
+        center = self.get_data('cells')[['x','y']].copy()
         im = mem.copy()
         im2 = mem #np.zeros(mem.shape) #mem.copy()
         orig = pd.DataFrame(mem.copy())
