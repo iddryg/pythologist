@@ -60,7 +60,7 @@ def flood_fill(image,x,y,exit_criteria,max_depth=1000,recursion=0,visited=None,b
     # return a list of coordinates we fill without visiting twice or hitting an exit condition
     if visited is None: visited = set()
     if len(visited)>=max_depth: return visited
-    if recursion > 100: return visited
+    if recursion > 1000: return visited
     if y < 0+border_trim or y >= image.shape[0]-border_trim: return visited
     if x < 0+border_trim or x >= image.shape[1]-border_trim: return visited
     if (x,y) in visited: return visited

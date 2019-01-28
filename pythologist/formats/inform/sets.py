@@ -13,7 +13,7 @@ class CellProjectInForm(CellProjectGeneric):
     def create_cell_sample_class(self):
         return CellSampleInForm()
 
-    def read_path(self,path,project_name=None,name_index=None,verbose=False):
+    def read_path(self,path,project_name=None,name_index=None,channel_abbreviations=None,verbose=False):
         if project_name is not None: self.set_project_name(project_name)
         if self.mode == 'r': raise ValueError("Error: cannot write to a path in read-only mode.")
         # read all terminal folders as sample_names unless there is none then the sample name is blank
@@ -27,15 +27,15 @@ class CellProjectInForm(CellProjectGeneric):
             sname = None
             if name_index is None: sname = s
             else: sname  = os.path.split(s)[name_index]
-            sid = self.add_sample_path(s,sample_name=sname,verbose=verbose)
+            sid = self.add_sample_path(s,sample_name=sname,channel_abbreviations=channel_abbreviations,verbose=verbose)
             if verbose: sys.stderr.write("Added sample "+sid+"\n")
 
-    def add_sample_path(self,path,sample_name=None,verbose=False):
+    def add_sample_path(self,path,sample_name=None,channel_abbreviations=None,verbose=False):
         if self.mode == 'r': raise ValueError("Error: cannot write to a path in read-only mode.")
         if verbose: sys.stderr.write("Reading sample "+path+"\n")
         cellsample = self.create_cell_sample_class()
         #print(type(cellsample))
-        cellsample.read_path(path,sample_name=sample_name,verbose=verbose)
+        cellsample.read_path(path,sample_name=sample_name,channel_abbreviations=channel_abbreviations,verbose=verbose)
         cellsample.to_hdf(self.h5path,location='samples/'+cellsample.id,mode='a')
         current = self.key
         if current is None:
@@ -57,7 +57,7 @@ class CellSampleInForm(CellSampleGeneric):
 
     def create_cell_frame_class(self):
         return CellFrameInForm()
-    def read_path(self,path,sample_name=None,verbose=False):
+    def read_path(self,path,sample_name=None,channel_abbreviations=None,verbose=False):
         # Read in a folder of inform cell images
         #
         # These image should be in a format with a image frame name prefix*
@@ -102,6 +102,7 @@ class CellSampleInForm(CellSampleGeneric):
                          tissue_seg_data_file=tissue_seg_data,
                          binary_seg_image_file=binary_seg_maps,
                          component_image_file=component_image,
+                         channel_abbreviations=channel_abbreviations,
                          verbose=verbose)
             frame_id = cid.id
             self._frames[frame_id]=cid

@@ -170,6 +170,7 @@ class CellFrameGeneric(object):
             f.create_dataset(location+'/images/'+image_id,data=self._images[image_id],compression='gzip')
         dset = f.create_dataset(location+'/meta', (100,), dtype=h5py.special_dtype(vlen=str))
         dset.attrs['frame_name'] = self.frame_name
+        dset.attrs['processed_image_id'] = self.processed_image_id
         dset.attrs['id'] = self._id
         #f.create_dataset(location+'/meta/frame_name',(len(self.frame_name),),dtype='S10')
         #f[location+'meta/frame_name'].attrs['frame_name'] = self.frame_name
@@ -412,10 +413,6 @@ class CellSampleGeneric(object):
         f.create_group(location+'/frames')
         f.close()
         for frame_id in self.frame_ids:
-            print('frame_id')
-            print(frame_id)
-            print('loc')
-            print(location+'/frames/'+frame_id)
             frame = self._frames[frame_id]
             frame.to_hdf(h5file,
                          location+'/frames/'+frame_id,
