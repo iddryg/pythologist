@@ -161,7 +161,7 @@ class CellFrameGeneric(object):
             data_table = self.get_data(table_name)
             data_table.to_hdf(h5file,
                               location+'/data/'+table_name,
-                              mode='r+',
+                              mode='a',
                               format='table',
                               complib='zlib',
                               complevel=9)
@@ -412,6 +412,10 @@ class CellSampleGeneric(object):
         f.create_group(location+'/frames')
         f.close()
         for frame_id in self.frame_ids:
+            print('frame_id')
+            print(frame_id)
+            print('loc')
+            print(location+'/frames/'+frame_id)
             frame = self._frames[frame_id]
             frame.to_hdf(h5file,
                          location+'/frames/'+frame_id,

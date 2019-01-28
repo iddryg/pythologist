@@ -56,10 +56,11 @@ def read_tiff_stack(filename):
             data.append({'raw_meta':meta,'raw_image':np.array(page.asarray())})
     return data
 
-def flood_fill(image,x,y,exit_criteria,max_depth=1000,visited=None,border_trim=1):
+def flood_fill(image,x,y,exit_criteria,max_depth=1000,recursion=0,visited=None,border_trim=1):
     # return a list of coordinates we fill without visiting twice or hitting an exit condition
     if visited is None: visited = set()
     if len(visited)>=max_depth: return visited
+    if recursion > 100: return visited
     if y < 0+border_trim or y >= image.shape[0]-border_trim: return visited
     if x < 0+border_trim or x >= image.shape[1]-border_trim: return visited
     if (x,y) in visited: return visited
@@ -67,10 +68,14 @@ def flood_fill(image,x,y,exit_criteria,max_depth=1000,visited=None,border_trim=1
         return visited
     visited.add((x,y))
     # traverse deeper
-    visited = flood_fill(image,x,y+1,exit_criteria,max_depth=max_depth,visited=visited)
-    visited = flood_fill(image,x+1,y,exit_criteria,max_depth=max_depth,visited=visited)
-    visited = flood_fill(image,x,y-1,exit_criteria,max_depth=max_depth,visited=visited)
-    visited = flood_fill(image,x-1,y,exit_criteria,max_depth=max_depth,visited=visited)
+    if (x,y+1) not in visited:
+       visited = flood_fill(image,x,y+1,exit_criteria,max_depth=max_depth,recursion=recursion+1,visited=visited,border_trim=border_trim)
+    if (x+1,y) not in visited:
+        visited = flood_fill(image,x+1,y,exit_criteria,max_depth=max_depth,recursion=recursion+1,visited=visited,border_trim=border_trim)
+    if (x,y-1) not in visited:
+       visited = flood_fill(image,x,y-1,exit_criteria,max_depth=max_depth,recursion=recursion+1,visited=visited,border_trim=border_trim)
+    if (x-1,y) not in visited:
+       visited = flood_fill(image,x-1,y,exit_criteria,max_depth=max_depth,recursion=recursion+1,visited=visited,border_trim=border_trim)
     return visited
 
 def map_image_ids(image,remove_zero=True):

@@ -23,5 +23,10 @@ setup(
   ],
   keywords='bioinformatics',
   packages=['pythologist'],
-  install_requires=['pandas>=0.23.0','numpy','scipy','h5py'],
+  install_requires=['pandas>=0.23.0',
+                    'numpy',
+                    'scipy',
+                    'h5py',
+                    'tifffile==0.15.1',
+                    'tables'],
 )
