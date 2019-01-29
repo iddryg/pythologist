@@ -548,44 +548,36 @@ class CellFrameInForm(CellFrameGeneric):
         overlap = nmap.rename(columns={'id':'nuc'}).\
                        merge(mmap.rename(columns={'id':'mem'}),on=['x','y'])
         overlap = set(overlap.apply(lambda x: (x['x'],x['y']),1))
-        #nmap2 = nmap.loc[~nmap.apply(lambda x: (x['x'],x['y']),1).isin(overlap)]
-        #print(nmap2)
-        #sys.stderr.write("locate the thing 1\n")
-        #centery = nmap2.groupby(['id']).apply(lambda x: 
-        #            pd.Series(dict(zip(
-        #                      ['y'],
-        #                      [x['y'].tolist()[int(len(x['y'])/2)]]                    
-        #                  )))
-        #            ).reset_index()
-        #sys.stderr.write("locate the thing 2\n")
-        #center = nmap2.merge(centery,on=['id','y']).groupby(['id','y']).apply(lambda x: 
-        #            pd.Series(dict(zip(
-        #                      ['x'],
-        #                      [x['x'].tolist()[int(len(x['x'])/2)]]                    
-        #                  )))
-        #            ).reset_index().set_index('id')
-        #print(center.head())
+
         center = self.get_data('cells')[['x','y']].copy()
         im = mem.copy()
-        im2 = mem #np.zeros(mem.shape) #mem.copy()
+        im2 = np.zeros(mem.shape) #mem.copy()
         orig = pd.DataFrame(mem.copy())
         b1 = orig.iloc[0,:].sum()
         b2 = orig.iloc[:,0].sum()
         b3 = orig.iloc[orig.shape[0]-1,:].sum()
         b4 = orig.iloc[:,orig.shape[1]-1].sum()
         total = b1+b2+b3+b4
-        border_trim = 0
-        if total  == 0:
-            border_trim = 1
+        #border_trim = 0
+        #if total  == 0:
+        #    border_trim = 2
         for cell_index in center.index:
             coord = (center.loc[cell_index]['x'],center.loc[cell_index]['y'])
-            num = flood_fill(im,coord[0],coord[1],lambda x: x!=0,max_depth=3000,border_trim=border_trim)
+            num = flood_fill(im,coord[0],coord[1],lambda x: x!=0,max_depth=3000,border_trim=0)
             if len(num) >= 2000: continue 
             for v in num: 
                 if im2[v[1]][v[0]] != 0 and im2[v[1]][v[0]] != cell_index: 
                     sys.stderr.write("Warning: skipping cell index overlap\n")
                     break 
                 im2[v[1]][v[0]] = cell_index
+
+        v = map_image_ids(im2,remove_zero=False)
+        zeros = v.loc[v['id']==0]
+        zeros = list(zip(zeros['x'],zeros['y']))
+        start = v.loc[v['id']!=0]
+        start = list(zip(start['x'],start['y']))
+
+        im2 = watershed_image(im2,start,zeros,steps=1,border=1)
 
         c1 = map_image_ids(im2).reset_index().rename(columns={'id':'cell_index_1'})
         c2 = map_image_ids(im2).reset_index().rename(columns={'id':'cell_index_2'})
