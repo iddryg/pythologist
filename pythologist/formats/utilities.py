@@ -140,7 +140,21 @@ def image_edges(image,seek_distance=1,verbose=False):
     testedge.loc[testedge['key']==1,'edge_id'] = testedge.loc[testedge['key']==1,'id']
     #print(testedge.shape)
     #print(testedge.head())
-    return np.array(testedge.pivot(columns='x',index='y',values='edge_id').astype(np.float16))
+
+    im2 = np.array(testedge.pivot(columns='x',index='y',values='edge_id').astype(int))
+    # Now lets clear the edges
+    trim_distance = 2
+    for y in range(0,im2.shape[0]):
+            for i in range(0,trim_distance):
+                im2[y][0+i] = 0
+                im2[y][im2.shape[1]-1-i] = 0
+    for x in range(0,im2.shape[1]):
+            for i in range(0,trim_distance):
+                im2[0+i][x] = 0
+                im2[im2.shape[0]-1-i][x] = 0
+
+
+    return im2.copy()
 
     cmap['is_edge'] = cmap.apply(lambda x: _test_edge(image,x['x'],x['y'],x['id']),1)
     edge_image = np.zeros(image.shape)

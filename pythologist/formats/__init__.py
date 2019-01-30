@@ -3,6 +3,8 @@ import numpy as np
 import h5py, os, json, sys
 from uuid import uuid4
 from pythologist.formats.utilities import map_image_ids
+from pythologist import CellDataFrame
+
 """ These are classes to help deal with cell-level image data """
 
 class CellFrameGeneric(object):
@@ -181,13 +183,23 @@ class CellFrameGeneric(object):
     def cell_map(self):
         if 'cell_map' not in list(self.get_data('segmentation_images')['segmentation_label']): return None
         cmid = self.get_data('segmentation_images').set_index('segmentation_label').loc['cell_map','image_id']
-        return map_image_ids(self.get_image(cmid)).rename(columns={'id':'cell_index'}).set_index('cell_index')
+        return map_image_ids(self.get_image(cmid)).rename(columns={'id':'cell_index'})
+
+    def cell_map_image(self):
+        if 'cell_map' not in list(self.get_data('segmentation_images')['segmentation_label']): return None
+        cmid = self.get_data('segmentation_images').set_index('segmentation_label').loc['cell_map','image_id']
+        return self.get_image(cmid)
 
     def edge_map(self):
         if 'edge_map' not in list(self.get_data('segmentation_images')['segmentation_label']): return None
         cmid = self.get_data('segmentation_images').set_index('segmentation_label').loc['edge_map','image_id']
         return map_image_ids(self.get_image(cmid)).\
-                   rename(columns={'id':'cell_index'}).set_index('cell_index')
+                   rename(columns={'id':'cell_index'})
+
+    def edge_map_image(self):
+        if 'edge_map' not in list(self.get_data('segmentation_images')['segmentation_label']): return None
+        cmid = self.get_data('segmentation_images').set_index('segmentation_label').loc['edge_map','image_id']
+        return self.get_image(cmid)
 
     def segmentation_info(self):
         return self.edge_map().reset_index().groupby(['cell_index']).count()[['x']].rename(columns={'x':'edge_pixels'}).\
@@ -282,61 +294,91 @@ class CellFrameGeneric(object):
     @property
     def df(self):
         # a minimum useful dataframe
+        #
+        # <Project id> <Project name> optional (will only be on a project export)
+        # <Sample id> <Sample name> optional (will only be on a sample export)
+        # <Frame id> <Frame name>
+        # <x> <y>
+        # 
+        #
+
         # get our region sizes
         region_sizes = self.get_data('regions').set_index('region_label')['region_size'].astype(int).to_dict()
+        # get our cells
         temp1 = self.get_data('cells').merge(self.get_data('phenotypes'),
                              left_on='phenotype_index',
                              right_index=True).drop(columns='phenotype_index').\
                        merge(self.get_data('regions'),
                              left_on='region_index',
                              right_index=True).drop(columns=['image_id','region_index','region_size'])
-        temp1['regions'] = json.dumps(region_sizes)
+        temp1['regions'] = temp1.apply(lambda x: region_sizes,1)
         temp2 = self.scored_calls()
         if temp2  is not None:
             temp2 = temp2.apply(lambda x:
-                json.dumps(dict(zip(
+                dict(zip(
                     list(x.index),
                     list(x)
-                 )))
+                 ))
             ,1).reset_index().rename(columns={0:'scored_calls'}).set_index('cell_index')
             temp1 = temp1.merge(temp2,left_index=True,right_index=True)
         else:
             temp1['scored_calls'] = np.nan
-        #temp3 = self.phenotype_calls().apply(lambda x:
-        #        json.dumps(dict(zip(
-        #            list(x.index),
-        #            list(x)
-        #        )))
-        #    ,1).reset_index().rename(columns={0:'phenotype_calls'}).set_index('cell_index')
-        #
-        #temp1 = temp1.merge(temp3,left_index=True,right_index=True)
-        temp1['phenotypes_present'] = json.dumps(list(
-                sorted([x for x in self.get_data('phenotypes')['phenotype_label'] if x is not np.nan])
-            ))
+        temp3 = self.phenotype_calls().apply(lambda x:
+                dict(zip(
+                    list(x.index),
+                    list(x)
+                ))
+            ,1).reset_index().rename(columns={0:'phenotype_calls'}).set_index('cell_index')
+        
+        temp1 = temp1.merge(temp3,left_index=True,right_index=True)
+        #temp1['phenotypes_present'] = json.dumps(list(
+        #        sorted([x for x in self.get_data('phenotypes')['phenotype_label'] if x is not np.nan])
+        #    ))
         temp4 = self.default_raw()
         if temp4 is not None:
             temp4 = temp4.apply(lambda x:
-                json.dumps(dict(zip(
+                dict(zip(
                     list(x.index),
                     list(x)
-                )))
+                ))
             ,1).reset_index().rename(columns={0:'channel_values'}).set_index('cell_index')
             temp1 = temp1.merge(temp4,left_index=True,right_index=True)
         else:
             temp1['channel_values'] = np.nan
 
-        temp5 = self.interaction_map().groupby('cell_index').\
-            apply(lambda x: json.dumps(list(sorted(x['neighbor_cell_index'])))).reset_index().\
-            rename(columns={0:'neighbor_cell_index'}).set_index('cell_index')
+        #temp5 = self.interaction_map().groupby('cell_index').\
+        #    apply(lambda x: json.dumps(list(sorted(x['neighbor_cell_index'])))).reset_index().\
+        #    rename(columns={0:'neighbor_cell_index'}).set_index('cell_index')
+
+
+        # Get neighbor data .. may not be available for all cells
+        neighbors = self.interaction_map().groupby('cell_index').\
+            apply(lambda x:
+                dict(zip(
+                    x['neighbor_cell_index'].astype(int),x['pixel_count'].astype(int)
+                ))
+            ).reset_index().rename(columns={0:'neighbors'}).set_index('cell_index')
+        edge_length = self.edge_map().reset_index().groupby('cell_index').count()[['x']].\
+            rename(columns={'x':'edge_length'})
+
+        cell_area = self.cell_map().reset_index().groupby('cell_index').count()[['x']].\
+            rename(columns={'x':'cell_area'})
+        temp5 = cell_area.merge(edge_length,left_index=True,right_index=True).merge(neighbors,left_index=True,right_index=True,how='left')
+        temp5.loc[temp5['neighbors'].isna(),'neighbors'] = temp5.loc[temp5['neighbors'].isna(),'neighbors'].apply(lambda x: {}) # these are ones we actuall have measured
 
         temp1 = temp1.merge(temp5,left_index=True,right_index=True,how='left')
-        temp1.loc[temp1['neighbor_cell_index'].isna(),'neighbor_cell_index'] = json.dumps([])
+        temp1.loc[temp1['neighbors'].isna(),'neighbors'] = np.nan # These we were not able to measure
 
 
         temp1['frame_name'] = self.frame_name
         temp1['frame_id'] = self.id
         temp1  = temp1.reset_index()
-        return temp1.sort_values('cell_index').reset_index(drop=True)
+        temp1 = temp1.sort_values('cell_index').reset_index(drop=True)
+        temp1['sample_name'] = 'undefined'
+        temp1['project_name'] = 'undefined'
+        temp1['sample_id'] = 'undefined'
+        temp1['project_id'] = 'undefined'
+        return CellDataFrame(temp1)
 
     def binary_df(self):
         temp1 = self.phenotype_calls().stack().reset_index().\
@@ -399,7 +441,9 @@ class CellSampleGeneric(object):
             output.append(temp)
         output = pd.concat(output).reset_index(drop=True)
         output.index.name = 'db_id'
-        return output
+        output['project_name'] = 'undefined'
+        output['project_id'] = 'undefined'
+        return CellDataFrame(pd.DataFrame(output))
 
 
     def to_hdf(self,h5file,location='',mode='w'):
@@ -498,13 +542,13 @@ class CellProjectGeneric(object):
             dset.attrs['id'] = uuid4().hex
             f.close()
 
-        if mode == 'r' or mode == 'r+':
-            f = h5py.File(self.h5path,'r')
-            if 'info' in [x for x in f]: 
-                self._key = pd.read_hdf(self.h5path,'info')
-            self.project_name = f['meta'].attrs['project_name']
-            self._id = f['meta'].attrs['id']
-            f.close()
+        #if mode == 'r' or mode == 'r+':
+        #    #f = h5py.File(self.h5path,'r')
+        #    #if 'info' in [x for x in f]: 
+        #    #    self._key = pd.read_hdf(self.h5path,'info')
+        #    #self.project_name = f['meta'].attrs['project_name']
+        #    #self._id = f['meta'].attrs['id']
+        #    #f.close()
         return
 
     @property
@@ -543,7 +587,7 @@ class CellProjectGeneric(object):
             output.append(temp)
         output = pd.concat(output).reset_index(drop=True)
         output.index.name = 'db_id'
-        return output
+        return CellDataFrame(pd.DataFrame(output))
 
     def cell_df(self):
         samples = []
@@ -590,9 +634,9 @@ class CellProjectGeneric(object):
     def create_cell_sample_class(self):
         return CellSampleGeneric()
 
-    @property
-    def key(self):
-        return self._key
+    #@property
+    #def key(self):
+    #    return self._key
     
     @property
     def sample_ids(self):
@@ -610,5 +654,11 @@ class CellProjectGeneric(object):
         if 'info' in [x for x in f]: val = True
         f.close()
         return None if not val else pd.read_hdf(self.h5path,'info')
-
     
+    def sample_iter(self):
+        for sample_id in self.sample_ids: yield self.get_sample(sample_id)
+
+    def frame_iter(self):
+        for s in self.sample_iter():
+            for frame_id in s.frame_ids:
+                yield s.get_frame(frame_id)

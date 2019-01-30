@@ -461,11 +461,11 @@ class CellFrameInForm(CellFrameGeneric):
             image_id = uuid4().hex
             if image_type == 'SegmentationImage':
                 ### Handle if its a segmentation
-                self._images[image_id] = raw['raw_image'].astype(self._storage_type)
+                self._images[image_id] = raw['raw_image'].astype(int)
                 segmentation_names.append([image_description['CompartmentType'],image_id])
             else:
                 ### Otherwise it is a mask
-                self._images[image_id] = raw['raw_image'].astype(self._storage_type)
+                self._images[image_id] = raw['raw_image'].astype(int)
                 mask_names.append([image_type,image_id])
         _mask_key = pd.DataFrame(mask_names,columns=['mask_label','image_id'])
         _mask_key.index.name = 'db_id'
@@ -497,11 +497,16 @@ class CellFrameInForm(CellFrameGeneric):
 
 
         segmentation_images = self.get_data('segmentation_images').set_index('segmentation_label')
+        nucid = segmentation_images.loc['Nucleus','image_id']
+        nuc = self.get_image(nucid)
+        nmap = map_image_ids(nuc)
+
         memid = segmentation_images.loc['Membrane','image_id']
         mem = self.get_image(memid)
         mem = pd.DataFrame(mem).astype(float).applymap(lambda x: 9999999 if x > 0 else x)
         mem = np.array(mem)
         points = self.get_data('cells')[['x','y']]
+        #points = points.loc[points.index.isin(nmap['id'])] # we may need this .. not sure
         output = np.zeros(mem.shape)
         for cell_index,v in points.iterrows():
             xi = v['x']
@@ -545,13 +550,27 @@ class CellFrameInForm(CellFrameGeneric):
         nmap = map_image_ids(nuc)
         mmap = map_image_ids(mem)
 
+        # get nuclear map coordinates that don't overlap the membrane
         overlap = nmap.rename(columns={'id':'nuc'}).\
                        merge(mmap.rename(columns={'id':'mem'}),on=['x','y'])
         overlap = set(overlap.apply(lambda x: (x['x'],x['y']),1))
+        nmap['coord'] = nmap.apply(lambda x: (x['x'],x['y']),1)
+        nmap = nmap.loc[~nmap['coord'].isin(overlap)]
+        coord_x = nmap.groupby('id').apply(lambda x: sorted(list(x['x']))[int(len(x['x'])/2)]).reset_index().rename(columns={0:'x'}).reset_index()
+        nmap = nmap.merge(coord_x,on=['id','x'])
+        coord_y = nmap.groupby('id').apply(lambda x: sorted(list(x['y']))[int(len(x['y'])/2)]).reset_index().rename(columns={0:'y'}).reset_index()
+        nmap = nmap.merge(coord_y,on=['id','y'])
+        center = nmap.groupby('id').first()
 
-        center = self.get_data('cells')[['x','y']].copy()
+        
+
+        #print(self.get_data('cells').shape)
+        #print(len(center))
+
+        #center = self.get_data('cells')
+        #center = center[['x','y']].copy()
         im = mem.copy()
-        im2 = np.zeros(mem.shape) #mem.copy()
+        im2 = np.zeros(mem.shape).astype(int) #mem.copy()
         orig = pd.DataFrame(mem.copy())
         b1 = orig.iloc[0,:].sum()
         b2 = orig.iloc[:,0].sum()
@@ -563,7 +582,10 @@ class CellFrameInForm(CellFrameGeneric):
         #    border_trim = 2
         for cell_index in center.index:
             coord = (center.loc[cell_index]['x'],center.loc[cell_index]['y'])
-            num = flood_fill(im,coord[0],coord[1],lambda x: x!=0,max_depth=3000,border_trim=0)
+            if im[coord[1]][coord[0]] != 0: 
+                sys.stderr.write("Warning: skipping a cell center is exactly on the edge of a map.")
+                continue
+            num = flood_fill(im,coord[0],coord[1],lambda x: x!=0,max_depth=3000,border_trim=1)
             if len(num) >= 2000: continue 
             for v in num: 
                 if im2[v[1]][v[0]] != 0 and im2[v[1]][v[0]] != cell_index: 
@@ -583,6 +605,8 @@ class CellFrameInForm(CellFrameGeneric):
         c2 = map_image_ids(im2).reset_index().rename(columns={'id':'cell_index_2'})
         overlap = c1.merge(c2,on=['x','y']).query('cell_index_1!=cell_index_2')
         if overlap.shape[0] > 0: raise ValueError("need to handle overlap")
+
+        
 
         cell_map_id  = uuid4().hex
         self._images[cell_map_id] = im2.copy()

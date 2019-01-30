@@ -1,3 +1,160 @@
+import pandas as pd
+
+class CellDataFrame(pd.DataFrame):
+    _metadata = ['_microns_per_pixel'] # for extending dataframe to include this property
+    @property
+    def _constructor(self):
+        return CellDataFrame
+    def __init__(self,*args,**kw):
+        kwcopy = kw.copy()
+        super(CellDataFrame,self).__init__(*args,**kwcopy)
+        self._neighbors = None
+
+    def clear_cache(self):
+        self._neighbors = None
+
+    @property
+    def microns_per_pixel(self):
+        if not hasattr(self,'_microns_per_pixel'): return None
+        return self._microns_per_pixel
+    @microns_per_pixel.setter
+    def microns_per_pixel(self,value):
+        self._microns_per_pixel = value
+
+    @property
+    def phenotypes(self):
+        # The mutually exclusive phenotypes present in the CellDataFrame
+        return _extract_unique_keys_from_series(self['phenotype_calls'])
+
+    @property
+    def scored_names(self):
+        return _extract_unique_keys_from_series(self['scored_calls'])
+
+    #def neighbor_z_score(self,phenotype_A,phenotype_B):
+    #
+    def neighbors(self,cache=True):
+        if cache and self._neighbors is not None: return self._neighbors.copy()
+        subset = self[~self['neighbors'].isna()]
+        data = subset.apply(lambda x: 
+                         pd.DataFrame({
+                          'project_id':x['project_id'],
+                          'project_name':x['project_name'],
+                          'sample_id':x['sample_id'],
+                          'sample_name':x['sample_name'],
+                          'frame_id':x['frame_id'],
+                          'frame_name':x['frame_name'],
+                          'cell_index':x['cell_index'],
+
+                          'neighbor_cell_index':list(x['neighbors'].keys()),
+                          'edge_shared_pixels':list(x['neighbors'].values())
+                          })
+                    ,1)
+        data = pd.concat(data.tolist())
+        data['neighbor_cell_index'] = data['neighbor_cell_index'].astype(int)
+        data['edge_shared_pixels'] = data['edge_shared_pixels'].astype(int)
+        self._neighbors = data
+        return data
+    def count_neighbors(self,phenotype1,phenotype2,on=['sample_id'],shuffle=False):
+        sub1 = self[on+['frame_id','phenotype_label','cell_index']]
+        sub1 = sub1[sub1['phenotype_label']=='HRS+']
+        #print(sub1.head())
+        sub2 = self[['frame_id','phenotype_label','cell_index']]
+        sub2 = sub2[sub2['phenotype_label']=='T cell'].rename(columns={'cell_index':'neighbor_cell_index'})
+        #print(sub2.head())
+        n = cf.neighbors() 
+        if shuffle: 
+            nmap = self._shuffle_ids()
+            n = n.merge(nmap,on=['frame_id','cell_index']).drop(columns=['cell_index']).\
+                rename(columns={'next_index':'cell_index'})
+            print(n.head())
+            n = n.merge(nmap.rename(columns={'cell_index':'neighbor_cell_index'}),
+                                    on=['frame_id','neighbor_cell_index']).drop(columns=['cell_index']).\
+                rename(columns={'next_index':'neighbor_cell_index'})
+            print(n.head())
+        subset = n.merge(sub1,on=['frame_id','cell_index']).\
+            merge(sub2,on=['frame_id','neighbor_cell_index'])
+        #print(subset.head())
+        return subset.groupby(on).count()['cell_index'].reset_index().rename(columns={'cell_index':'count'})
+    def _shuffle_ids(self):
+        together = []
+        for frame_id in self['frame_id'].unique():
+            v1 = self.loc[self['frame_id']==frame_id,['cell_index']].copy().reset_index(drop=True)
+            v2 = v1.copy().sample(frac=1)
+            v1['next_index'] = list(v2.index)
+            v1['frame_id'] = frame_id
+            together.append(v1)
+        return pd.concat(together)
+
+    ### Modifying functions
+    def merge_scores(self,df_addition,reference_markers='all',
+                                      addition_markers='all',on=['project_name','sample_name','frame_name']):
+        if isinstance(reference_markers, str):
+            reference_markers = [x for x in json.loads(self['scored_calls'].iloc[0])]
+        elif reference_markers is None: reference_markers = []
+        if isinstance(addition_markers, str):
+            addition_markers = [x for x in json.loads(df_addition['scored_calls'].iloc[0])]
+        elif additionmarkers is None: addition_markers = []
+
+        df_addition = df_addition.copy()
+        df_addition['_key'] = 1
+        df = self.merge(df_addition[['scored_calls','_key']+on].rename(columns={'scored_calls':'_addition'}),
+                            on = on,
+                            how = 'left'
+                        )
+        df['_sub1'] = self.apply(lambda x: 
+                json.loads(x['scored_calls'])                  
+            ,1).apply(lambda x:
+                dict((k,x[k]) for k in reference_markers)
+            )
+        df['_sub2'] = df_addition.apply(lambda x: 
+                json.loads(x['scored_calls'])                  
+            ,1).apply(lambda x:
+                dict((k,x[k]) for k in addition_markers)
+            )
+        df['scored_calls'] = df.apply(lambda x:
+                json.dumps({**x['_sub1'],**x['_sub2']})                    
+            ,1)
+        df = df.drop(columns=['_sub1','_sub2','_addition'])
+
+        df = df.drop(columns='_key').copy(),df[df['_key'].isna()].drop(columns='_key').copy()
+        return df
+
+    def rename_scored_calls(self,change):
+        # input dictionary change with {<current name>:<new name>} format, new name must not already exist
+        output = self.copy()
+        output['scored_calls'] = output.apply(lambda x:
+          _dict_rename(x['scored_calls'],change)
+          ,1)
+        return output
+
+    def subset_logic(logic,how='any')
+        # subset on 'phenotype' or 'scored_calls' or both 'any'
+        # logic is a dict of rules
+        # {
+        #    <label 1>:<+/->,
+        #    <label 2>:<+/->
+        # }
+        pnames = self.phenotypes
+        snames = self.scored_names
+        data = self.copy()
+        for rule in logic:
+            score = logic[rule]
+            #if rule in pnames:
+            #    test = data['phenotypes'].apply(lambda x: False if rule not in x else (True if rule[x]==1 else False))
+
+def _extract_unique_keys_from_series(s):
+    uni = pd.Series(s.apply(lambda x: json.dumps(x)).unique()).\
+            apply(lambda x: json.loads(x)).apply(lambda x: set(sorted(x.keys())))
+    return sorted(list(set().union(*list(uni))))
+def _dict_rename(old,change):
+    new_keys = [x if x not in change else change[x] for x in old.keys()]
+    return dict(zip(new_keys, old.values()))
+
+
+
+
+
+
 """ This class is for reading Perkin Elmer Exports
 
 **Example:** reading a group of folders
