@@ -51,8 +51,10 @@ def sample_counts(cdf,subsets=None,ignore_empty_phenotypes=True):
         'label'
         ]).apply(lambda x: {
             'frame_count':len(x['frame_id']),
-            'count':np.sum(x['count']),
+            'total_count':np.sum(x['count']),
+            'total_area_mm2':np.sum(x['region_area_mm2']),
+            'total_density_mm2':np.nan if np.sum(x['region_area_mm2']) == 0 else np.sum(x['count'])/np.sum(x['region_area_mm2']),
             'mean_density_mm2':np.mean(x['density_mm2']),
-            'stderr_mm2':np.nan if len(x['frame_id'])==0 else np.std(x['density_mm2'])/math.sqrt(len(x['frame_id']))
+            'std_err_mm2':np.nan if len(x['frame_id'])==0 else np.std(x['density_mm2'])/math.sqrt(len(x['frame_id']))
         }).apply(pd.Series,1).reset_index()
     return output

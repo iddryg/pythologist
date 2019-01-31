@@ -1,8 +1,9 @@
 import pandas as pd
 import numpy as np
 import sys, json, h5py
-from pythologist.counts import frame_counts
 from pythologist.selection import SubsetLogic
+import pythologist.counts 
+import pythologist.spatial.contact
 
 class CellDataFrame(pd.DataFrame):
     _metadata = ['_microns_per_pixel'] # for extending dataframe to include this property
@@ -80,9 +81,18 @@ class CellDataFrame(pd.DataFrame):
     def scored_names(self):
         return _extract_unique_keys_from_series(self['scored_calls'])
 
-    #def neighbor_z_score(self,phenotype_A,phenotype_B):
-    #
-    def neighbors(self,cache=True):
+    @property
+    def regions(self):
+        return _extract_unique_keys_from_series(self['regions'])
+
+    # Output aggrogate data
+    def frame_counts(self,*args,**kwargs):
+        return pythologist.counts.frame_counts(self,*args,**kwargs)
+    def sample_counts(self,*args,**kwargs):
+        return pythologist.counts.sample_counts(self,*args,**kwargs)
+
+    def neighbors(self,*args,**kwargs):
+        return pythologist.spatial.contact.neighbors(self,*args,**kwargs)
         if cache and self._neighbors is not None: return self._neighbors.copy()
         subset = self[~self['neighbors'].isna()]
         data = subset.apply(lambda x: 
@@ -193,19 +203,110 @@ class CellDataFrame(pd.DataFrame):
     def subset(self,logic):
         # subset create a specific phenotype based on a logic
         # logic is a 'SubsetLogic' class
+        # take union of all the phenotypes listed.  If none are listed use all phenotypes.
+        # take the intersection of all the scored calls
         pnames = self.phenotypes
         snames = self.scored_names
         data = self.copy()
-        for k,v in logic.phenotypes.items():
+        values = []
+        phenotypes = logic.phenotypes
+        if len(phenotypes)==0: phenotypes = pnames
+        removing = set(self.phenotypes)-set(phenotypes)
+        for k in phenotypes:
             if k not in pnames: raise ValueError("phenotype must exist in defined")
-            filter = 0 if v == '-' else 1
-            data = data.loc[data['phenotype_calls'].apply(lambda x: x[k]==filter)]
+            temp = data.loc[data['phenotype_calls'].apply(lambda x: x[k]==1)].copy()
+            if len(removing) > 0:
+                temp['phenotype_calls'] = temp.apply(lambda x:
+                    dict([(k,v) for k,v in x['phenotype_calls'].items() if k not in removing])
+                    ,1)
+            values.append(temp)
+        data = pd.concat(values)
         for k,v in logic.scored_calls.items():
             if k not in snames: raise ValueError("Scored name must exist in defined")
             filter = 0 if v == '-' else 1
             data = data.loc[data['scored_calls'].apply(lambda x: x[k]==filter)]
         return data
 
+    def threshold(self,phenotype,scored_name,positive_label=None,negative_label=None):
+        # split a phenotype on a scored_call and if no label is specified
+        #       use the format '<phenotype> <scored_call><+/->'
+        # to specify a label give the positive and negative label
+        if positive_label is None and negative_label is not None or \
+           negative_label is None and positive_label is not None: raise ValueError("Error if you want to specify labels, give both positive and negative")
+        if phenotype not in self.phenotypes: raise ValueError("Error phenotype "+str(phenotype)+" is not in the data.")
+        if scored_name not in self.scored_names: raise ValueError("Error scored_name "+str(scored_name)+" is not in the data.")
+        if positive_label is None and negative_label is None:
+            positive_label = phenotype+' '+scored_name+'+'
+            negative_label = phenotype+' '+scored_name+'-'
+        elif positive_label == negative_label: raise ValueError("Cant have the same label for positive and negative.")
+        def _swap_in(d,pheno,scored,phenotype_calls,scored_calls,pos,neg):
+            if pheno not in phenotype_calls.keys(): return d
+            keepers = [(k,v) for k,v in phenotype_calls.items() if k!=phenotype]
+            if scored not in scored_calls.keys(): raise ValueError("Error scored calls are not unified across samples")
+            scored_value = scored_calls[scored]
+            phenotype_value = phenotype_calls[pheno]
+            if phenotype_value == 0:
+                keepers += [(pos,0),(neg,0)]
+            elif scored_value == 1:
+                keepers += [(pos,1),(neg,0)]
+            elif scored_value == 0:
+                keepers += [(pos,0),(neg,1)]
+            else: raise ValueError("Format error.  These values should only ever be zero or one.")
+            return dict(keepers)
+        data = self.copy()
+        data['phenotype_calls'] = self.apply(lambda x:
+                _swap_in(x,phenotype,scored_name,x['phenotype_calls'],x['scored_calls'],positive_label,negative_label)
+            ,1)
+        return data
+
+    def collapse_phenotypes(self,input_phenotype_labels,output_phenotype_label,verbose=True):
+        # Rename one or more input phenotypes to a single output phenotype
+        if isinstance(input_phenotype_labels,str): input_phenotype_labels = [input_phenotype_labels]
+        bad_phenotypes = set(input_phenotype_labels)-set(self.phenotypes)
+        if len(bad_phenotypes) > 0: raise ValueError("Error phenotype(s) "+str(bad_phenotypes)+" are not in the data.")
+        data = self.copy()
+        if len(input_phenotype_labels) == 0: return data
+        def _swap_in(d,inputs,output):
+            # Get the keys we need to merge together
+            overlap = set(d.keys()).intersection(inputs)
+            # if there are none to merge we're done already
+            if len(overlap) == 0: return d
+            keepers = [(k,v) for k,v in d.items() if k not in inputs]
+            # combine anything thats not a keeper
+            return dict(keepers+\
+                        [(output_phenotype_label,max([d[x] for x in overlap]))])
+        data['phenotype_calls'] = data.apply(lambda x:
+            _swap_in(x['phenotype_calls'],input_phenotype_labels,output_phenotype_label)
+            ,1)
+        return data
+    def rename_phenotype(self,*args,**kwargs): 
+        """simple alias for collapse phenotypes"""
+        return self.collapse_phenotypes(*args,**kwargs)
+
+    def combine_regions(self,input_region_labels,output_region_label,verbose=True):
+        # Rename one or more input phenotypes to a single output phenotype
+        if isinstance(input_region_labels,str): input_region_labels = [input_region_labels]
+        bad_regions = set(input_region_labels)-set(self.regions)
+        if len(bad_regions) > 0: raise ValueError("Error regions(s) "+str(bad_regions)+" are not in the data.")
+        data = self.copy()
+        if len(input_region_labels) == 0: return data
+        def _swap_in(d,inputs,output):
+            # Get the keys we need to merge together
+            overlap = set(d.keys()).intersection(inputs)
+            # if there are none to merge we're done already
+            if len(overlap) == 0: return d
+            keepers = [(k,v) for k,v in d.items() if k not in inputs]
+            # combine anything thats not a keeper
+            return dict(keepers+\
+                        [(output_region_label,sum([d[x] for x in overlap]))])
+        data['regions'] = data.apply(lambda x:
+            _swap_in(x['regions'],input_region_labels,output_region_label)
+            ,1)
+        data.loc[data['region_label'].isin(input_region_labels),'region_label'] = output_region_label
+        return data
+    def rename_region(self,*args,**kwargs): 
+        """simple alias for combine phenotypes"""
+        return self.combine_regions(*args,**kwargs)
 
 def _extract_unique_keys_from_series(s):
     uni = pd.Series(s.apply(lambda x: json.dumps(x)).unique()).\
