@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import sys, json, h5py
+from pythologist.counts import frame_counts
+from pythologist.selection import SubsetLogic
 
 class CellDataFrame(pd.DataFrame):
     _metadata = ['_microns_per_pixel'] # for extending dataframe to include this property
@@ -188,20 +190,22 @@ class CellDataFrame(pd.DataFrame):
             ,1)
         return output
 
-    def subset_logic(logic,how='any'):
-        # subset on 'phenotype' or 'scored_calls' or both 'any'
-        # logic is a dict of rules
-        # {
-        #    <label 1>:<+/->,
-        #    <label 2>:<+/->
-        # }
+    def subset(self,logic):
+        # subset create a specific phenotype based on a logic
+        # logic is a 'SubsetLogic' class
         pnames = self.phenotypes
         snames = self.scored_names
         data = self.copy()
-        for rule in logic:
-            score = logic[rule]
-            #if rule in pnames:
-            #    test = data['phenotypes'].apply(lambda x: False if rule not in x else (True if rule[x]==1 else False))
+        for k,v in logic.phenotypes.items():
+            if k not in pnames: raise ValueError("phenotype must exist in defined")
+            filter = 0 if v == '-' else 1
+            data = data.loc[data['phenotype_calls'].apply(lambda x: x[k]==filter)]
+        for k,v in logic.scored_calls.items():
+            if k not in snames: raise ValueError("Scored name must exist in defined")
+            filter = 0 if v == '-' else 1
+            data = data.loc[data['scored_calls'].apply(lambda x: x[k]==filter)]
+        return data
+
 
 def _extract_unique_keys_from_series(s):
     uni = pd.Series(s.apply(lambda x: json.dumps(x)).unique()).\
@@ -210,8 +214,6 @@ def _extract_unique_keys_from_series(s):
 def _dict_rename(old,change):
     new_keys = [x if x not in change else change[x] for x in old.keys()]
     return dict(zip(new_keys, old.values()))
-
-
 
 
 
