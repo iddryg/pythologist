@@ -225,6 +225,7 @@ class CellDataFrame(pd.DataFrame):
             if k not in snames: raise ValueError("Scored name must exist in defined")
             filter = 0 if v == '-' else 1
             data = data.loc[data['scored_calls'].apply(lambda x: x[k]==filter)]
+        data.microns_per_pixel = self.microns_per_pixel
         return data
 
     def threshold(self,phenotype,scored_name,positive_label=None,negative_label=None):

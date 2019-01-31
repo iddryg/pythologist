@@ -48,6 +48,7 @@ def sample_counts(cdf,subsets=None,ignore_empty_phenotypes=True):
         'project_name',
         'sample_id',
         'sample_name',
+        'region_label',
         'label'
         ]).apply(lambda x: {
             'frame_count':len(x['frame_id']),
