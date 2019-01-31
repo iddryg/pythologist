@@ -305,9 +305,7 @@ class CellFrameGeneric(object):
         # get our region sizes
         region_sizes = self.get_data('regions').set_index('region_label')['region_size'].astype(int).to_dict()
         # get our cells
-        temp1 = self.get_data('cells').merge(self.get_data('phenotypes'),
-                             left_on='phenotype_index',
-                             right_index=True).drop(columns='phenotype_index').\
+        temp1 = self.get_data('cells').drop(columns='phenotype_index').\
                        merge(self.get_data('regions'),
                              left_on='region_index',
                              right_index=True).drop(columns=['image_id','region_index','region_size'])
@@ -360,9 +358,11 @@ class CellFrameGeneric(object):
             ).reset_index().rename(columns={0:'neighbors'}).set_index('cell_index')
         edge_length = self.edge_map().reset_index().groupby('cell_index').count()[['x']].\
             rename(columns={'x':'edge_length'})
+        edge_length['edge_length'] = edge_length['edge_length'].astype(int)
 
         cell_area = self.cell_map().reset_index().groupby('cell_index').count()[['x']].\
             rename(columns={'x':'cell_area'})
+        cell_area['cell_area'] = cell_area['cell_area'].astype(int)
         temp5 = cell_area.merge(edge_length,left_index=True,right_index=True).merge(neighbors,left_index=True,right_index=True,how='left')
         temp5.loc[temp5['neighbors'].isna(),'neighbors'] = temp5.loc[temp5['neighbors'].isna(),'neighbors'].apply(lambda x: {}) # these are ones we actuall have measured
 

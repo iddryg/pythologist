@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+import sys, json, h5py
 
 class CellDataFrame(pd.DataFrame):
     _metadata = ['_microns_per_pixel'] # for extending dataframe to include this property
@@ -9,9 +11,42 @@ class CellDataFrame(pd.DataFrame):
         kwcopy = kw.copy()
         super(CellDataFrame,self).__init__(*args,**kwcopy)
         self._neighbors = None
-
     def clear_cache(self):
         self._neighbors = None
+
+    def to_hdf(self,path,key,mode='a'):
+        # overwrite pandas to write to a dataframe
+        pd.DataFrame(self.serialize()).to_hdf(path,key,mode=mode,format='table',complib='zlib',complevel=9)
+        f = h5py.File(path,'r+')
+        f[key].attrs["microns_per_pixel"] = float(self.microns_per_pixel) if self.microns_per_pixel is not None else np.nan
+        f.close()
+
+    @classmethod
+    def read_hdf(cls,path,key=None):
+        df = pd.read_hdf(path,key)
+        df['scored_calls'] = df['scored_calls'].apply(lambda x: json.loads(x))
+        df['channel_values'] = df['channel_values'].apply(lambda x: json.loads(x))
+        df['regions'] = df['regions'].apply(lambda x: json.loads(x))
+        df['phenotype_calls'] = df['phenotype_calls'].apply(lambda x: json.loads(x))
+        df['neighbors'] = df['neighbors'].apply(lambda x: json.loads(x))
+        df['neighbors'] = df['neighbors'].apply(lambda x:
+                np.nan if not isinstance(x,dict) else dict(zip([int(y) for y in x.keys()],x.values()))
+            )
+        df = cls(df)
+        f = h5py.File(path,'r')
+        mpp = f[key].attrs["microns_per_pixel"]
+        if not np.isnan(mpp): df.microns_per_pixel = mpp
+        f.close()
+        return df
+
+    def serialize(self):
+        df = self.copy()
+        df['scored_calls'] = df['scored_calls'].apply(lambda x: json.dumps(x))
+        df['channel_values'] = df['channel_values'].apply(lambda x: json.dumps(x))
+        df['regions'] = df['regions'].apply(lambda x: json.dumps(x))
+        df['phenotype_calls'] = df['phenotype_calls'].apply(lambda x: json.dumps(x))
+        df['neighbors'] = df['neighbors'].apply(lambda x: json.dumps(x))
+        return df
 
     @property
     def microns_per_pixel(self):
@@ -20,6 +55,19 @@ class CellDataFrame(pd.DataFrame):
     @microns_per_pixel.setter
     def microns_per_pixel(self,value):
         self._microns_per_pixel = value
+
+    def is_uniform(self,verbose=True):
+        uni = pd.Series(self['phenotype_calls'].apply(lambda x: json.dumps(x)).unique()).\
+            apply(lambda x: json.loads(x)).apply(lambda x: tuple(sorted(x.keys()))).unique()
+        if len(uni) > 1: 
+            if verbose: sys.stderr.write("WARNING: phenotypes differ across the dataframe \n"+str(uni)+"\n")
+            return False
+        uni = pd.Series(self['scored_calls'].apply(lambda x: json.dumps(x)).unique()).\
+            apply(lambda x: json.loads(x)).apply(lambda x: tuple(sorted(x.keys()))).unique()
+        if len(uni) > 1: 
+            if verbose: sys.stderr.write("WARNING: scored_calls differ across the dataframe \n"+str(uni)+"\n")
+            return False
+        return True
 
     @property
     def phenotypes(self):
@@ -87,12 +135,12 @@ class CellDataFrame(pd.DataFrame):
 
     ### Modifying functions
     def merge_scores(self,df_addition,reference_markers='all',
-                                      addition_markers='all',on=['project_name','sample_name','frame_name']):
+                                      addition_markers='all',on=['project_name','sample_name','frame_name','cell_index']):
         if isinstance(reference_markers, str):
-            reference_markers = [x for x in json.loads(self['scored_calls'].iloc[0])]
+            reference_markers = self.scored_names
         elif reference_markers is None: reference_markers = []
         if isinstance(addition_markers, str):
-            addition_markers = [x for x in json.loads(df_addition['scored_calls'].iloc[0])]
+            addition_markers = df_addition.scored_names
         elif additionmarkers is None: addition_markers = []
 
         df_addition = df_addition.copy()
@@ -101,18 +149,15 @@ class CellDataFrame(pd.DataFrame):
                             on = on,
                             how = 'left'
                         )
-        df['_sub1'] = self.apply(lambda x: 
-                json.loads(x['scored_calls'])                  
-            ,1).apply(lambda x:
+        df['_sub1'] = self['scored_calls'].apply(lambda x:
                 dict((k,x[k]) for k in reference_markers)
             )
-        df['_sub2'] = df_addition.apply(lambda x: 
-                json.loads(x['scored_calls'])                  
-            ,1).apply(lambda x:
+        df['_sub2'] = df_addition['scored_calls'].apply(lambda x:
                 dict((k,x[k]) for k in addition_markers)
             )
+        # combine the two dictionaries
         df['scored_calls'] = df.apply(lambda x:
-                json.dumps({**x['_sub1'],**x['_sub2']})                    
+                {**x['_sub1'],**x['_sub2']}                    
             ,1)
         df = df.drop(columns=['_sub1','_sub2','_addition'])
 
@@ -127,7 +172,23 @@ class CellDataFrame(pd.DataFrame):
           ,1)
         return output
 
-    def subset_logic(logic,how='any')
+    def zero_fill_missing_phenotypes(self):
+        # Fill in missing phenotypes and scored types by listing any missing data as negative
+        if self.is_uniform(verbose=False): return self.copy()
+        output = self.copy()
+        def _do_fill(d,names):
+            old_names = list(d.keys())
+            old_values = list(d.values())
+            missing = set(names)-set(old_names)
+            return dict(zip(old_names+list(missing),old_values+([0]*len(missing))))
+        ## Need to make these uniform
+        pnames = self.phenotypes
+        output['phenotype_calls']= output.apply(lambda x:
+            _do_fill(x['phenotype_calls'],pnames)
+            ,1)
+        return output
+
+    def subset_logic(logic,how='any'):
         # subset on 'phenotype' or 'scored_calls' or both 'any'
         # logic is a dict of rules
         # {
