@@ -24,7 +24,6 @@ def frame_counts(cdf,subsets=None,ignore_empty_phenotypes=True):
                'region_label',
                'region_area']
     frames_present = cdf[mergeon].drop_duplicates()
-    frames_present['_key'] = 1
 
     counts = []
     for sl in subsets:
@@ -32,7 +31,6 @@ def frame_counts(cdf,subsets=None,ignore_empty_phenotypes=True):
         df = pd.DataFrame(df)
         df = df.groupby(mergeon)[['cell_index']].count().\
              rename(columns={'cell_index':'count'}).reset_index()
-        df['_key'] = 1
         df = frames_present.merge(df,on=mergeon,how='left').fillna(0)
         df['label'] = sl.label
         counts.append(df)
