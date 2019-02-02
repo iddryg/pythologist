@@ -60,7 +60,8 @@ class CellFrameInForm(CellFrameGeneric):
                  binary_seg_image_file=None,
                  component_image_file=None,
                  verbose=False,
-                 channel_abbreviations=None):
+                 channel_abbreviations=None,
+                 require=True):
         self.frame_name = frame_name
         ### Read in the data for our object
         if verbose: sys.stderr.write("Reading text data.\n")
@@ -69,11 +70,12 @@ class CellFrameInForm(CellFrameGeneric):
                    score_data_file,
                    tissue_seg_data_file,
                    verbose,
-                   channel_abbreviations)
+                   channel_abbreviations,require=require)
         if verbose: sys.stderr.write("Reading image data.\n")
         self._read_images(binary_seg_image_file,
                    component_image_file,
-                   verbose=verbose)
+                   verbose=verbose,
+                   require=require)
         return
 
     def default_raw(self):
@@ -117,7 +119,8 @@ class CellFrameInForm(CellFrameGeneric):
                         score_data_file=None,
                         tissue_seg_data_file=None,
                         verbose=False,
-                        channel_abbreviations=None):
+                        channel_abbreviations=None,
+                        require=True):
         """ Read in the image data from a inForm
 
         :param cell_seg_data_file:
@@ -349,13 +352,14 @@ class CellFrameInForm(CellFrameGeneric):
         self.set_data('thresholds',_thresholds)
 
     ### Lets work with image files now
-    def _read_images(self,binary_seg_image_file=None,component_image_file=None,verbose=False):
+    def _read_images(self,binary_seg_image_file=None,component_image_file=None,verbose=False,require=True):
         # Start with the binary seg image file because if it has a processed image area,
         # that will be applied to all other masks and we can get that segmentation right away
 
         # Now we've read in whatever we've got fromt he binary seg image
         if verbose: sys.stderr.write("Reading component images.\n")
-        self._read_component_image(component_image_file)
+        if require or (not require and os.path.isfile(component_image_file)): 
+            self._read_component_image(component_image_file)
         if verbose: sys.stderr.write("Finished reading component images.\n")
 
         if binary_seg_image_file is not None:

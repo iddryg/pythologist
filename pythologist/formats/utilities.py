@@ -2,11 +2,12 @@ from tifffile import TiffFile
 import numpy as np
 import pandas as pd
 import sys
-
+from random import random
 def watershed_image(np_array,starting_points,valid_target_points,steps=1,border=1):
     output = np_array.copy()
     for i in range(0,steps):
-        output,filled_points = _watershed_image_step(output,starting_points,valid_target_points)
+        used_target_points = valid_target_points.copy()
+        output,filled_points = _watershed_image_step(output,starting_points,used_target_points)
         starting_points = filled_points
         valid_target_points = list(set(valid_target_points)-set(filled_points))
     return output
@@ -25,13 +26,15 @@ def _watershed_image_step(np_array,starting_points,valid_target_points,border=1)
         groupby(['x','y']).first().reset_index()
     full = np_array.copy()
 
+    filled_points = []
     for i,r in n.iterrows():
         x = r['x']
         y = r['y']
         if x < 0+border or x > np_array.shape[1]-border: continue
         if y < 0+border or y > np_array.shape[0]-border: continue
+        filled_points.append((x,y))
         full[y][x] = r['id']
-    return full,list(zip(n['x'],n['y']))
+    return full,filled_points
 
 def split_color_image_array(np_array):
     if len(np_array.shape) == 2: return [np_array]
