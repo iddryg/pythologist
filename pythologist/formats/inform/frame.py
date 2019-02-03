@@ -296,6 +296,7 @@ class CellFrameInForm(CellFrameGeneric):
                           merge(self.get_data('measurement_features').reset_index(),on='feature_label',how='left').\
                           drop(columns=['channel_label','feature_label','statistic_label','channel_abbreviation'])
         _cell_measurements.index.name = 'measurement_index'
+        _cell_measurements['cell_index'] = _cell_measurements['cell_index'].astype(np.uint32)
         self.set_data('cell_measurements',_cell_measurements)
 
 
@@ -398,14 +399,21 @@ class CellFrameInForm(CellFrameGeneric):
 
         _channel_key = self.get_data('measurement_channels')
         _channel_key_with_images = _channel_key[~_channel_key['image_id'].isna()]
-        if self._processed_image_id is None and _channel_key_with_images.shape[0]>0:
+        _channel_image_ids =  list(_channel_key.loc[~_channel_key['image_id'].isna(),'image_id'])
+
+        _seg_key = self.get_data('segmentation_images')
+        _seg_key_with_images = _seg_key[~_seg_key['image_id'].isna()]
+        _seg_image_ids =  list(_seg_key.loc[~_seg_key['image_id'].isna(),'image_id'])
+        _use_image_ids = _channel_image_ids+_seg_image_ids
+        if self._processed_image_id is None and len(_use_image_ids)>0:
             # We have nothing so we assume the entire image is processed until we have some reason to update this
             if verbose: sys.stderr.write("No mask present so setting entire image area to be processed area.\n")
-            dim = self._images[_channel_key_with_images.iloc[0]['image_id']].shape                
+            dim = self._images[_use_image_ids[0]].shape                
             self._processed_image_id = uuid4().hex
             self._images[self._processed_image_id] = np.ones(dim,dtype=np.int8)
 
         if self._processed_image_id is None:
+
             raise ValueError("Nothing to set determine size of images")
 
         # Now we can set the regions if we have them set intrinsically
@@ -589,7 +597,7 @@ class CellFrameInForm(CellFrameGeneric):
             if im[coord[1]][coord[0]] != 0: 
                 sys.stderr.write("Warning: skipping a cell center is exactly on the edge of a map.")
                 continue
-            num = flood_fill(im,coord[0],coord[1],lambda x: x!=0,max_depth=3000,border_trim=1)
+            num = flood_fill(im,coord[0],coord[1],lambda x: x!=0,max_depth=3000,border_trim=2)
             if len(num) >= 2000: continue 
             for v in num: 
                 if im2[v[1]][v[0]] != 0 and im2[v[1]][v[0]] != cell_index: 
