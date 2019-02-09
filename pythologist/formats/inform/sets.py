@@ -15,7 +15,7 @@ class CellProjectInForm(CellProjectGeneric):
 
     def read_path(self,path,project_name=None,
                       name_index=None,channel_abbreviations=None,
-                      verbose=False,require=True):
+                      verbose=False,require=True,**kwargs):
         if project_name is not None: self.set_project_name(project_name)
         if self.mode == 'r': raise ValueError("Error: cannot write to a path in read-only mode.")
         # read all terminal folders as sample_names unless there is none then the sample name is blank
@@ -31,17 +31,18 @@ class CellProjectInForm(CellProjectGeneric):
             else: sname  = os.path.split(s)[name_index]
             sid = self.add_sample_path(s,sample_name=sname,
                                          channel_abbreviations=channel_abbreviations,
-                                         verbose=verbose,require=require)
+                                         verbose=verbose,require=require,**kwargs)
             if verbose: sys.stderr.write("Added sample "+sid+"\n")
 
-    def add_sample_path(self,path,sample_name=None,channel_abbreviations=None,verbose=False,require=True):
+    def add_sample_path(self,path,sample_name=None,channel_abbreviations=None,
+                                  verbose=False,require=True,**kwargs):
         if self.mode == 'r': raise ValueError("Error: cannot write to a path in read-only mode.")
         if verbose: sys.stderr.write("Reading sample "+path+"\n")
         cellsample = self.create_cell_sample_class()
         #print(type(cellsample))
         cellsample.read_path(path,sample_name=sample_name,
                                   channel_abbreviations=channel_abbreviations,
-                                  verbose=verbose,require=require)
+                                  verbose=verbose,require=require,**kwargs)
         cellsample.to_hdf(self.h5path,location='samples/'+cellsample.id,mode='a')
         current = self.key
         if current is None:
@@ -65,7 +66,7 @@ class CellSampleInForm(CellSampleGeneric):
         return CellFrameInForm()
     def read_path(self,path,sample_name=None,
                             channel_abbreviations=None,
-                            verbose=False,require=True):
+                            verbose=False,require=True,**kwargs):
         # Read in a folder of inform cell images
         #
         # These image should be in a format with a image frame name prefix*
@@ -102,7 +103,7 @@ class CellSampleInForm(CellSampleGeneric):
             if not os.path.exists(score):
                     raise ValueError('Missing score file '+score)
             if verbose: sys.stderr.write('Acquiring frame '+data+"\n")
-            cid = CellFrameInForm()
+            cid = self.create_cell_frame_class()
             cid.read_raw(frame_name = frame,
                          cell_seg_data_file=data,
                          cell_seg_data_summary_file=summary,

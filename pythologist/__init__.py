@@ -258,7 +258,13 @@ class CellDataFrame(pd.DataFrame):
         data['phenotype_calls'] = self.apply(lambda x:
                 _swap_in(x,phenotype,scored_name,x['phenotype_calls'],x['scored_calls'],positive_label,negative_label)
             ,1)
-        return data
+        def _set_label(d):
+            vals = [k for k,v in d.items() if v==1]
+            return np.nan if len(vals) == 0 else vals[0]
+        data['phenotype_label'] = data.apply(lambda x:
+                _set_label(x['phenotype_calls'])
+            ,1)
+        return data.copy()
 
     def collapse_phenotypes(self,input_phenotype_labels,output_phenotype_label,verbose=True):
         # Rename one or more input phenotypes to a single output phenotype

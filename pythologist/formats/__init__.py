@@ -378,6 +378,12 @@ class CellFrameGeneric(object):
         temp1['project_name'] = 'undefined'
         temp1['sample_id'] = 'undefined'
         temp1['project_id'] = 'undefined'
+        def _get_phenotype(d):
+            vals = [k for k,v in d.items() if v ==  1]
+            return np.nan if len(vals) == 0 else vals[0]
+        temp1['phenotype_label'] = temp1.apply(lambda x:
+                  _get_phenotype(x['phenotype_calls'])
+            ,1)
         return CellDataFrame(temp1)
 
     def binary_df(self):
