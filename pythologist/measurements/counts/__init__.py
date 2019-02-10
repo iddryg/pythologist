@@ -52,60 +52,43 @@ class Counts(Measurement):
         cnts['density_mm2'] = cnts.apply(lambda x: x['count']/x['region_area_mm2'],1)
         return cnts
 
+    def sample_counts(self,subsets=None):
+        mergeon = ['project_id',
+                   'project_name',
+                   'sample_id',
+                   'sample_name']
+        fc = self.measured_regions[mergeon+[
+            'frame_id',
+            'frame_name'
+            ]].drop_duplicates().groupby(mergeon).\
+            count()[['frame_id']].rename(columns={'frame_id':'frame_count'}).\
+            reset_index()
+        cnts = self.frame_counts(subsets=subsets).groupby(mergeon+['region_label','phenotype_label']).\
+            apply(lambda x:
+                pd.Series(dict(zip(
+                    [
+                     'cummulative_region_area_pixels',
+                     'cummulative_region_area_mm2',
+                     'cummulative_count',
+                     'cummulative_density_mm2',
+                     'mean_density_mm2',
+                     'stddev_density_mm2',
+                     'sterr_density_mm2',
+                     'measured_frame_count'
+                    ],
+                    [
+                     x['region_area_pixels'].sum(),
+                     x['region_area_mm2'].sum(),
+                     x['count'].sum(),
+                     x['count'].sum()/x['region_area_mm2'].sum(),
+                     x['density_mm2'].mean(),
+                     x['density_mm2'].std(),
+                     x['density_mm2'].std()/np.sqrt(len(x['density_mm2'])),
+                     len(x['density_mm2'])
+                    ]
+                )))
+            ).reset_index()
+        cnts = cnts.merge(fc,on=mergeon)
+        cnts['measured_frame_count'] = cnts['measured_frame_count'].astype(int)
+        return cnts
 
-def frame_counts(cdf,subsets=None,ignore_empty_phenotypes=True):
-    if ignore_empty_phenotypes:
-        cdf = cdf.loc[cdf['phenotype_calls'].apply(lambda x: len(x.keys())>0 and max(x.values())>0)].copy()
-    if cdf.microns_per_pixel is None: 
-        raise ValueError("microns_per_pixel must be set to get counts")
-    cdf['region_area'] = cdf.apply(lambda x: x['regions'][x['region_label']],1)
-    # If no subsets are given return the phenotype counts
-    if subsets is None: 
-        subsets = []
-        for phenotype in cdf.phenotypes:
-            subsets.append(SL(label=phenotype,phenotypes={phenotype:'+'}))
-    elif isinstance(subsets,SL): subsets=[subsets]
-    mergeon = ['project_id',
-               'project_name',
-               'sample_id',
-               'sample_name',
-               'frame_id',
-               'frame_name',
-               'region_label',
-               'region_area']
-    frames_present = cdf[mergeon].drop_duplicates()
-
-    counts = []
-    for sl in subsets:
-        df = cdf.subset(sl)
-        df = pd.DataFrame(df)
-        df = df.groupby(mergeon)[['cell_index']].count().\
-             rename(columns={'cell_index':'count'}).reset_index()
-        df = frames_present.merge(df,on=mergeon,how='left').fillna(0)
-        df['label'] = sl.label
-        counts.append(df)
-    counts = pd.concat(counts)
-    counts['microns_per_pixel'] = cdf.microns_per_pixel
-    counts['region_area_mm2'] = counts.apply(lambda x: 
-        (x['region_area']/1000000)/(cdf.microns_per_pixel*cdf.microns_per_pixel),1)
-    counts['density_mm2'] = counts.apply(lambda x: x['count']/x['region_area_mm2'],1)
-    return counts
-
-def sample_counts(cdf,subsets=None,ignore_empty_phenotypes=True):
-    fc = frame_counts(cdf,subsets=subsets,ignore_empty_phenotypes=ignore_empty_phenotypes).copy()
-    output = fc.groupby([
-        'project_id',
-        'project_name',
-        'sample_id',
-        'sample_name',
-        'region_label',
-        'label'
-        ]).apply(lambda x: {
-            'frame_count':len(x['frame_id']),
-            'total_count':np.sum(x['count']),
-            'total_area_mm2':np.sum(x['region_area_mm2']),
-            'total_density_mm2':np.nan if np.sum(x['region_area_mm2']) == 0 else np.sum(x['count'])/np.sum(x['region_area_mm2']),
-            'mean_density_mm2':np.mean(x['density_mm2']),
-            'std_err_mm2':np.nan if len(x['frame_id'])==0 else np.std(x['density_mm2'])/math.sqrt(len(x['frame_id']))
-        }).apply(pd.Series,1).reset_index()
-    return output

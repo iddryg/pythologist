@@ -106,12 +106,6 @@ class CellDataFrame(pd.DataFrame):
         rows = rows.loc[rows['region_area_pixels']>0].copy()
         return rows
 
-    # Output aggrogate data
-    def frame_counts(self,*args,**kwargs):
-        return pythologist.counts.frame_counts(self,*args,**kwargs)
-    def sample_counts(self,*args,**kwargs):
-        return pythologist.counts.sample_counts(self,*args,**kwargs)
-
     def contacts(self,*args,**kwargs):
         n = Contacts.read_cellframe(self)
         if 'measured_regions' in kwargs: n.measured_regions = kwargs['measured_regions']
