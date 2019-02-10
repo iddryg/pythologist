@@ -1,3 +1,4 @@
+import json
 class SubsetLogic(dict):
     def __init__(self,*args,**kwcopy):
         if 'label' not in kwcopy: kwcopy['label'] = None
