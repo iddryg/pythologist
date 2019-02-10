@@ -26,7 +26,7 @@ class Contacts(Measurement):
         base = subset[['project_id','project_name',
                    'sample_id','sample_name',
                    'frame_id','frame_name',
-                   'cell_index','region_label','regions',
+                   'cell_index','region_label',
                    ]].merge(data,left_index=True,right_on='db_id').\
                    drop(columns='db_id')
         temp = cdf[['frame_id','cell_index','edge_length','phenotype_calls']].copy()
@@ -36,14 +36,14 @@ class Contacts(Measurement):
         temp2 = temp.copy().rename(columns={'phenotype':'neighbor_phenotype','edge_length':'neighbor_edge_length','cell_index':'neighbor_cell_index'})
         merged = merged.merge(temp2,on=['frame_id','neighbor_cell_index'])
         return merged
-    def counts(self):
+    def frame_counts(self):
         mergeon=['project_id',
-                             'project_name',
-                             'sample_id',
-                             'sample_name',
-                             'frame_id',
-                             'frame_name',
-                             'region_label']
+                 'project_name',
+                 'sample_id',
+                 'sample_name',
+                 'frame_id',
+                 'frame_name',
+                 'region_label']
         mr = self.measured_regions.copy()
         mr['_key'] = 1
         cnts = self.groupby(mergeon+['phenotype','neighbor_phenotype']).\
@@ -54,4 +54,54 @@ class Contacts(Measurement):
         pheno2 = pheno1.copy().rename(columns={'phenotype':'neighbor_phenotype'})
         blank = mr.merge(pheno1,on='_key').merge(pheno2,on='_key').drop(columns='_key')
         cnts = blank.merge(cnts,on=mergeon+['phenotype','neighbor_phenotype'],how='left').fillna(0)
+        cnts['region_area_mm2'] = cnts.apply(lambda x: 
+            (x['region_area_pixels']/1000000)/(self.microns_per_pixel*self.microns_per_pixel),1)
+        cnts['density_mm2'] = cnts.apply(lambda x: x['count']/x['region_area_mm2'],1)
+        return cnts
+    def sample_counts(self):
+        mergeon=[
+             'project_id',
+             'project_name',
+             'sample_id',
+             'sample_name',
+             'region_label',
+             'phenotype',
+             'neighbor_phenotype'
+        ]
+        mergeon1  = [
+             'project_id',
+             'project_name',
+             'sample_id',
+             'sample_name',
+        ]
+        fc = self.measured_regions[mergeon1+[
+            'frame_id',
+            'frame_name'
+        ]].drop_duplicates().groupby(mergeon1).\
+            count()[['frame_id']].rename(columns={'frame_id':'frame_count'})
+        cnts = self.frame_counts().groupby(mergeon).\
+            apply(lambda x:
+                pd.Series(dict(zip(
+                    ['cummulative_count',
+                     'cummulative_region_area_pixels',
+                     'cummulative_region_area_mm2',
+                     'cummulative_density_mm2',
+                     'mean_density_mm2',
+                     'stddev_density_mm2',
+                     'stderr_density_mm2',
+                     'measured_frame_count'
+                    ],
+                    [
+                     x['count'].sum(),
+                     x['region_area_pixels'].sum(),
+                     x['region_area_mm2'].sum(),
+                     x['count'].sum()/x['region_area_mm2'].sum(),
+                     x['density_mm2'].mean(),
+                     x['density_mm2'].std(),
+                     x['density_mm2'].std()/np.sqrt(len(x['density_mm2'])),
+                     len(x['density_mm2'])
+                    ]
+                )))
+            ).reset_index()
+        cnts = cnts.merge(fc,on=mergeon1)
         return cnts
