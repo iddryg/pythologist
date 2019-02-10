@@ -11,8 +11,8 @@ class Measurement(pd.DataFrame):
     def _constructor(self):
         return Measurement
     @classmethod
-    def read_cellframe(cls,cdf,measured_regions=None,measured_phenotypes=None):
-        v = cls(cls._preprocess_dataframe(cdf))
+    def read_cellframe(cls,cdf,measured_regions=None,measured_phenotypes=None,**kwargs):
+        v = cls(cls._preprocess_dataframe(cdf,**kwargs))
         if measured_regions is None: v.measured_regions = cdf.get_measured_regions()
         if measured_phenotypes is None: v.measured_phenotypes = cdf.phenotypes
         v.microns_per_pixel = cdf.microns_per_pixel

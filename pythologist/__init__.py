@@ -4,6 +4,7 @@ import sys, json, h5py
 from pythologist.selection import SubsetLogic
 from pythologist.measurements.counts import Counts
 from pythologist.measurements.spatial.contacts import Contacts
+from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
 
 class CellDataFrame(pd.DataFrame):
     _metadata = ['_microns_per_pixel'] # for extending dataframe to include this property
@@ -105,6 +106,15 @@ class CellDataFrame(pd.DataFrame):
             drop_duplicates()[mergeon+['region_label','region_area_pixels']]
         rows = rows.loc[rows['region_area_pixels']>0].copy()
         return rows
+
+    def nearestneighbors(self,*args,**kwargs):
+        n = NearestNeighbors.read_cellframe(self,*args,**kwargs)
+        if 'measured_regions' in kwargs: n.measured_regions = kwargs['measured_regions']
+        else: n.measured_regions = self.get_measured_regions()
+        if 'measured_phenotypes' in kwargs: n.measured_phenotypes = kwargs['measured_phenotypes']
+        else: n.measured_phenotypes = self.phenotypes
+        n.microns_per_pixel = self.microns_per_pixel
+        return n
 
     def contacts(self,*args,**kwargs):
         n = Contacts.read_cellframe(self)
