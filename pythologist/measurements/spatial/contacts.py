@@ -36,6 +36,43 @@ class Contacts(Measurement):
         temp2 = temp.copy().rename(columns={'phenotype':'neighbor_phenotype','edge_length':'neighbor_edge_length','cell_index':'neighbor_cell_index'})
         merged = merged.merge(temp2,on=['frame_id','neighbor_cell_index'])
         return merged
+    def _proportions(self,mergeon):
+        tot = self.groupby(mergeon+['phenotype']).\
+            count()[['cell_index']].rename(columns={'cell_index':'total'})
+        mr = self.measured_regions[mergeon].drop_duplicates()
+        mr['_key'] = 1
+        mp = pd.DataFrame({'phenotype':self.measured_phenotypes})
+        mp['_key'] = 1
+        mn = pd.DataFrame({'neighbor_phenotype':self.measured_phenotypes})
+        mn['_key'] = 1
+        tot = mr.merge(mp,on='_key').\
+            merge(tot,on=mergeon+['phenotype'],how='left').fillna(0).drop(columns='_key')
+        cnt = self.groupby(mergeon+['phenotype','neighbor_phenotype']).\
+            count()[['cell_index']].rename(columns={'cell_index':'count'})
+        cnt = mr.merge(mp,on='_key').merge(mn,on='_key').\
+            merge(cnt,on=mergeon+['phenotype','neighbor_phenotype'],how='left').fillna(0)
+        cnt = cnt.merge(tot,on=mergeon+['phenotype']).drop(columns='_key')
+        cnt['fraction'] = cnt.apply(lambda x: 
+                np.nan if x['total'] == 0 else x['count']/x['total']
+            ,1)
+        return cnt
+    def frame_proportions(self):
+        mergeon=['project_id',
+                 'project_name',
+                 'sample_id',
+                 'sample_name',
+                 'frame_id',
+                 'frame_name',
+                 'region_label']
+        return self._proportions(mergeon)
+    def sample_proportions(self):
+        mergeon=['project_id',
+                 'project_name',
+                 'sample_id',
+                 'sample_name',
+                 'region_label']
+        return self._proportions(mergeon)
+
     def frame_counts(self):
         mergeon=['project_id',
                  'project_name',
