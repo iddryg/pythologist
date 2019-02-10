@@ -48,7 +48,7 @@ class Counts(Measurement):
             cnts = pd.concat(cnts)
         cnts = cnts[mergeon+['region_area_pixels','phenotype_label','count']]
         cnts['region_area_mm2'] = cnts.apply(lambda x: 
-            (x['region_area_pixels']/1000000)/(self.microns_per_pixel*self.microns_per_pixel),1)
+            (x['region_area_pixels']/1000000)*(self.microns_per_pixel*self.microns_per_pixel),1)
         cnts['density_mm2'] = cnts.apply(lambda x: x['count']/x['region_area_mm2'],1)
         return cnts
 

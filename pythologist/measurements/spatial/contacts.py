@@ -92,7 +92,7 @@ class Contacts(Measurement):
         blank = mr.merge(pheno1,on='_key').merge(pheno2,on='_key').drop(columns='_key')
         cnts = blank.merge(cnts,on=mergeon+['phenotype','neighbor_phenotype'],how='left').fillna(0)
         cnts['region_area_mm2'] = cnts.apply(lambda x: 
-            (x['region_area_pixels']/1000000)/(self.microns_per_pixel*self.microns_per_pixel),1)
+            (x['region_area_pixels']/1000000)*(self.microns_per_pixel*self.microns_per_pixel),1)
         cnts['density_mm2'] = cnts.apply(lambda x: x['count']/x['region_area_mm2'],1)
         return cnts
     def sample_counts(self):

@@ -67,10 +67,12 @@ class CellSampleInFormLineArea(CellSampleInForm):
                          channel_abbreviations=channel_abbreviations,
                          verbose=verbose,
                          require=require)
-            cid.set_line_area(margin,tumor,steps=steps)
+            if verbose: sys.stderr.write("setting tumor and stroma and margin\n")
+            cid.set_line_area(margin,tumor,steps=steps,verbose=verbose)
             frame_id = cid.id
             self._frames[frame_id]=cid
             frames.append({'frame_id':frame_id,'frame_name':frame,'frame_path':absdir})
+            if verbose: sys.stderr.write("finished tumor and stroma and margin\n")
         self._key = pd.DataFrame(frames)
         self._key.index.name = 'db_id'
         self.sample_name = sample_name #os.path.split(path)[-1]
@@ -85,7 +87,7 @@ class CellFrameInFormLineArea(CellFrameInForm):
             if x in self._data: continue
             self._data[x] = pd.DataFrame(columns=self.data_tables[x]['columns'])
             self._data[x].index.name = self.data_tables[x]['index']
-    def set_line_area(self,line_image,area_image,steps=20):
+    def set_line_area(self,line_image,area_image,steps=20,verbose=False):
         #regions = prepare_margin_line_tumor_area(line_image,area_image)
         drawn_binary = read_tiff_stack(line_image)[0]['raw_image']
         drawn_binary = make_binary_image_array(drawn_binary)

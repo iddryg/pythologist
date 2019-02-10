@@ -139,7 +139,7 @@ class NearestNeighbors(Measurement):
         v1 = self._cummulative_sample_distance(minimum_edges)
         v2 = self._mean_sample_distance(minimum_edges)
         data = v1.merge(v2,on=mergeon+['phenotype_label','neighbor_phenotype_label'])
-        data = data.loc[data['measured_frame_count'].isna(),'measured_frame_count'] = 0
+        data.loc[data['measured_frame_count'].isna(),'measured_frame_count'] = 0
         return data
 
     def frame_proximity(self,threshold_um,phenotype):
