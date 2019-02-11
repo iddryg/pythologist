@@ -72,6 +72,11 @@ class Contacts(Measurement):
                  'sample_name',
                  'region_label']
         return self._proportions(mergeon)
+    def project_proportions(self):
+        mergeon=['project_id',
+                 'project_name',
+                 'region_label']
+        return self._proportions(mergeon)
 
     def frame_counts(self):
         mergeon=['project_id',

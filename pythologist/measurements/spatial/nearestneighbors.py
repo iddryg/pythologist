@@ -173,3 +173,12 @@ class NearestNeighbors(Measurement):
         cnt = cnt.merge(total,on=mergeon+['location']).sort_values(mergeon+['location','phenotype_label'])
         cnt['fraction'] = cnt.apply(lambda x: x['count']/x['total'],1)
         return cnt
+    def project_proximity(self,threshold_um,phenotype):
+        mergeon = ['project_id','project_name','region_label']
+        fp = self.sample_proximity(threshold_um,phenotype)
+        cnt = fp.groupby(mergeon+['phenotype_label','location']).sum()[['count']].reset_index()
+        total = cnt.groupby(mergeon+['location']).sum()[['count']].rename(columns={'count':'total'}).\
+             reset_index()
+        cnt = cnt.merge(total,on=mergeon+['location']).sort_values(mergeon+['location','phenotype_label'])
+        cnt['fraction'] = cnt.apply(lambda x: x['count']/x['total'],1)
+        return cnt

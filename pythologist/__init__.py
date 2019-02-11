@@ -220,7 +220,7 @@ class CellDataFrame(pd.DataFrame):
             ,1)
         return output
 
-    def subset(self,logic):
+    def subset(self,logic,update=False):
         # subset create a specific phenotype based on a logic
         # logic is a 'SubsetLogic' class
         # take union of all the phenotypes listed.  If none are listed use all phenotypes.
@@ -246,6 +246,7 @@ class CellDataFrame(pd.DataFrame):
             filter = 0 if v == '-' else 1
             data = data.loc[data['scored_calls'].apply(lambda x: x[k]==filter)]
         data.microns_per_pixel = self.microns_per_pixel
+        if update: data['phenotype_calls'] = data['phenotype_calls'].apply(lambda x: {logic.label:1})
         return data
 
     def threshold(self,phenotype,scored_name,positive_label=None,negative_label=None):

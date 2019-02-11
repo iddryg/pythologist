@@ -56,14 +56,15 @@ class Counts(Measurement):
         mergeon = ['project_id',
                    'project_name',
                    'sample_id',
-                   'sample_name']
+                   'sample_name',
+                   'region_label']
         fc = self.measured_regions[mergeon+[
             'frame_id',
             'frame_name'
             ]].drop_duplicates().groupby(mergeon).\
             count()[['frame_id']].rename(columns={'frame_id':'frame_count'}).\
             reset_index()
-        cnts = self.frame_counts(subsets=subsets).groupby(mergeon+['region_label','phenotype_label']).\
+        cnts = self.frame_counts(subsets=subsets).groupby(mergeon+['phenotype_label']).\
             apply(lambda x:
                 pd.Series(dict(zip(
                     [
@@ -73,7 +74,7 @@ class Counts(Measurement):
                      'cummulative_density_mm2',
                      'mean_density_mm2',
                      'stddev_density_mm2',
-                     'sterr_density_mm2',
+                     'stderr_density_mm2',
                      'measured_frame_count'
                     ],
                     [
@@ -90,5 +91,25 @@ class Counts(Measurement):
             ).reset_index()
         cnts = cnts.merge(fc,on=mergeon)
         cnts['measured_frame_count'] = cnts['measured_frame_count'].astype(int)
+        # get fractions also
+        totals = cnts.groupby(mergeon).sum()[['cummulative_count']].\
+            rename(columns={'cummulative_count':'sample_total_count'}).reset_index()
+        cnts = cnts.merge(totals,on=mergeon)
+        cnts['fraction'] = cnts.apply(lambda x: x['cummulative_count']/x['sample_total_count'],1)
         return cnts
-
+    def project_counts(self,subsets=None):
+        mergeon = ['project_id',
+                   'project_name',
+                   'region_label']
+        cnts = self.sample_counts(subsets=subsets).groupby(mergeon+['phenotype_label']).\
+            apply(lambda x: 
+                pd.Series(dict(zip(
+                    ['cummulative_count'],
+                    [x['cummulative_count'].sum()]
+                )))
+            ).reset_index()
+        totals = cnts.groupby(mergeon).sum()[['cummulative_count']].\
+            rename(columns={'cummulative_count':'project_total_count'})
+        cnts = totals.merge(cnts,on=mergeon)
+        cnts['fraction'] = cnts.apply(lambda x: x['cummulative_count']/x['project_total_count'],1)
+        return cnts
