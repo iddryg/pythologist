@@ -6,43 +6,52 @@ from scipy.spatial.distance import cdist
 class NearestNeighbors(Measurement):
     @staticmethod
     def _preprocess_dataframe(cdf,*args,**kwargs):
-        #mergeon = ['project_id','sample_id','frame_id','cell_index']
+        def _mindist_nodiag(pts1,pts2):
+            mat = cdist(list(pts1),list(pts2))
+            if len(pts1)==len(pts2) and set(pts1.index) == set(pts2.index): 
+                np.fill_diagonal(mat,np.nan)
+            matmin = np.nanargmin(mat,axis=1)
+            data = [(pts1.index[i],pts1.iloc[i],pts2.index[y],pts2.iloc[y],mat[i,y]) for i,y in enumerate(matmin)]
+            data = pd.DataFrame(data,columns=['cell_index','cell_coord','neighbor_cell_index','neighbor_cell_coord','minimum_distance_pixels'])
+            return data
+        def _combine_dfs(minima,index,index_names):
+            n1 = minima
+            n1['_key'] = 1
+            n2 = pd.DataFrame(index,index=index_names).T
+            n2['_key'] = 1
+            return n2.merge(n1,on='_key').drop(columns='_key')
+        cdf = cdf.copy()
+        if 'verbose'  in kwargs and kwargs['verbose']: sys.stderr.write("read phenotype label\n")
         mr = cdf.get_measured_regions().drop(columns='region_area_pixels')
         cdf['phenotype_label'] = cdf.apply(lambda x: 
                 [k for k,v in x['phenotype_calls'].items() if v==1]
             ,1).apply(lambda x: np.nan if len(x)==0 else x[0])
-        subsets = []
-        for i,r in mr.iterrows():
-            if 'verbose' in kwargs and kwargs['verbose'] is True: 
-                sys.stderr.write(str(i+1)+'/'+str(mr.shape[0])+"\n")
-            pts = cdf[(cdf['frame_id']==r['frame_id'])&\
-                (cdf['frame_name']==r['frame_name'])&\
-                (cdf['sample_id']==r['sample_id'])&\
-                (cdf['sample_name']==r['sample_name'])&\
-                (cdf['project_id']==r['project_id'])&\
-                (cdf['project_name']==r['project_name'])&\
-                (cdf['region_label']==r['region_label'])
-            ].copy()
-            pts = pts.dropna(subset=['phenotype_label']).\
-                 drop(columns=['regions','scored_calls','phenotype_calls',
-                       'channel_values','cell_area','edge_length','neighbors'])
-            pts['coord'] = pts.apply(lambda x: (x['x'],x['y']),1)
-            pts = pts.reset_index(drop=True)
-            phenos = pts['phenotype_label'].unique()
-            distance = pd.DataFrame(cdist(list(pts['coord']),list(pts['coord'])))
-            for i in range(0,distance.shape[0]): distance[i][i] = np.nan
-            for pheno1 in phenos:
-                pp1 = pts[pts['phenotype_label']==pheno1]
-                for pheno2 in phenos:
-                    #if pheno1 == pheno2: continue
-                    pp2 = pts[pts['phenotype_label']==pheno2]            
-                    subset = pd.DataFrame(distance.loc[pp1.index,pp2.index].apply(lambda x: x.min(),1)).\
-                        merge(pts,left_index=True,right_index=True).rename(columns={0:'distance'}).\
-                        drop(columns='coord')
-                    subset['neighbor_phenotype_label'] = pheno2
-                    subsets.append(subset)
-        subsets = pd.concat(subsets)
-        return subsets
+        phenotypes = cdf['phenotype_label'].unique()
+        if 'verbose'  in kwargs and kwargs['verbose']: sys.stderr.write("get all coordinates\n")
+        cdf['coord'] = cdf.apply(lambda x: (x['x'],x['y']),1)
+        if 'verbose'  in kwargs and kwargs['verbose']: sys.stderr.write("get all coord pairs\n")
+        cdf = cdf.groupby(list(mr.columns)+['phenotype_label']).apply(lambda x: 
+            pd.Series(dict(zip(
+                ['cell_index','coordinates'],
+                [list(x['cell_index']),list(x['coord'])]            
+            )))
+        ).reset_index()
+        if 'verbose'  in kwargs and kwargs['verbose']: sys.stderr.write("set up comparisons points\n")
+        cdf = cdf.merge(cdf.rename(columns={'cell_index':'neighbor_cell_index',
+                                            'coordinates':'neighbor_coordinates',
+                                            'phenotype_label':'neighbor_phenotype_label'}),
+                       on = list(mr.columns))
+        if 'verbose'  in kwargs and kwargs['verbose']: sys.stderr.write("get minima\n")
+        cdf = cdf.set_index(list(mr.columns)+['phenotype_label','neighbor_phenotype_label']).\
+            apply(lambda x: 
+                    _mindist_nodiag(pd.Series(x['coordinates'],index=x['cell_index']),
+                                    pd.Series(x['neighbor_coordinates'],index=x['neighbor_cell_index']))
+            ,1)
+        inames = cdf.index.names
+        cdf  = cdf.reset_index().rename(columns={0:'cdist'}).set_index(inames)
+        if 'verbose'  in kwargs and kwargs['verbose']: sys.stderr.write("combine data\n")
+        cdf = cdf.apply(lambda x: _combine_dfs(x['cdist'],x.name,cdf.index.names),1)
+        return pd.concat(cdf.tolist())    
     def _distance(self,mergeon,minimum_edges):
         mr = self.measured_regions[mergeon].drop_duplicates().copy()
         mr['_key'] = 1
