@@ -3,7 +3,6 @@ import numpy as np
 from itertools import chain
 from pythologist.measurements import Measurement
 
-
 def _find_one(d):
     for k in d.keys():
         if d[k] == 1: return k
@@ -33,7 +32,9 @@ class Contacts(Measurement):
         temp['phenotype_calls'] = temp['phenotype_calls'].apply(lambda x: _find_one(x))
         temp = temp.loc[~temp['phenotype_calls'].isna()].rename(columns={'phenotype_calls':'phenotype'})
         merged = temp.merge(base,on=['frame_id','cell_index'])
-        temp2 = temp.copy().rename(columns={'phenotype':'neighbor_phenotype','edge_length':'neighbor_edge_length','cell_index':'neighbor_cell_index'})
+        temp2 = temp.copy().rename(columns={'phenotype':'neighbor_phenotype',
+                                            'edge_length':'neighbor_edge_length',
+                                            'cell_index':'neighbor_cell_index'})
         merged = merged.merge(temp2,on=['frame_id','neighbor_cell_index'])
         return merged
     def _proportions(self,mergeon):
@@ -57,35 +58,14 @@ class Contacts(Measurement):
             ,1)
         return cnt
     def frame_proportions(self):
-        mergeon=['project_id',
-                 'project_name',
-                 'sample_id',
-                 'sample_name',
-                 'frame_id',
-                 'frame_name',
-                 'region_label']
-        return self._proportions(mergeon)
+        return self._proportions(self.cdf.frame_columns+['region_label'])
     def sample_proportions(self):
-        mergeon=['project_id',
-                 'project_name',
-                 'sample_id',
-                 'sample_name',
-                 'region_label']
-        return self._proportions(mergeon)
+        return self._proportions(self.cdf.sample_columns+['region_label'])
     def project_proportions(self):
-        mergeon=['project_id',
-                 'project_name',
-                 'region_label']
-        return self._proportions(mergeon)
+        return self._proportions(self.cdf.project_columns+['region_label'])
 
     def frame_counts(self):
-        mergeon=['project_id',
-                 'project_name',
-                 'sample_id',
-                 'sample_name',
-                 'frame_id',
-                 'frame_name',
-                 'region_label']
+        mergeon = self.cdf.frame_columns+['region_label']
         mr = self.measured_regions.copy()
         mr['_key'] = 1
         cnts = self.groupby(mergeon+['phenotype','neighbor_phenotype']).\
@@ -101,25 +81,9 @@ class Contacts(Measurement):
         cnts['density_mm2'] = cnts.apply(lambda x: x['count']/x['region_area_mm2'],1)
         return cnts
     def sample_counts(self):
-        mergeon=[
-             'project_id',
-             'project_name',
-             'sample_id',
-             'sample_name',
-             'region_label',
-             'phenotype',
-             'neighbor_phenotype'
-        ]
-        mergeon1  = [
-             'project_id',
-             'project_name',
-             'sample_id',
-             'sample_name',
-        ]
-        fc = self.measured_regions[mergeon1+[
-            'frame_id',
-            'frame_name'
-        ]].drop_duplicates().groupby(mergeon1).\
+        mergeon = self.cdf.sample_columns+['region_label','phenotype','neighbor_phenotype']
+        fc = self.measured_regions[self.cdf.frame_columns].\
+            drop_duplicates().groupby(self.cdf.sample_columns).\
             count()[['frame_id']].rename(columns={'frame_id':'frame_count'})
         cnts = self.frame_counts().groupby(mergeon).\
             apply(lambda x:
@@ -145,5 +109,5 @@ class Contacts(Measurement):
                     ]
                 )))
             ).reset_index()
-        cnts = cnts.merge(fc,on=mergeon1)
+        cnts = cnts.merge(fc,on=self.cdf.sample_columns)
         return cnts

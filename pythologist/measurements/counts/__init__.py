@@ -14,13 +14,7 @@ class Counts(Measurement):
             ,1).apply(lambda x: np.nan if len(x)==0 else x[0])
         return data
     def frame_counts(self,subsets=None):
-        mergeon = ['project_id',
-                   'project_name',
-                   'sample_id',
-                   'sample_name',
-                   'frame_id',
-                   'frame_name',
-                   'region_label']
+        mergeon = self.cdf.frame_columns+['region_label']
         if subsets is None:
             cnts = self.groupby(mergeon+['phenotype_label']).count()[['cell_index']].\
                 rename(columns={'cell_index':'count'})
@@ -53,15 +47,8 @@ class Counts(Measurement):
         return cnts
 
     def sample_counts(self,subsets=None):
-        mergeon = ['project_id',
-                   'project_name',
-                   'sample_id',
-                   'sample_name',
-                   'region_label']
-        fc = self.measured_regions[mergeon+[
-            'frame_id',
-            'frame_name'
-            ]].drop_duplicates().groupby(mergeon).\
+        mergeon = self.cdf.sample_columns+['region_label']
+        fc = self.measured_regions[self.cdf.frame_columns+['region_label']].drop_duplicates().groupby(mergeon).\
             count()[['frame_id']].rename(columns={'frame_id':'frame_count'}).\
             reset_index()
         cnts = self.frame_counts(subsets=subsets).groupby(mergeon+['phenotype_label']).\
@@ -98,9 +85,7 @@ class Counts(Measurement):
         cnts['fraction'] = cnts.apply(lambda x: x['cummulative_count']/x['sample_total_count'],1)
         return cnts
     def project_counts(self,subsets=None):
-        mergeon = ['project_id',
-                   'project_name',
-                   'region_label']
+        mergeon = self.cdf.project_columns+['region_label']
         cnts = self.sample_counts(subsets=subsets).groupby(mergeon+['phenotype_label']).\
             apply(lambda x: 
                 pd.Series(dict(zip(

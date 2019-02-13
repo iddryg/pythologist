@@ -15,6 +15,22 @@ class CellDataFrame(pd.DataFrame):
         kwcopy = kw.copy()
         super(CellDataFrame,self).__init__(*args,**kwcopy)
 
+    @property
+    def frame_columns(self):
+        # These fields isolate individual images
+        return ['project_id','project_name',
+                'sample_id','sample_name',
+                'frame_id','frame_name']
+    @property
+    def sample_columns(self):
+        # These fields isolate individual samples
+        return ['project_id','project_name',
+                'sample_id','sample_name']
+    @property
+    def project_columns(self):
+        # These fields isolate projects
+        return ['project_id','project_name']
+
     def to_hdf(self,path,key,mode='a'):
         # overwrite pandas to write to a dataframe
         pd.DataFrame(self.serialize()).to_hdf(path,key,mode=mode,format='table',complib='zlib',complevel=9)
@@ -85,13 +101,12 @@ class CellDataFrame(pd.DataFrame):
 
     def get_measured_regions(self):
         # get measurable areas
-        mergeon=['project_id',
-            'project_name',
-            'sample_id',
-            'sample_name',
-            'frame_id',
-            'frame_name']
-        temp = self.loc[:,mergeon+['regions']].set_index(mergeon)['regions'].apply(json.dumps).\
+        mergeon = ['project_id','project_name',
+                'sample_id','sample_name',
+                'frame_id','frame_name',
+                ]
+        temp = self.loc[:,mergeon+['regions']].\
+            set_index(mergeon)['regions'].apply(json.dumps).\
             reset_index().drop_duplicates()
         temp['regions'] = temp['regions'].apply(json.loads)
         rows = []
@@ -134,27 +149,6 @@ class CellDataFrame(pd.DataFrame):
         n.microns_per_pixel = self.microns_per_pixel
         return n
 
-    #def count_neighbors(self,phenotype1,phenotype2,on=['sample_id'],shuffle=False):
-    #    sub1 = self[on+['frame_id','phenotype_label','cell_index']]
-    #    sub1 = sub1[sub1['phenotype_label']=='HRS+']
-    #    #print(sub1.head())
-    #    sub2 = self[['frame_id','phenotype_label','cell_index']]
-    #    sub2 = sub2[sub2['phenotype_label']=='T cell'].rename(columns={'cell_index':'neighbor_cell_index'})
-    #    #print(sub2.head())
-    #    n = cf.neighbors() 
-    #    if shuffle: 
-    #        nmap = self._shuffle_ids()
-    #        n = n.merge(nmap,on=['frame_id','cell_index']).drop(columns=['cell_index']).\
-    #            rename(columns={'next_index':'cell_index'})
-    #        print(n.head())
-    #        n = n.merge(nmap.rename(columns={'cell_index':'neighbor_cell_index'}),
-    #                                on=['frame_id','neighbor_cell_index']).drop(columns=['cell_index']).\
-    #            rename(columns={'next_index':'neighbor_cell_index'})
-    #        print(n.head())
-    #    subset = n.merge(sub1,on=['frame_id','cell_index']).\
-    #        merge(sub2,on=['frame_id','neighbor_cell_index'])
-    #    #print(subset.head())
-    #    return subset.groupby(on).count()['cell_index'].reset_index().rename(columns={'cell_index':'count'})
     def _shuffle_ids(self):
         together = []
         for frame_id in self['frame_id'].unique():

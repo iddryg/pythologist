@@ -23,9 +23,12 @@ class NearestNeighbors(Measurement):
         cdf = cdf.copy()
         if 'verbose'  in kwargs and kwargs['verbose']: sys.stderr.write("read phenotype label\n")
         mr = cdf.get_measured_regions().drop(columns='region_area_pixels')
-        cdf['phenotype_label'] = cdf.apply(lambda x: 
-                [k for k,v in x['phenotype_calls'].items() if v==1]
-            ,1).apply(lambda x: np.nan if len(x)==0 else x[0])
+        #cdf['phenotype_label'] = cdf.apply(lambda x: 
+        #        [k for k,v in x['phenotype_calls'].items() if v==1]
+        #    ,1).apply(lambda x: np.nan if len(x)==0 else x[0])
+        cdf['phenotype_label'] = cdf['phenotype_calls'].\
+            apply(lambda x: dict((v,k) for k, v in x.items())).\
+            apply(lambda x: np.nan if 1 not in x else x[1])
         phenotypes = cdf['phenotype_label'].unique()
         if 'verbose'  in kwargs and kwargs['verbose']: sys.stderr.write("get all coordinates\n")
         cdf['coord'] = cdf.apply(lambda x: (x['x'],x['y']),1)
@@ -153,9 +156,7 @@ class NearestNeighbors(Measurement):
 
     def frame_proximity(self,threshold_um,phenotype):
         threshold  = threshold_um/self.microns_per_pixel
-        mergeon = ['project_id','project_name','sample_id','sample_name',
-               'frame_id','frame_name','region_label'
-              ]
+        mergeon = self.cdf.frame_columns+['region_label']
         df = self.loc[(self['neighbor_phenotype_label']==phenotype)
                  ].copy()
         df.loc[df['distance']>=threshold,'location'] = 'far'
@@ -174,7 +175,7 @@ class NearestNeighbors(Measurement):
         df = df.sort_values(mergeon+['location','phenotype_label'])
         return df
     def sample_proximity(self,threshold_um,phenotype):
-        mergeon = ['project_id','project_name','sample_id','sample_name','region_label']
+        mergeon = self.cdf.sample_columns+['region_label']
         fp = self.frame_proximity(threshold_um,phenotype)
         cnt = fp.groupby(mergeon+['phenotype_label','location']).sum()[['count']].reset_index()
         total = cnt.groupby(mergeon+['location']).sum()[['count']].rename(columns={'count':'total'}).\
@@ -183,7 +184,7 @@ class NearestNeighbors(Measurement):
         cnt['fraction'] = cnt.apply(lambda x: x['count']/x['total'],1)
         return cnt
     def project_proximity(self,threshold_um,phenotype):
-        mergeon = ['project_id','project_name','region_label']
+        mergeon = self.cdf.project_columns+['region_label']
         fp = self.sample_proximity(threshold_um,phenotype)
         cnt = fp.groupby(mergeon+['phenotype_label','location']).sum()[['count']].reset_index()
         total = cnt.groupby(mergeon+['location']).sum()[['count']].rename(columns={'count':'total'}).\
