@@ -192,3 +192,22 @@ class NearestNeighbors(Measurement):
         cnt = cnt.merge(total,on=mergeon+['location']).sort_values(mergeon+['location','phenotype_label'])
         cnt['fraction'] = cnt.apply(lambda x: x['count']/x['total'],1)
         return cnt
+    def threshold(self,phenotype,proximal_label,distance_um=None,distance_pixels=None):
+        def _add_score(d,value,label):
+            d[label] = int(value)
+            return d
+        # for the given phenotype, define whether all cell is within 
+        # distance_um of a neighboring cell with that phenotype
+        if distance_um is not None and distance_pixels is None:
+            distance_pixels = distance_um/self.microns_per_pixel
+        nn1 = self.loc[self['neighbor_phenotype_label']==phenotype].copy()
+        nn1['_threshold'] = np.nan
+        nn1.loc[(nn1['minimum_distance_pixels']<distance_um),'_threshold'] = 1
+        nn1.loc[(nn1['minimum_distance_pixels']>=distance_um),'_threshold'] = 0
+        mergeon = self.cdf.frame_columns+['region_label','cell_index']
+        cdf = self.cdf.merge(nn1[mergeon+['_threshold']],on=mergeon)
+        cdf['scored_calls'] = cdf.apply(lambda x:
+            _add_score(x['scored_calls'],x['_threshold'],proximal_label)
+        ,1)
+        cdf.microns_per_pixel = self.microns_per_pixel
+        return cdf.drop(columns='_threshold')

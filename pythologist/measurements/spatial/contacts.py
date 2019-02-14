@@ -30,29 +30,29 @@ class Contacts(Measurement):
                    drop(columns='db_id')
         temp = cdf[['frame_id','cell_index','edge_length','phenotype_calls']].copy()
         temp['phenotype_calls'] = temp['phenotype_calls'].apply(lambda x: _find_one(x))
-        temp = temp.loc[~temp['phenotype_calls'].isna()].rename(columns={'phenotype_calls':'phenotype'})
+        temp = temp.loc[~temp['phenotype_calls'].isna()].rename(columns={'phenotype_calls':'phenotype_label'})
         merged = temp.merge(base,on=['frame_id','cell_index'])
-        temp2 = temp.copy().rename(columns={'phenotype':'neighbor_phenotype',
+        temp2 = temp.copy().rename(columns={'phenotype_label':'neighbor_phenotype_label',
                                             'edge_length':'neighbor_edge_length',
                                             'cell_index':'neighbor_cell_index'})
         merged = merged.merge(temp2,on=['frame_id','neighbor_cell_index'])
         return merged
     def _proportions(self,mergeon):
-        tot = self.groupby(mergeon+['phenotype']).\
+        tot = self.groupby(mergeon+['phenotype_label']).\
             count()[['cell_index']].rename(columns={'cell_index':'total'})
         mr = self.measured_regions[mergeon].drop_duplicates()
         mr['_key'] = 1
-        mp = pd.DataFrame({'phenotype':self.measured_phenotypes})
+        mp = pd.DataFrame({'phenotype_label':self.measured_phenotypes})
         mp['_key'] = 1
         mn = pd.DataFrame({'neighbor_phenotype':self.measured_phenotypes})
         mn['_key'] = 1
         tot = mr.merge(mp,on='_key').\
-            merge(tot,on=mergeon+['phenotype'],how='left').fillna(0).drop(columns='_key')
-        cnt = self.groupby(mergeon+['phenotype','neighbor_phenotype']).\
+            merge(tot,on=mergeon+['phenotype_label'],how='left').fillna(0).drop(columns='_key')
+        cnt = self.groupby(mergeon+['phenotype_label','neighbor_phenotype_label']).\
             count()[['cell_index']].rename(columns={'cell_index':'count'})
         cnt = mr.merge(mp,on='_key').merge(mn,on='_key').\
-            merge(cnt,on=mergeon+['phenotype','neighbor_phenotype'],how='left').fillna(0)
-        cnt = cnt.merge(tot,on=mergeon+['phenotype']).drop(columns='_key')
+            merge(cnt,on=mergeon+['phenotype_label','neighbor_phenotype_label'],how='left').fillna(0)
+        cnt = cnt.merge(tot,on=mergeon+['phenotype_label']).drop(columns='_key')
         cnt['fraction'] = cnt.apply(lambda x: 
                 np.nan if x['total'] == 0 else x['count']/x['total']
             ,1)
@@ -68,20 +68,20 @@ class Contacts(Measurement):
         mergeon = self.cdf.frame_columns+['region_label']
         mr = self.measured_regions.copy()
         mr['_key'] = 1
-        cnts = self.groupby(mergeon+['phenotype','neighbor_phenotype']).\
+        cnts = self.groupby(mergeon+['phenotype_label','neighbor_phenotype_label']).\
             count()[['cell_index']].rename(columns={'cell_index':'count'})
         cnts = cnts.reset_index()
-        pheno1 = pd.DataFrame({'phenotype':self.measured_phenotypes})
+        pheno1 = pd.DataFrame({'phenotype_label':self.measured_phenotypes})
         pheno1['_key'] = 1
-        pheno2 = pheno1.copy().rename(columns={'phenotype':'neighbor_phenotype'})
+        pheno2 = pheno1.copy().rename(columns={'phenotype_label':'neighbor_phenotype_label'})
         blank = mr.merge(pheno1,on='_key').merge(pheno2,on='_key').drop(columns='_key')
-        cnts = blank.merge(cnts,on=mergeon+['phenotype','neighbor_phenotype'],how='left').fillna(0)
+        cnts = blank.merge(cnts,on=mergeon+['phenotype_label','neighbor_phenotype_label'],how='left').fillna(0)
         cnts['region_area_mm2'] = cnts.apply(lambda x: 
             (x['region_area_pixels']/1000000)*(self.microns_per_pixel*self.microns_per_pixel),1)
         cnts['density_mm2'] = cnts.apply(lambda x: x['count']/x['region_area_mm2'],1)
         return cnts
     def sample_counts(self):
-        mergeon = self.cdf.sample_columns+['region_label','phenotype','neighbor_phenotype']
+        mergeon = self.cdf.sample_columns+['region_label','phenotype_label','neighbor_phenotype_label']
         fc = self.measured_regions[self.cdf.frame_columns].\
             drop_duplicates().groupby(self.cdf.sample_columns).\
             count()[['frame_id']].rename(columns={'frame_id':'frame_count'})
@@ -111,3 +111,20 @@ class Contacts(Measurement):
             ).reset_index()
         cnts = cnts.merge(fc,on=self.cdf.sample_columns)
         return cnts
+    def threshold(self,phenotype,contact_label=None):
+        if contact_label is None: contact_label = phenotype+'/contact'
+        def _add_score(d,value,label):
+            d[label] = int(value)
+            return d
+        # for the given phenotype, define whether a cell is touching or not 
+        cdf = self.cdf.copy()
+        mergeon = cdf.frame_columns+['cell_index']
+        contacts = self.loc[self['neighbor_phenotype_label']==phenotype,mergeon].drop_duplicates()
+        contacts['_threshold'] = 1
+        cdf = cdf.merge(contacts,on=mergeon,how='left')
+        cdf.loc[cdf['_threshold'].isna(),'_threshold'] = 0
+        cdf['scored_calls'] = cdf.apply(lambda x:
+            _add_score(x['scored_calls'],x['_threshold'],contact_label)
+        ,1)
+        cdf.microns_per_pixel = self.microns_per_pixel
+        return cdf.drop(columns='_threshold')
