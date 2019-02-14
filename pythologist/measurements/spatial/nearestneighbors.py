@@ -10,10 +10,20 @@ class NearestNeighbors(Measurement):
             mat = cdist(list(pts1),list(pts2))
             if len(pts1)==len(pts2) and set(pts1.index) == set(pts2.index): 
                 np.fill_diagonal(mat,np.nan)
-            matmin = np.nanargmin(mat,axis=1)
-            data = [(pts1.index[i],pts1.iloc[i],pts2.index[y],pts2.iloc[y],mat[i,y]) for i,y in enumerate(matmin)]
+            dmat = pd.DataFrame(mat)
+            # remove if they are all nan
+            worst = pd.DataFrame(mat).isna().all(1)
+            dmat.loc[worst]=999999999
+            mat = np.array(dmat)
+            #print(mat)
+            matmin = np.nanargmin(mat,axis=1).astype(float)
+            matmin[worst] = np.nan
+            #print(matmin)
+            data = [[pts1.index[i],pts1.iloc[i],np.nan,np.nan,np.nan] if np.isnan(y) else
+                    (pts1.index[i],pts1.iloc[i],pts2.index[int(y)],pts2.iloc[int(y)],mat[i,int(y)]) \
+                        for i,y in enumerate(matmin)]
             data = pd.DataFrame(data,columns=['cell_index','cell_coord','neighbor_cell_index','neighbor_cell_coord','minimum_distance_pixels'])
-            return data
+            return data.dropna()
         def _combine_dfs(minima,index,index_names):
             n1 = minima
             n1['_key'] = 1
