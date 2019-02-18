@@ -1,8 +1,63 @@
-FROM jupyter/r-notebook
-RUN git clone https://github.com/gusef/IrisSpatialFeatures.git
-RUN Rscript -e 'source("https://bioconductor.org/biocLite.R");biocLite("BiocInstaller")'
-RUN Rscript -e "install.packages(c('SpatialTools','gplots','spatstat','tiff','data.table','matrixStats'),repos = 'http://cran.us.r-project.org')"
-RUN Rscript -e 'devtools::install_local("IrisSpatialFeatures")'
-RUN rm -r IrisSpatialFeatures
-RUN Rscript -e "install.packages('tidyverse',repos = 'http://cran.us.r-project.org')"
-RUN pip install pythologist==0.1.10
+# An Image development environment
+#     docker build -t cio_image_lab:20181129 --build-arg user=USERNAME --build-arg group=GROUPNAME --build-arg user_id=USERID --build-arg group_id=GROUPID .
+FROM ubuntu:18.04
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && DEBIAN_FRONTEND='noninteractive' apt-get install -y \
+               python3-pip \
+               python3-dev \
+               nano \
+               wget \
+               git \
+               r-base \
+    && apt-get autoremove \
+    && apt-get clean
+
+RUN apt-get update \
+ && DEBIAN_FRONTEND='noninteractive' \
+ && apt-get install -y --no-install-recommends apt-utils \
+                                               build-essential \
+                                               sudo \
+                                               git \
+                                               libhdf5-serial-dev \
+ && apt-get autoremove \
+ && apt-get clean
+
+
+RUN pip3 install --upgrade pip
+
+RUN pip3 install cython \
+    && pip3 install cmake \
+    && pip3 install tables \
+    && pip3 install pandas \
+    && pip3 install numpy \
+    && pip3 install scipy \
+    && pip3 install scikit-learn \
+    && pip3 install h5py \
+    && pip3 install openpyxl \
+    && pip3 install MulticoreTSNE
+
+ARG user=jupyter_user
+ARG user_id=999
+ARG group=jupyter_group
+ARG group_id=999
+
+RUN useradd -l -u $user_id -ms /bin/bash $user \
+    && groupadd -g $group_id $group \
+    && usermod -a -G $group $user
+
+RUN pip3 install jupyterlab \
+    && pip3 install matplotlib \
+    && pip3 install plotnine[all] \
+    && pip3 install seaborn 
+
+USER $user
+RUN mkdir /home/$user/source \
+    && cd /home/$user/source \
+    && git clone https://github.com/jason-weirather/pythologist.git \
+    && cd pythologist \
+    && pip3 install --user .
+RUN mkdir /home/$user/work
+WORKDIR /home/$user/work
+
+CMD ["jupyter","lab","--ip=0.0.0.0","--port=8888"]
