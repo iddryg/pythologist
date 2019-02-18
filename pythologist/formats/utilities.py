@@ -22,7 +22,10 @@ def _watershed_image_step(np_array,starting_points,valid_target_points,border=1)
     n['y'] = n['y'].add(n['mod_y'])
     n = n.drop(columns=['mod_x','mod_y','key'])
     targets = pd.DataFrame(valid_target_points,columns=['x','y'])
-    n = n.merge(targets,on=['x','y']).sample(frac=1).reset_index(drop=True).\
+    n = n.merge(targets,on=['x','y'])
+    if n.shape[0] == 0 :
+        return np_array.copy(), []
+    n = n.sample(frac=1).reset_index(drop=True).\
         groupby(['x','y']).first().reset_index()
     full = np_array.copy()
 

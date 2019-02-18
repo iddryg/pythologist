@@ -85,13 +85,13 @@ class NearestNeighbors(Measurement):
                      'stderr_distance_um'
                     ],
                     [
-                      len(x['distance']),
-                      x['distance'].mean(),
-                      x['distance'].mean()*self.microns_per_pixel,
-                      x['distance'].std(),
-                      x['distance'].std()*self.microns_per_pixel,
-                      x['distance'].std()/np.sqrt(len(x['distance'])),
-                      x['distance'].std()*self.microns_per_pixel/np.sqrt(len(x['distance']))
+                      len(x['minimum_distance_pixels']),
+                      x['minimum_distance_pixels'].mean(),
+                      x['minimum_distance_pixels'].mean()*self.microns_per_pixel,
+                      x['minimum_distance_pixels'].std(),
+                      x['minimum_distance_pixels'].std()*self.microns_per_pixel,
+                      x['minimum_distance_pixels'].std()/np.sqrt(len(x['minimum_distance_pixels'])),
+                      x['minimum_distance_pixels'].std()*self.microns_per_pixel/np.sqrt(len(x['minimum_distance_pixels']))
                     ]
            )))
         ).reset_index()

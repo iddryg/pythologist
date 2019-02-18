@@ -82,8 +82,10 @@ class CellFrameGeneric(object):
         """
         
         # delete our current regions
+
         regions = regions.copy()
         image_ids = list(self.get_data('mask_images')['image_id'])
+        image_ids = [x for x in image_ids if x != self.processed_image_id]
         for image_id in image_ids: del self._images[image_id]
 
         labels = list(regions.keys())

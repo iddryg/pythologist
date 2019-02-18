@@ -371,13 +371,13 @@ class CellFrameInForm(CellFrameGeneric):
             if 'ProcessRegionImage' in m.index:
                 # we have a ProcessedImage
                 #print('have a processedimage')
-                self._processed_image_id = m.loc['ProcessRegionImage']['image_id']
-                self._images[self._processed_image_id] = self._images[self._processed_image_id].astype(np.int8)
+                self.set_processed_image_id(m.loc['ProcessRegionImage']['image_id'])
+                self._images[self.processed_image_id] = self._images[self.processed_image_id].astype(np.int8)
             elif 'TissueClassMap' in m.index:
                 # We can build a ProcessedImage from the TissueClassMap
                 img = self._images[m.loc['TissueClassMap']['image_id']]
-                self._processed_image_id =uuid4 ().hex
-                self._images[self._processed_image_id] = np.array(pd.DataFrame(img).applymap(lambda x: 0 if x==255 else 1)).astype(np.int8)
+                self.set_processed_image_id(uuid4().hex)
+                self._images[self.processed_image_id] = np.array(pd.DataFrame(img).applymap(lambda x: 0 if x==255 else 1)).astype(np.int8)
             segmentation_images = self.get_data('segmentation_images').set_index('segmentation_label')
             if 'Nucleus' in segmentation_images.index and \
                'Membrane' in segmentation_images.index:

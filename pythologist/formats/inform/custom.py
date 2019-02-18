@@ -88,6 +88,7 @@ class CellFrameInFormLineArea(CellFrameInForm):
             self._data[x] = pd.DataFrame(columns=self.data_tables[x]['columns'])
             self._data[x].index.name = self.data_tables[x]['index']
     def set_line_area(self,line_image,area_image,steps=20,verbose=False):
+
         #regions = prepare_margin_line_tumor_area(line_image,area_image)
         drawn_binary = read_tiff_stack(line_image)[0]['raw_image']
         drawn_binary = make_binary_image_array(drawn_binary)
@@ -121,6 +122,7 @@ class CellFrameInFormLineArea(CellFrameInForm):
         stroma_binary = (~((tumor_binary|grown)&processed_image))&processed_image
 
         #regions - we will replace all regions
+
         d = {'Margin':margin_binary,
                           'Tumor':tumor_binary,
                           'Stroma':stroma_binary}

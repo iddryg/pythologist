@@ -14,7 +14,7 @@ class CellProjectInForm(CellProjectGeneric):
         return CellSampleInForm()
 
     def read_path(self,path,project_name=None,
-                      name_index=None,channel_abbreviations=None,
+                      sample_name_index=None,channel_abbreviations=None,
                       verbose=False,require=True,**kwargs):
         if project_name is not None: self.set_project_name(project_name)
         if self.mode == 'r': raise ValueError("Error: cannot write to a path in read-only mode.")
@@ -27,8 +27,8 @@ class CellProjectInForm(CellProjectGeneric):
             sample_dirs.add(root)
         for s in sample_dirs:
             sname = None
-            if name_index is None: sname = s
-            else: sname  = os.path.split(s)[name_index]
+            if sample_name_index is None: sname = s
+            else: sname  = s.split(os.sep)[sample_name_index]
             sid = self.add_sample_path(s,sample_name=sname,
                                          channel_abbreviations=channel_abbreviations,
                                          verbose=verbose,require=require,**kwargs)
