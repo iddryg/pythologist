@@ -9,6 +9,7 @@ with open(path.join(this_folder,'README.md'),encoding='utf-8') as inf:
 setup(
   name='pythologist',
   version='1.0.0',
+  test_suite='nose2.collector.collector',
   description='inForm PerkinElmer Reader - Python interface to read outputs of the PerkinElmer inForm software',
   long_description=long_description,
   url='https://github.com/jason-weirather/pythologist',
