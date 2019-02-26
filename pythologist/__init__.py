@@ -5,15 +5,31 @@ from pythologist.selection import SubsetLogic
 from pythologist.measurements.counts import Counts
 from pythologist.measurements.spatial.contacts import Contacts
 from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
+from pythologist.interface import Interface
 
 class CellDataFrame(pd.DataFrame):
-    _metadata = ['_microns_per_pixel'] # for extending dataframe to include this property
+    _metadata = ['_microns_per_pixel','_db'] # for extending dataframe to include this property
     @property
     def _constructor(self):
         return CellDataFrame
     def __init__(self,*args,**kw):
         kwcopy = kw.copy()
         super(CellDataFrame,self).__init__(*args,**kwcopy)
+
+    def prune_neighbors(self):
+        def _neighbor_check(neighbors,valid):
+            #print(valid)
+            if not neighbors==neighbors: return np.nan
+            valid_keys = set(valid)&set(neighbors.keys())
+            d = dict([(k,v) for k,v in neighbors.items() if k in valid])
+            return d
+        fixed = self.copy()
+        valid = pd.DataFrame(fixed).groupby(fixed.frame_columns).apply(lambda x: list(x['cell_index'])).\
+            reset_index().rename(columns={0:'_valid'})
+        valid = pd.DataFrame(self).merge(valid,on=self.frame_columns)
+        new_neighbors = valid.apply(lambda x: _neighbor_check(x['neighbors'],x['_valid']),1)
+        fixed.loc[:,'neighbors'] = list(new_neighbors)
+        return fixed
 
     @property
     def frame_columns(self):
@@ -87,6 +103,13 @@ class CellDataFrame(pd.DataFrame):
         return True
 
     @property
+    def db(self):
+        return self._db
+    @db.setter
+    def db(self,db):
+        self._db = db
+
+    @property
     def phenotypes(self):
         # The mutually exclusive phenotypes present in the CellDataFrame
         return _extract_unique_keys_from_series(self['phenotype_calls'])
@@ -121,6 +144,12 @@ class CellDataFrame(pd.DataFrame):
             drop_duplicates()[mergeon+['region_label','region_area_pixels']]
         rows = rows.loc[rows['region_area_pixels']>0].copy()
         return rows
+
+    def interface(self,*args,**kwargs):
+        if not self.db: raise ValueError("Need to set db")
+        inter = Interface.read_cellframe(self,*args,**kwargs)
+        inter.microns_per_pixel = self.microns_per_pixel
+        return inter
 
     def nearestneighbors(self,*args,**kwargs):
         n = NearestNeighbors.read_cellframe(self,*args,**kwargs)

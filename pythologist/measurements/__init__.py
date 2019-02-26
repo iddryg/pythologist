@@ -19,6 +19,7 @@ class Measurement(pd.DataFrame):
         # measured_regions
         # measured_phenotypes
         #
+        cdf = cdf.prune_neighbors()
         v = cls(cls._preprocess_dataframe(cdf,**kwargs))
         if measured_regions is None: v.measured_regions = cdf.get_measured_regions()
         if measured_phenotypes is None: v.measured_phenotypes = cdf.phenotypes
