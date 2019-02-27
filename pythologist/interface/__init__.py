@@ -6,6 +6,29 @@ import sys, os, io
 import imageio
 from PIL import Image
 
+class ImageOutput(pd.DataFrame):
+    _metadata = []
+    def __init__(self,*args, **kw):
+        super(ImageOutput, self).__init__(*args, **kw) 
+        if 'verbose' in kw: self.verbose = kw['verbose']
+    @property
+    def _constructor(self):
+        return ImageOutput
+    def write_to_path(self,path,suffix='',format='png',overwrite=False):
+        """
+        Output the data the dataframe's 'image' column to a directory structured by project->sample and named by frame
+        """
+        if os.path.exists(path) and overwrite is False: raise ValueError("Error: use ovewrite=True to overwrite images")
+        if not os.path.exists(path): os.makedirs(path)
+        for i,r in self.iterrows():
+            spath = os.path.join(path,r['project_name'],r['sample_name'])
+            if not os.path.exists(spath): os.makedirs(spath)
+            if suffix == '':
+                fname = os.path.join(spath,r['frame_name']+'.'+format)
+            else: fname = os.path.join(spath,r['frame_name']+'_'+suffix+'.'+format)
+            imageio.imwrite(fname, r['image'],format=format)
+
+
 class Images(Measurement):
     def __init__(self,*args,**kwargs):
         super(Images,self).__init__(*args,**kwargs)
@@ -65,7 +88,8 @@ class Images(Measurement):
             cummulative = cummulative.merge(images,on=list(self.columns))
             cummulative['new'] = cummulative.apply(lambda x: _merge_images(x['merged'],x['old']),1)
             cummulative = cummulative.drop(columns=['old','merged']).rename(columns={'new':'merged'})
-        return cummulative
+        cummulative = cummulative.rename(columns={'merged':'image'})
+        return ImageOutput(cummulative)
 
     def get_outline_images(self,subset_logic=None,edge_color=(0,0,255,255),fill_color=(135,206,250,255),watershed_steps=1):
         v = self.get_segmentation_map_images(type='edge',subset_logic=subset_logic,color=edge_color,blank=(0,0,0,0),watershed_steps=watershed_steps).\
@@ -78,8 +102,6 @@ class Images(Measurement):
     def get_segmentation_map_images(self,type='edge',subset_logic=None,color=None,watershed_steps=0,blank=(0,0,0,255)):
         # if subset logic is set only plot those cells
         # if color is set color all cells that color
-        #if os.path.exists(path) and overwrite is False: raise ValueError("Error: use ovewrite=True to overwrite images")
-        #if not os.path.exists(path): os.makedirs(path)
         ems = self.get_segmentation_maps(type=type)
         if subset_logic is not None: 
             #print(subset_logic)

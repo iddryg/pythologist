@@ -127,4 +127,5 @@ class Contacts(Measurement):
             _add_score(x['scored_calls'],x['_threshold'],contact_label)
         ,1)
         cdf.microns_per_pixel = self.microns_per_pixel
+        cdf.db = self.cdf.db
         return cdf.drop(columns='_threshold')
