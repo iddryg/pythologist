@@ -24,15 +24,39 @@ class Images(Measurement):
                 data.append([sample_id,frame_id,f.shape])
         return base.merge(pd.DataFrame(data,columns=['sample_id','frame_id','shape']),on=['sample_id','frame_id'])
 
-    def build_image(self,schema):
+    def build_segmentation_image(self,schema,background=(0,0,0,0)):
         """
-        Put together an image
+        Put together an image.  Defined by a list of layers with RGBA colors
+
+        Example:
+            schema = [
+                {'subset_logic':SL(phenotypes=['SOX10+']),
+                 'edge_color':(31, 31, 46,255),
+                 'watershed_steps':0,
+                 'fill_color':(51, 51, 77,255)
+                },
+                {'subset_logic':SL(phenotypes=['CD8+'],scored_calls={'PD1':'+'}),
+                 'edge_color':(255,0,0,255),
+                 'watershed_steps':1,
+                 'fill_color':(0,0,0,255)
+                },
+                {'subset_logic':SL(phenotypes=['CD8+'],scored_calls={'PD1':'-'}),
+                 'edge_color':(255,0,255,255),
+                 'watershed_steps':1,
+                 'fill_color':(0,0,255,255)
+                }
+            ]
+            imgs = imageaccess.build_segmentation_image(schema,background=(0,0,0,255))
         """
-        #layers = []
-        # get a blank image set first
         cummulative = self.copy()
-        cummulative['merged'] = cummulative.apply(lambda x: np.zeros(list(x['shape'])+[4]),1)
+        def _set_blank(img,blank):
+            img[:][:] = blank
+            return img
+        cummulative['merged'] = cummulative.apply(lambda x: 
+            _set_blank(np.zeros(list(x['shape'])+[4]),background)
+            ,1)
         for layer in schema:
+            if self.verbose: sys.stderr.write("Calculating layer "+str(layer)+"\n")
             images  = self.get_outline_images(subset_logic=layer['subset_logic'],
                                               edge_color=layer['edge_color'],
                                               watershed_steps=layer['watershed_steps'],
@@ -41,9 +65,6 @@ class Images(Measurement):
             cummulative = cummulative.merge(images,on=list(self.columns))
             cummulative['new'] = cummulative.apply(lambda x: _merge_images(x['merged'],x['old']),1)
             cummulative = cummulative.drop(columns=['old','merged']).rename(columns={'new':'merged'})
-            #eturn cummulative
-            #layers.append(images)
-        #return layers
         return cummulative
 
     def get_outline_images(self,subset_logic=None,edge_color=(0,0,255,255),fill_color=(135,206,250,255),watershed_steps=1):
@@ -63,7 +84,7 @@ class Images(Measurement):
         if subset_logic is not None: 
             #print(subset_logic)
             subset = self.cdf.subset(subset_logic)
-            print(subset.shape)
+            #print(subset.shape)
             ems = ems.merge(subset.loc[:,subset.frame_columns+['cell_index']],on=subset.frame_columns+['cell_index'])
         edf = ems.set_index(list(self.columns))
         imgs = []
@@ -99,6 +120,7 @@ class Images(Measurement):
     def get_segmentation_maps(self,type='edge'):
         if type == 'edge' and self._edge_map_cache is not None: return self._edge_map_cache
         if type == 'cell' and self._cell_map_cache is not None: return self._cell_map_cache
+        if self.verbose: sys.stderr.write("The "+str(type)+" map has not been calculated yet. ... computing.\n")
         outputs = self.apply_frames(lambda x: x.edge_map() if type == 'edge' else x.cell_map())
         dfs = []
         for i,r in outputs.iterrows():
@@ -112,6 +134,7 @@ class Images(Measurement):
         if type == 'edge': self._edge_map_cache = dfs
         elif type == 'cell': self._cell_map_cache = dfs
         else: raise ValueError('edge or cell')
+        if self.verbose: sys.stderr.write("The "+str(type)+" map is finished.\n")
         return dfs
 
     def apply_frames(self,func):
