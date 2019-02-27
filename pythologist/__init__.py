@@ -5,16 +5,42 @@ from pythologist.selection import SubsetLogic
 from pythologist.measurements.counts import Counts
 from pythologist.measurements.spatial.contacts import Contacts
 from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
-from pythologist.interface import Interface
+from pythologist.interface import Images
+
+class CellDataSeries(pd.Series):
+    @property
+    def _constructor(self):
+        return CellDataSeries
+
+    @property
+    def _constructor_expanddim(self):
+        return CellDataFrame
+    
 
 class CellDataFrame(pd.DataFrame):
     _metadata = ['_microns_per_pixel','_db'] # for extending dataframe to include this property
     @property
     def _constructor(self):
         return CellDataFrame
+
+    @property
+    def _constructor_sliced(self):
+        return CellDataSeries
+
+    @property
+    def _constructor_expanddim(self):
+        return CellDataFrame
+
     def __init__(self,*args,**kw):
         kwcopy = kw.copy()
         super(CellDataFrame,self).__init__(*args,**kwcopy)
+
+    def get_valid_cell_indecies(self):
+        """
+        Return a dataframe of images present with 'valid' being a list of cell indecies that can be included
+        """
+        return pd.DataFrame(self).groupby(self.frame_columns).apply(lambda x: list(x['cell_index'])).\
+            reset_index().rename(columns={0:'valid'})
 
     def prune_neighbors(self):
         def _neighbor_check(neighbors,valid):
@@ -24,10 +50,9 @@ class CellDataFrame(pd.DataFrame):
             d = dict([(k,v) for k,v in neighbors.items() if k in valid])
             return d
         fixed = self.copy()
-        valid = pd.DataFrame(fixed).groupby(fixed.frame_columns).apply(lambda x: list(x['cell_index'])).\
-            reset_index().rename(columns={0:'_valid'})
+        valid = self.get_valid_cell_indecies()
         valid = pd.DataFrame(self).merge(valid,on=self.frame_columns)
-        new_neighbors = valid.apply(lambda x: _neighbor_check(x['neighbors'],x['_valid']),1)
+        new_neighbors = valid.apply(lambda x: _neighbor_check(x['neighbors'],x['valid']),1)
         fixed.loc[:,'neighbors'] = list(new_neighbors)
         return fixed
 
@@ -145,11 +170,11 @@ class CellDataFrame(pd.DataFrame):
         rows = rows.loc[rows['region_area_pixels']>0].copy()
         return rows
 
-    def interface(self,*args,**kwargs):
+    def images(self,*args,**kwargs):
         if not self.db: raise ValueError("Need to set db")
-        inter = Interface.read_cellframe(self,*args,**kwargs)
-        inter.microns_per_pixel = self.microns_per_pixel
-        return inter
+        images = Images.read_cellframe(self,*args,**kwargs)
+        images.microns_per_pixel = images.microns_per_pixel
+        return images
 
     def nearestneighbors(self,*args,**kwargs):
         n = NearestNeighbors.read_cellframe(self,*args,**kwargs)
