@@ -4,6 +4,8 @@ from pythologist.measurements import Measurement
 from pythologist_reader.utilities import watershed_image, map_image_ids
 import sys, os, io
 import imageio
+from PIL import Image
+
 class Images(Measurement):
     def __init__(self,*args,**kwargs):
         super(Images,self).__init__(*args,**kwargs)
@@ -22,13 +24,35 @@ class Images(Measurement):
                 data.append([sample_id,frame_id,f.shape])
         return base.merge(pd.DataFrame(data,columns=['sample_id','frame_id','shape']),on=['sample_id','frame_id'])
 
-    def get_outline_images(self,subset_logic=None,edge_color=(0,0,255,255),fill_color=(135,206,250,255)):
-        v = self.get_segmentation_map_images(type='edge',subset_logic=subset_logic,color=edge_color,blank=(0,0,0,0),watershed_steps=1).\
+    def build_image(self,schema):
+        """
+        Put together an image
+        """
+        #layers = []
+        # get a blank image set first
+        cummulative = self.copy()
+        cummulative['merged'] = cummulative.apply(lambda x: np.zeros(list(x['shape'])+[4]),1)
+        for layer in schema:
+            images  = self.get_outline_images(subset_logic=layer['subset_logic'],
+                                              edge_color=layer['edge_color'],
+                                              watershed_steps=layer['watershed_steps'],
+                                              fill_color=layer['fill_color'])
+            cummulative = cummulative.rename(columns={'merged':'old'})
+            cummulative = cummulative.merge(images,on=list(self.columns))
+            cummulative['new'] = cummulative.apply(lambda x: _merge_images(x['merged'],x['old']),1)
+            cummulative = cummulative.drop(columns=['old','merged']).rename(columns={'new':'merged'})
+            #eturn cummulative
+            #layers.append(images)
+        #return layers
+        return cummulative
+
+    def get_outline_images(self,subset_logic=None,edge_color=(0,0,255,255),fill_color=(135,206,250,255),watershed_steps=1):
+        v = self.get_segmentation_map_images(type='edge',subset_logic=subset_logic,color=edge_color,blank=(0,0,0,0),watershed_steps=watershed_steps).\
             rename(columns={'image':'edge'}).\
             merge(self.get_segmentation_map_images(type='cell',subset_logic=subset_logic,color=fill_color,blank=(0,0,0,0)),on=list(self.columns)).\
             rename(columns={'image':'cell'})
-        v['merged'] = v.apply(lambda x: _merge_images(x['cell'],x['edge']),1)
-        return v
+        v['merged'] = v.apply(lambda x: _merge_images(x['edge'],x['cell']),1)
+        return v.drop(columns=['cell','edge'])
 
     def get_segmentation_map_images(self,type='edge',subset_logic=None,color=None,watershed_steps=0,blank=(0,0,0,255)):
         # if subset logic is set only plot those cells
@@ -37,7 +61,9 @@ class Images(Measurement):
         #if not os.path.exists(path): os.makedirs(path)
         ems = self.get_segmentation_maps(type=type)
         if subset_logic is not None: 
+            #print(subset_logic)
             subset = self.cdf.subset(subset_logic)
+            print(subset.shape)
             ems = ems.merge(subset.loc[:,subset.frame_columns+['cell_index']],on=subset.frame_columns+['cell_index'])
         edf = ems.set_index(list(self.columns))
         imgs = []
