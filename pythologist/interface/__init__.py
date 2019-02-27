@@ -92,6 +92,8 @@ class Images(Measurement):
         return ImageOutput(cummulative)
 
     def get_outline_images(self,subset_logic=None,edge_color=(0,0,255,255),fill_color=(135,206,250,255),watershed_steps=1):
+        if len(edge_color) == 3: edge_color = tuple(list(edge_color)+[255])
+        if len(fill_color) == 3: fill_color = tuple(list(fill_color)+[255])
         v = self.get_segmentation_map_images(type='edge',subset_logic=subset_logic,color=edge_color,blank=(0,0,0,0),watershed_steps=watershed_steps).\
             rename(columns={'image':'edge'}).\
             merge(self.get_segmentation_map_images(type='cell',subset_logic=subset_logic,color=fill_color,blank=(0,0,0,0)),on=list(self.columns)).\

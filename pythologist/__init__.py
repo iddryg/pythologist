@@ -11,7 +11,6 @@ class CellDataSeries(pd.Series):
     @property
     def _constructor(self):
         return CellDataSeries
-
     @property
     def _constructor_expanddim(self):
         return CellDataFrame
