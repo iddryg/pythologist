@@ -116,8 +116,8 @@ class Images(Measurement):
             edfsub = edf.loc[tuple(r)]
             imsize = r['shape']
             img = pd.DataFrame(np.zeros(imsize))
-            for i2,r2 in edfsub.iterrows():
-                img[r2['x']][r2['y']] = r2['cell_index']
+            img = np.array(edfsub.pivot(columns='x',index='y',values='cell_index').\
+                loc[range(0,imsize[0]),range(0,imsize[1])].fillna(0).astype(int))
             if watershed_steps > 0:
                 # get the zero and nonzero components
                 mid = map_image_ids(img,remove_zero=False)
