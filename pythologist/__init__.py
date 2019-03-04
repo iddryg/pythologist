@@ -5,7 +5,7 @@ from pythologist.selection import SubsetLogic
 from pythologist.measurements.counts import Counts
 from pythologist.measurements.spatial.contacts import Contacts
 from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
-from pythologist.interface import Images
+from pythologist.interface import SegmentationImages
 
 class CellDataSeries(pd.Series):
     @property
@@ -43,7 +43,6 @@ class CellDataFrame(pd.DataFrame):
 
     def prune_neighbors(self):
         def _neighbor_check(neighbors,valid):
-            #print(valid)
             if not neighbors==neighbors: return np.nan
             valid_keys = set(valid)&set(neighbors.keys())
             d = dict([(k,v) for k,v in neighbors.items() if k in valid])
@@ -169,11 +168,11 @@ class CellDataFrame(pd.DataFrame):
         rows = rows.loc[rows['region_area_pixels']>0].copy()
         return rows
 
-    def images(self,*args,**kwargs):
+    def segmentation_images(self,*args,**kwargs):
         if not self.db: raise ValueError("Need to set db")
-        images = Images.read_cellframe(self,*args,**kwargs)
-        images.microns_per_pixel = images.microns_per_pixel
-        return images
+        segs = SegmentationImages.read_cellframe(self,*args,**kwargs)
+        segs.microns_per_pixel = segs.microns_per_pixel
+        return segs
 
     def nearestneighbors(self,*args,**kwargs):
         n = NearestNeighbors.read_cellframe(self,*args,**kwargs)
@@ -282,7 +281,7 @@ class CellDataFrame(pd.DataFrame):
         for k in phenotypes:
             if k not in pnames: raise ValueError("phenotype must exist in defined")
             temp = data.loc[data['phenotype_calls'].apply(lambda x: x[k]==1)].copy()
-            if len(removing) > 0:
+            if len(removing) > 0 and temp.shape[0] > 0:
                 temp['phenotype_calls'] = temp.apply(lambda x:
                     dict([(k,v) for k,v in x['phenotype_calls'].items() if k not in removing])
                     ,1)
