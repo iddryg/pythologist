@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from pythologist.measurements import Measurement
-from pythologist_reader.utilities import watershed_image, map_image_ids
+from pythologist_image_utilities import watershed_image, map_image_ids
 import sys, os, io
 import imageio
 from PIL import Image
