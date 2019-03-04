@@ -33,7 +33,7 @@ class Counts(Measurement):
                 if x.label is None: raise ValueError("Subsets must be named")
             if len(labels) != len(subsets): raise ValueError("Subsets must be uniquely named.")
             for sl in subsets:
-                df = self.cellframe.subset(sl)
+                df = self.cdf.subset(sl)
                 df = df.groupby(mergeon).count()[['cell_index']].\
                     rename(columns={'cell_index':'count'}).reset_index()
                 df = self.measured_regions.merge(df,on=mergeon,how='left').fillna(0)

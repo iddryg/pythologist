@@ -44,7 +44,7 @@ class Contacts(Measurement):
         mr['_key'] = 1
         mp = pd.DataFrame({'phenotype_label':self.measured_phenotypes})
         mp['_key'] = 1
-        mn = pd.DataFrame({'neighbor_phenotype':self.measured_phenotypes})
+        mn = pd.DataFrame({'neighbor_phenotype_label':self.measured_phenotypes})
         mn['_key'] = 1
         tot = mr.merge(mp,on='_key').\
             merge(tot,on=mergeon+['phenotype_label'],how='left').fillna(0).drop(columns='_key')
