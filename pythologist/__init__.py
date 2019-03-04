@@ -45,13 +45,16 @@ class CellDataFrame(pd.DataFrame):
         def _neighbor_check(neighbors,valid):
             if not neighbors==neighbors: return np.nan
             valid_keys = set(valid)&set(neighbors.keys())
-            d = dict([(k,v) for k,v in neighbors.items() if k in valid])
+            d = dict([(k,v) for k,v in neighbors.items() if k in valid_keys])
             return d
         fixed = self.copy()
         valid = self.get_valid_cell_indecies()
-        valid = pd.DataFrame(self).merge(valid,on=self.frame_columns)
-        new_neighbors = valid.apply(lambda x: _neighbor_check(x['neighbors'],x['valid']),1)
-        fixed.loc[:,'neighbors'] = list(new_neighbors)
+        valid = pd.DataFrame(self).merge(valid,on=self.frame_columns).set_index(self.frame_columns+['cell_index'])
+        valid = valid.apply(lambda x: _neighbor_check(x['neighbors'],x['valid']),1).reset_index().\
+            rename(columns={0:'new_neighbors'})
+        fixed = fixed.merge(valid,on=self.frame_columns+['cell_index']).drop(columns='neighbors').\
+            rename(columns={'new_neighbors':'neighbors'})
+        #fixed.loc[:,'neighbors'] = list(new_neighbors)
         return fixed
 
     @property

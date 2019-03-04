@@ -169,8 +169,8 @@ class NearestNeighbors(Measurement):
         mergeon = self.cdf.frame_columns+['region_label']
         df = self.loc[(self['neighbor_phenotype_label']==phenotype)
                  ].copy()
-        df.loc[df['distance']>=threshold,'location'] = 'far'
-        df.loc[df['distance']<threshold,'location'] = 'near'
+        df.loc[df['minimum_distance_pixels']>=threshold,'location'] = 'far'
+        df.loc[df['minimum_distance_pixels']<threshold,'location'] = 'near'
         df = df.groupby(mergeon+['phenotype_label','neighbor_phenotype_label','location']).count()[['cell_index']].\
             rename(columns={'cell_index':'count'}).reset_index()[mergeon+['phenotype_label','location','count']]
         mr = self.measured_regions[mergeon].copy()
