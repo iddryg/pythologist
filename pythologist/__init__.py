@@ -6,6 +6,7 @@ from pythologist.measurements.counts import Counts
 from pythologist.measurements.spatial.contacts import Contacts
 from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
 from pythologist.interface import SegmentationImages
+from pythologist.qc import QC
 
 class CellDataSeries(pd.Series):
     @property
@@ -130,6 +131,7 @@ class CellDataFrame(pd.DataFrame):
 
     @property
     def db(self):
+        if not hasattr(self,'_db'): return None
         return self._db
     @db.setter
     def db(self,db):
@@ -203,6 +205,9 @@ class CellDataFrame(pd.DataFrame):
         else: n.measured_phenotypes = self.phenotypes
         n.microns_per_pixel = self.microns_per_pixel
         return n
+
+    def qc(self,*args,**kwargs):
+        return QC(self,*args,**kwargs)
 
     def _shuffle_ids(self):
         together = []
