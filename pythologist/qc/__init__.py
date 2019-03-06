@@ -6,20 +6,24 @@ class QC(object):
     def __init__(self,cdf,verbose=False):
         self.cdf = cdf
         self.verbose = verbose
+        self._test_list = [
+           QCMPPSet,
+           QCDBSet,
+           QCSampleIDs,
+           QCFrameIDs,
+           QCProjectIDs,
+           QCOverlappingFrames,
+           QCPhenotypeRules,
+           QCPhenotypeConsistency,
+           QCScoredNameConsistency,
+           QCRegionConsistency,
+           QCRegionRules,
+           QCRegionSize,
+        ]
         self._tests = None
     def run_tests(self):
         # set the _tests property
-        self._tests = [
-           QCCheckMPPSet(self.cdf),
-           QCCheckDBSet(self.cdf),
-           QCSampleIDs(self.cdf),
-           QCFrameIDs(self.cdf),
-           QCProjectIDs(self.cdf),
-           QCCheckOverlappingFrames(self.cdf),
-           QCCheckPhenotypeRules(self.cdf),
-           QCCheckPhenotypeConsistency(self.cdf),
-           QCCheckScoredNameConsistency(self.cdf),
-        ]
+        self._tests = [x(self.cdf) for x in self._test_list]
     def print_results(self):
         if self._tests is None:
             if self.verbose: sys.stderr.write("tests is None so running tests\n")
@@ -58,7 +62,7 @@ class QCTestGeneric(object):
         if self._result is None: self._result = self.run()
         return self._result.total    
 
-class QCCheckDBSet(QCTestGeneric):
+class QCDBSet(QCTestGeneric):
     @property
     def name(self): return 'Check storage object is set'
     def run(self):
@@ -73,7 +77,7 @@ class QCCheckDBSet(QCTestGeneric):
                       total=None)
 
 
-class QCCheckMPPSet(QCTestGeneric):
+class QCMPPSet(QCTestGeneric):
     @property
     def name(self): return 'Check microns per pixel attribute'
     def run(self):
@@ -87,7 +91,7 @@ class QCCheckMPPSet(QCTestGeneric):
                       count = None,
                       total=None)
 
-class QCCheckOverlappingFrames(QCTestGeneric):
+class QCOverlappingFrames(QCTestGeneric):
     @property
     def name(self): return 'Is the same frame name present in multiple samples?'
     def run(self):
@@ -106,7 +110,7 @@ class QCCheckOverlappingFrames(QCTestGeneric):
                       count=0,
                       total=frames.shape[0])    
 
-class QCCheckPhenotypeRules(QCTestGeneric):
+class QCPhenotypeRules(QCTestGeneric):
     @property
     def name(self): return 'Are the same phenotypes listed and following rules for mutual exclusion?'
     def run(self):
@@ -150,9 +154,9 @@ class QCCheckPhenotypeRules(QCTestGeneric):
                total=None
                    )
 
-class QCCheckPhenotypeConsistency(QCTestGeneric):
+class QCPhenotypeConsistency(QCTestGeneric):
     @property
-    def name(self): return 'Are the same phenotypes included on all samples?'
+    def name(self): return 'Are the same phenotypes included on all images?'
     def run(self):
         cdf = self.cdf
         phenotypes = set(cdf.phenotypes)
@@ -180,9 +184,9 @@ class QCCheckPhenotypeConsistency(QCTestGeneric):
                       about='Consistent phenotypes' if len(log) == 0 else json.dumps(log,indent=4),
                       count=issue_count,
                       total=issue_total)    
-class QCCheckScoredNameConsistency(QCTestGeneric):
+class QCScoredNameConsistency(QCTestGeneric):
     @property
-    def name(self): return 'Are the same scored names included on all samples?'
+    def name(self): return 'Are the same scored names included on all images?'
     def run(self):
         cdf = self.cdf
         scored_names = set(cdf.scored_names)
@@ -210,6 +214,111 @@ class QCCheckScoredNameConsistency(QCTestGeneric):
                       about='Consistent scored_names' if len(log) == 0 else json.dumps(log,indent=4),
                       count=issue_count,
                       total=issue_total)    
+class QCRegionConsistency(QCTestGeneric):
+    @property
+    def name(self): return 'Are the same regions represented the same with an image and across images?'
+    def run(self):
+        cdf = self.cdf
+        regions = set(cdf.regions)
+        checks = cdf[['project_name','sample_name','frame_name','regions']].copy()
+        checks['regions'] = checks['regions'].apply(lambda x: json.dumps(sorted(list(x.keys()))))
+        checks = checks.drop_duplicates()
+        issue_total = 0
+        issue_count = 0
+        pf = 'PASS'
+        log = []
+        # see if each image is consistent
+        cnts = checks.groupby(['project_name','sample_name','frame_name']).count()['regions']
+        issue_total+=1
+        if len(cnts[cnts>1]) > 0:
+            issue_count += 1
+            pf = 'FAIL'
+            log.append('there are images with multiple sets of regions defined. each image should have the same set of regions. '+"\n"+str(cnts[cnts>1]))
+        # switch back to arrays
+        checks['regions'] = checks['regions'].apply(lambda x: json.loads(x))
+        for i,r in checks.iterrows():
+            issue_total+=1
+            # see which rows have different scored_names
+            calls = set(r['regions'])
+            if len(regions-calls) > 0:
+                issue_count+=1
+                pf = 'FAIL'
+                log.append([str(r[['project_name','sample_name','frame_name']].tolist())+' is missing or has cells missing region(s) '+str(regions-calls)])
+            elif len(calls-regions) > 0:
+                issue_count +=1
+                pf = 'FAIL'
+                log.append([str(r)+' unknown error where regions has a region(s) unknown to the CDF class']) 
+        return Result(result=pf,
+                      about='Consistent regions' if len(log) == 0 else json.dumps(log,indent=4),
+                      count=issue_count,
+                      total=issue_total)    
+
+class QCRegionSize(QCTestGeneric):
+    @property
+    def name(self): return 'Do we have any region sizes so small they should consider being excluded?'
+    @property
+    def minimum_fraction(self): return 0.05
+    @property
+    def minimum_pixels(self): return 500    
+    def run(self):
+        cdf = self.cdf
+        regions = set(cdf.regions)
+        checks = cdf[['project_name','sample_name','frame_name','regions']].copy()
+        checks['region_names'] = checks['regions'].apply(lambda x: json.dumps(sorted(list(x.keys()))))
+        checks = checks.groupby(['project_name','sample_name','frame_name','region_names']).first().reset_index()
+        checks['region_names'] = checks['region_names'].apply(lambda x: json.loads(x))
+        checks['total_size'] = checks.apply(lambda x: sum(x['regions'].values()),1)
+        issue_total = 2
+        issue_count = 0
+        pf = 'PASS'
+        log1 = []
+        for i,r in checks.iterrows():
+            # how which regions have regions of size zero
+            zero_count = len([y for y in [r['regions'][name] for name in r['region_names']] if y==0])
+            if zero_count > 0:
+                pf = 'WARNING'
+                log1.append('Zero size regions are included in the data.  These are generally fine to have, but they will not contribute to count density calculations for that region. (only showing one example)'+"\n"+str(r[['project_name','sample_name','frame_name','regions']].tolist()))
+        if len(log1) > 0: 
+          issue_count += 1
+          log1 = [log1[0]]
+        ## Now look for small regions
+        log2 = []
+        for i,r in checks.iterrows():
+            # how which regions have regions of size zero
+            small_count = len([y for y in [r['regions'][name] for name in r['region_names']] if ((y/r['total_size'])<self.minimum_fraction or y < self.minimum_pixels) and y > 0])
+            if small_count > 0:
+                pf = 'WARNING'
+                log2.append('Very small non-zero regions are included in the data'+str(r[['project_name','sample_name','frame_name','regions']].tolist()))
+        if len(log2) > 0: issue_count += 1
+        return Result(result=pf,
+                      about='No zero or very small regions' if len(log1+log2) == 0 else json.dumps(log1+log2,indent=4),
+                      count=issue_count,
+                      total=issue_total)    
+
+class QCRegionRules(QCTestGeneric):
+    @property
+    def name(self): return 'Are the same regions listed matching a valid region_label'
+    def run(self):
+        cdf = self.cdf
+        if 'region_label' not in cdf.columns:
+            return Result(result='ERROR',
+                          about='There is no region label column defined so cannot check consistency',
+                          count=None,
+                          total=None)   
+        # Check consistency of phenotype_label
+        concordance = cdf.apply(lambda x: x['region_label'] in x['regions'].keys(),1)
+        if not concordance.all():
+            mismatch = cdf.loc[~concordance].head()
+            return Result(result='FAIL',
+                          about='region_label not matching any regions key (only showing first 5 indecies): '+"\n"+str(mismatch.index.tolist()),
+                          count=None,
+                          total=None
+                   )
+        return Result(result='PASS',
+               about='regions and region_label follows expected rules',
+               count=None,
+               total=None
+                   )  
 
 class QCSampleIDs(QCTestGeneric):
     @property
