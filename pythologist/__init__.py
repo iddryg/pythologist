@@ -390,6 +390,19 @@ class CellDataFrame(pd.DataFrame):
         """simple alias for combine phenotypes"""
         return self.combine_regions(*args,**kwargs)
 
+    def fill_phenotype_label(self,inplace=True):
+        """
+        Set the phenotype_label column according to our rules for mutual exclusion
+        """
+        def _get_phenotype(d):
+            vals = [k for k,v in d.items() if v ==  1]
+            return np.nan if len(vals) == 0 else vals[0]
+        if inplace:
+            self['phenotype_label'] = self.apply(lambda x: _get_phenotype(x['phenotype_calls']),1)
+            return
+        fixed = self.copy()
+        fixed['phenotype_label'] = fixed.apply(lambda x: _get_phenotype(x['phenotype_calls']),1)
+        return fixed
 def _extract_unique_keys_from_series(s):
     uni = pd.Series(s.apply(lambda x: json.dumps(x)).unique()).\
             apply(lambda x: json.loads(x)).apply(lambda x: set(sorted(x.keys())))
