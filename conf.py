@@ -1,3 +1,4 @@
+# Build: sphinx-build -b builder . ./_build
 # -*- coding: utf-8 -*-
 #
 # Configuration file for the Sphinx documentation builder.
