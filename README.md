@@ -4,7 +4,7 @@
 
 Pythologist provides tools for 1) reading exports from InForm software into a common storage format, and 2) analyzing image data where cells have been segemented and annotated.
 
-Pythologist is based on **IrisSpatialFeatures** https://github.com/gusef/IrisSpatialFeatures (C.D. Carey, ,D. Gusenleitner, M. Lipshitz. Blood. 2017) https://doi.org/10.1182/blood-2017-03-770719, and is implemented in the python programming language. 
+Pythologist is based on **IrisSpatialFeatures** https://github.com/gusef/IrisSpatialFeatures (C.D. Carey, ,D. Gusenleitner, M. Lipshitz, et al. Blood. 2017) https://doi.org/10.1182/blood-2017-03-770719, and is implemented in the python programming language. 
 
 Features this software add are:
 
