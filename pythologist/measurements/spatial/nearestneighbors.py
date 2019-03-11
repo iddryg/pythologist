@@ -6,8 +6,8 @@ from scipy.spatial.distance import cdist
 class NearestNeighbors(Measurement):
     @staticmethod
     def _preprocess_dataframe(cdf,*args,**kwargs):
-        step_pixels = kwargs['step_pixels']
-        max_distance_pixels = kwargs['max_distance_pixels']
+        #step_pixels = kwargs['step_pixels']
+        #max_distance_pixels = kwargs['max_distance_pixels']
         def _mindist_nodiag(pts1,pts2):
             mat = cdist(list(pts1),list(pts2))
             if len(pts1)==len(pts2) and set(pts1.index) == set(pts2.index): 
@@ -214,10 +214,11 @@ class NearestNeighbors(Measurement):
             distance_pixels = distance_um/self.microns_per_pixel
         nn1 = self.loc[self['neighbor_phenotype_label']==phenotype].copy()
         nn1['_threshold'] = np.nan
-        nn1.loc[(nn1['minimum_distance_pixels']<distance_um),'_threshold'] = 1
-        nn1.loc[(nn1['minimum_distance_pixels']>=distance_um),'_threshold'] = 0
-        mergeon = self.cdf.frame_columns+['region_label','cell_index']
-        cdf = self.cdf.merge(nn1[mergeon+['_threshold']],on=mergeon)
+        nn1.loc[(nn1['minimum_distance_pixels']<distance_pixels),'_threshold'] = 1
+        nn1.loc[(nn1['minimum_distance_pixels']>=distance_pixels),'_threshold'] = 0
+        output = self.cdf.copy()
+        mergeon = output.frame_columns+['region_label','cell_index']
+        cdf = output.merge(nn1[mergeon+['_threshold']],on=mergeon)
         cdf['scored_calls'] = cdf.apply(lambda x:
             _add_score(x['scored_calls'],x['_threshold'],proximal_label)
         ,1)

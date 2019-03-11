@@ -1,13 +1,23 @@
 # pythologist
 
-Read files from inForm software by PerkinElmer.
+*Read and analyze cell image data.*
+
+Pythologist provides tools for 1) reading exports from InForm software into a common storage format, and 2) analyzing image data where cells have been segemented and annotated.
 
 ## Docker quickstart
 
 To start a jupyter notebook in the current working directory on port 8885 you can use the following docker command.
 
+**First build a docker image that will use your own user name and group name / id**
+
 ```
-$ docker run --rm -p 8885:8885 -v $(pwd):/home/jovyan vacation/pythologist:latest jupyter notebook --port 8885
+$ docker build -t pythologist:latest --build-arg user=$USERNAME --build-arg group=$GROUPNAME --build-arg user_id=$USERID --build-arg group_id=$GROUPID .
+```
+
+**Now start the docker image**
+
+```
+$ docker run --rm -p 8885:8888 -v $(pwd):/home/$USERNAME/work pythologist:latest
 ```
 
 ## Install
