@@ -33,7 +33,7 @@ $ pip install pythologist
 
 ## Common tasks
 
-### Reading in a project in the form of InForm exports
+### Reading in a project composed of InForm exports
 
 ```python
 from pythologist_reader.formats.inform.sets import CellProjectInForm
