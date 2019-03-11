@@ -12,7 +12,7 @@ class Measurement(pd.DataFrame):
     def _constructor(self):
         return Measurement
     @classmethod
-    def read_cellframe(cls,cdf,measured_regions=None,measured_phenotypes=None,verbose=None,**kwargs):
+    def read_cellframe(cls,cdf,measured_regions=None,measured_phenotypes=None,verbose=None,prune_neighbors=True,**kwargs):
         # Properties are:
         #
         # cdf - the cell data frame
@@ -20,7 +20,7 @@ class Measurement(pd.DataFrame):
         # measured_regions
         # measured_phenotypes
         #
-        cdf = cdf.prune_neighbors()
+        if prune_neighbors: cdf = cdf.prune_neighbors()
         v = cls(cls._preprocess_dataframe(cdf,verbose=verbose,**kwargs))
         if measured_regions is None: v.measured_regions = cdf.get_measured_regions()
         if measured_phenotypes is None: v.measured_phenotypes = cdf.phenotypes

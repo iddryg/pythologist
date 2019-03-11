@@ -5,6 +5,7 @@ from pythologist.selection import SubsetLogic
 from pythologist.measurements.counts import Counts
 from pythologist.measurements.spatial.contacts import Contacts
 from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
+from pythologist.measurements.spatial.cartesian import Cartesian
 from pythologist.interface import SegmentationImages
 from pythologist.qc import QC
 
@@ -92,6 +93,7 @@ class CellDataFrame(pd.DataFrame):
         df['neighbors'] = df['neighbors'].apply(lambda x:
                 np.nan if not isinstance(x,dict) else dict(zip([int(y) for y in x.keys()],x.values()))
             )
+        df['frame_shape'] = df['frame_shape'].apply(lambda x: tuple(json.loads(x)))
         df = cls(df)
         f = h5py.File(path,'r')
         mpp = f[key].attrs["microns_per_pixel"]
@@ -106,6 +108,7 @@ class CellDataFrame(pd.DataFrame):
         df['regions'] = df['regions'].apply(lambda x: json.dumps(x))
         df['phenotype_calls'] = df['phenotype_calls'].apply(lambda x: json.dumps(x))
         df['neighbors'] = df['neighbors'].apply(lambda x: json.dumps(x))
+        df['frame_shape'] = df['frame_shape'].apply(lambda x: json.dumps(x))
         return df
 
     @property
@@ -189,7 +192,16 @@ class CellDataFrame(pd.DataFrame):
         return n
 
     def contacts(self,*args,**kwargs):
-        n = Contacts.read_cellframe(self)
+        n = Contacts.read_cellframe(self,prune_neighbors=True)
+        if 'measured_regions' in kwargs: n.measured_regions = kwargs['measured_regions']
+        else: n.measured_regions = self.get_measured_regions()
+        if 'measured_phenotypes' in kwargs: n.measured_phenotypes = kwargs['measured_phenotypes']
+        else: n.measured_phenotypes = self.phenotypes
+        n.microns_per_pixel = self.microns_per_pixel
+        return n
+
+    def cartesian(self,subsets=None,step_pixels=100,max_distance_pixels=150,*args,**kwargs):
+        n = Cartesian.read_cellframe(self,subsets=subsets,step_pixels=step_pixels,max_distance_pixels=max_distance_pixels,prune_neighbors=False,*args,**kwargs)
         if 'measured_regions' in kwargs: n.measured_regions = kwargs['measured_regions']
         else: n.measured_regions = self.get_measured_regions()
         if 'measured_phenotypes' in kwargs: n.measured_phenotypes = kwargs['measured_phenotypes']
@@ -198,7 +210,7 @@ class CellDataFrame(pd.DataFrame):
         return n
 
     def counts(self,*args,**kwargs):
-        n = Counts.read_cellframe(self)
+        n = Counts.read_cellframe(self,prune_neighbors=False)
         if 'measured_regions' in kwargs: n.measured_regions = kwargs['measured_regions']
         else: n.measured_regions = self.get_measured_regions()
         if 'measured_phenotypes' in kwargs: n.measured_phenotypes = kwargs['measured_phenotypes']
@@ -300,7 +312,9 @@ class CellDataFrame(pd.DataFrame):
             filter = 0 if v == '-' else 1
             data = data.loc[data['scored_calls'].apply(lambda x: x[k]==filter)]
         data.microns_per_pixel = self.microns_per_pixel
-        if update: data['phenotype_calls'] = data['phenotype_calls'].apply(lambda x: {logic.label:1})
+        if update: 
+            data['phenotype_calls'] = data['phenotype_calls'].apply(lambda x: {logic.label:1})
+        data.fill_phenotype_label(inplace=True)
         return data
 
     def threshold(self,phenotype,scored_name,positive_label=None,negative_label=None):

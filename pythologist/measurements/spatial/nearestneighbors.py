@@ -6,6 +6,8 @@ from scipy.spatial.distance import cdist
 class NearestNeighbors(Measurement):
     @staticmethod
     def _preprocess_dataframe(cdf,*args,**kwargs):
+        step_pixels = kwargs['step_pixels']
+        max_distance_pixels = kwargs['max_distance_pixels']
         def _mindist_nodiag(pts1,pts2):
             mat = cdist(list(pts1),list(pts2))
             if len(pts1)==len(pts2) and set(pts1.index) == set(pts2.index): 
