@@ -2,12 +2,12 @@
 
 *Read and analyze cell image data.*
 
-The purpose of this software is to 1) read exports from InForm software or other sources into a common storage format, and 2) analyzing image data where cells have been segemented and annotated.  This software is generally run from a jupyter notebook and aims to provide hooks into the image data so that the user can have flexability to execute analyses they find in the primary literature.
+The purpose of this software is to 1) read exports from InForm software or other sources into a common storage format, and 2) extract basic analysis features from cell image data.  This software is generally intended to be run from a jupyter notebook and aims to provide hooks into the image data so that the user can have flexability to execute analyses they find in the primary literature.
 
 [List of large-scale image analysis publications](https://github.com/jason-weirather/pythologist/wiki/list-of-large-scale-image-analysis-publications)
 
 
-Pythologist is based on **IrisSpatialFeatures** https://github.com/gusef/IrisSpatialFeatures (C.D. Carey, ,D. Gusenleitner, M. Lipshitz, et al. Blood. 2017) https://doi.org/10.1182/blood-2017-03-770719, and is implemented in the python programming language. 
+Pythologist is based on [**IrisSpatialFeatures**](https://github.com/gusef/IrisSpatialFeatures) (C.D. Carey, ,D. Gusenleitner, M. Lipshitz, et al. Blood. 2017) https://doi.org/10.1182/blood-2017-03-770719, and is implemented in the python programming language. 
 
 Features this software add are:
 
