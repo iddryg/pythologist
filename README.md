@@ -8,19 +8,24 @@ Pythologist provides tools for 1) reading exports from InForm software into a co
 
 To start a jupyter notebook in the current working directory on port 8885 you can use the following docker command.
 
-**First build a docker image that will use your own user name and group name / id**
+**First build a docker image that will use your own user/group name and id.**
 
 ```
-$ docker build -t pythologist:latest --build-arg user=$USERNAME --build-arg group=$GROUPNAME --build-arg user_id=$USERID --build-arg group_id=$GROUPID .
+$ docker build -t pythologist:latest --build-arg user=$USERNAME \
+                                     --build-arg group=$GROUPNAME \
+                                     --build-arg user_id=$USERID \
+                                     --build-arg group_id=$GROUPID .
 ```
 
-**Now start the docker image**
+**Now start the docker image.**
 
 ```
 $ docker run --rm -p 8885:8888 -v $(pwd):/home/$USERNAME/work pythologist:latest
 ```
 
-## Install
+where `$USERNAME`, `$GROUPNAME`, `$USERID`, `$GROUPID` correspond to your user/group name/id.
+
+## Install by pip
 
 ```
 $ pip install pythologist
@@ -28,75 +33,51 @@ $ pip install pythologist
 
 ## Common tasks
 
-### Reading in data
+### Reading in a project in the form of InForm exports
 
 ```python
-import pythologist
-
-fname = 'data directory'
-raw = pythologist.read_inForm(fname)
+from pythologist_reader.formats.inform.sets import CellProjectInForm
+oname = 'my_inform_export_directory'
+cpi = CellProjectInForm(oname,'w')
+cpi.read_path(fname,project_name='MyProject',name_index=-1,verbose='True',microns_per_pixel=0.496)
+cdf = cpi.cdf
 ```
 
-Directory names are infered from the last folder name.  If this is not actually the sample name, you can safely use the folder path as a sample name, or specify a `sample_index` in argument.
-
-*Use the second to last folder as the sample name*
-
-```python
-import pythologist
-
-fname = 'data directory'
-raw = pythologist.read_inForm(fname,sample_index=2)
-```
-
-*Use the folder path as the sample name*
-
-```python
-import pythologist
-
-fname = 'data directory'
-raw = pythologist.read_inForm(fname,folder_as_sample=True)
-```
+The assumption here is that the exports are grouped so that sample folders contain one or more image exports, and that sample name can be inferred from the last folder name.
 
 ### Quality check samples
 
+Check general status of the CellDataFrame
+
 ```python
 import pythologist
-from pythologist.test import InFormCellFrameTest
 
-raw = pythologist.read_inForm('myfolder')
-test = InFormCellFrameTest(raw)
-test.check_overlapping_samples()
+cdf.qc(verbose=True).print_results()
 ```
 
+View histograms of pixel intensity and the scoring of binary markers on each image
+
 ```python
-test.check_overlapping_frames()
+qc = cdf.db.qc(verbose=True)
+hist = qc.channel_histograms(0,20,100)
+(ggplot(hist[hist['channel_label']=='CD86 (Opal 540)'],
+        aes(x='bins',y='counts',fill='sample_name'))
+ + geom_bar(stat='identity')
+ + geom_vline(aes(xintercept='threshold_value',color='feature_label'))
+ + facet_wrap(['sample_name','frame_name'])
+ + theme_bw()
+ + theme(figure_size=(20,20))
+)
 ```
 
+### Show names of the binary 'scored_calls'
 ```python
-test.check_scored_stain_consistency()
-```
-
-```python
-test.check_phenotype_consistency()
-```
-
-```python
-test.check_tissue_consistency()
-```
-
-```python
-test.scored_stain_compartment()
-```
-
-
-### Show the stains present
-```python
-raw.all_stains
+cdf.scored_names
 ```
 
 ### Combine two or more phenotypes into one or rename a phenotype
 ```python
-collapsed = raw.collapse_phenotypes(['CD68 PDL1+','CD68 PDL1-'],'CD68')
+collapsed = cdf.collapse_phenotypes(['CD68 PDL1+','CD68 PDL1-'],'CD68')
 ```
 
 ### Rename a tisssue
@@ -104,7 +85,13 @@ collapsed = raw.collapse_phenotypes(['CD68 PDL1+','CD68 PDL1-'],'CD68')
 Rename *TUMOR* to *Tumor*
 
 ```python
-raw = raw.rename_tissue('TUMOR','Tumor')
+renamed = cdf.rename_region('TUMOR','Tumor')
+```
+
+### Rename scored phenotypes
+
+```python
+renamed = cdf.rename_scored_calls({'PDL1 (Opal 520)':'PDL1'})
 ```
 
 ### Threshold a phenotype
@@ -112,54 +99,26 @@ raw = raw.rename_tissue('TUMOR','Tumor')
 Make *CYTOK* into *CYTOK PDL1+* and *CYTOK PDL1-*
 
 ```python
-raw_thresh = raw.threshold('PDL1 (Opal 520)','CYTOK','PDL1')
+raw_thresh = raw.threshold('CYTOK','PDL1')
 ```
 
 ### Double threshold
 
 ```python
-CD68_CD163 = raw.threshold('CD163 (Opal 690)','CD68','CD163')
-CD68_CD163pos_PDL1 = CD68_CD163.threshold('PDL1 (Opal 520)','CD68 CD163+','PDL1')
+CD68_CD163 = raw.threshold('CD68','CD163').\
+    threshold('CD68 CD163+','PDL1').\
+    threshold('CD68 CD163-','PDL1')
 ```
 
-### Get per frame counts
+generate counts and fractions of the current phenotypes and export them to a csv
 
 ```python
-frame_counts = raw.frame_counts
-frame_counts
-```
-
-write those counts out to a csv file
-
-```python
-frame_counts.to_csv('my_frame_counts.csv')
+cdf.counts().frame_counts().to_csv('my_frame_counts.csv')
 ```
 
 ### Get per sample counts
 
 ```python
-sample_counts = raw.sample_counts
-sample_counts
+cdf.counts().sample_counts().to_csv('my_sample_counts.csv')
 ```
 
-write those counts out to a csv file
-
-```python
-sample_counts.to_csv('my_sample_counts.csv')
-```
-
-### Save gated-relabeled data as an inFrom compatible project
-
-1. make a copy of your data
-
-either copy the folder in your file explorer or from command line i.e.
-
-`$ cp -r myfolder myfolder2`
-
-2. write your new data into the folder
-
-```python
-CD68_CD163pos.write_inForm('myfolder2',overwrite=True)
-```
-
-Now the project myfolder2 can be used in IrisSpatialFeatures
