@@ -2,7 +2,10 @@
 
 *Read and analyze cell image data.*
 
-Pythologist provides tools for 1) reading exports from InForm software into a common storage format, and 2) analyzing image data where cells have been segemented and annotated.
+The purpose of this software is to 1) read exports from InForm software or other sources into a common storage format, and 2) analyzing image data where cells have been segemented and annotated.  This software is generally run from a jupyter notebook and aims to provide hooks into the image data so that the user can have flexability to execute analyses they find in the primary literature.
+
+[List of large-scale image analysis publications](https://github.com/jason-weirather/pythologist/wiki/list-of-large-scale-image-analysis-publications)
+
 
 Pythologist is based on **IrisSpatialFeatures** https://github.com/gusef/IrisSpatialFeatures (C.D. Carey, ,D. Gusenleitner, M. Lipshitz, et al. Blood. 2017) https://doi.org/10.1182/blood-2017-03-770719, and is implemented in the python programming language. 
 
@@ -12,7 +15,8 @@ Features this software add are:
 * A mutable CellDataFrame class that can be used for slicing, and combining projects.
 * The ability to add binary features to cells based on cell-cell contacts or cell proximity.
 * Customizable images based on the cell segmentation or heatmaps spaninng the cartesian coordinates.
-* Specify cell populations of interest to subset on or extract counts for through a SubsetLogic syntax to specify specific phenotypes and binary features.
+* Specify cell populations through a SubsetLogic syntax for quick selection of mutually exclusive phenotypes or binary features
+* A set of Quality Check functions to identify potential issues in imported data.
 
 # Installation
 
@@ -128,6 +132,15 @@ hist = qc.channel_histograms(0,20,100)
  + theme(figure_size=(20,20))
 )
 ```
+
+### Merge CellDataFrames that have the same image segmentations but different scored calls
+
+This happens frequently because current InForm exports only permit two features to be scored per export
+
+```python
+merged,fail = cdf1.merge_scores(cdf2,on=['sample_name','frame_name','x','y'])
+```
+
 
 ### Show names of the binary 'scored_calls'
 ```python

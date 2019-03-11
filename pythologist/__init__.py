@@ -258,8 +258,9 @@ class CellDataFrame(pd.DataFrame):
                 {**x['_sub1'],**x['_sub2']}                    
             ,1)
         df = df.drop(columns=['_sub1','_sub2','_addition'])
-
         df = df.drop(columns='_key').copy(),df[df['_key'].isna()].drop(columns='_key').copy()
+        if self.microns_per_pixel: df[0].microns_per_pixel = self.microns_per_pixel
+        if self.microns_per_pixel: df[1].microns_per_pixel = self.microns_per_pixel
         return df
 
     def rename_scored_calls(self,change):
