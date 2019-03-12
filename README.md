@@ -75,7 +75,8 @@ plt.show()
 ```
 
 > MEL2_7
-![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_7_cell_map.png?raw=true)
+>
+> ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_7_cell_map.png?raw=true)
 
 #### Custom region annotations from tumor and invasive margin image drawings
 
