@@ -137,6 +137,8 @@ cdf.db = cpi
 cdf.qc(verbose=True).print_results()
 ```
 
+*prints the following QC metrics to stdout*
+
 ```
 ==========
 Check microns per pixel attribute
@@ -212,6 +214,10 @@ hist = qc.channel_histograms(0,20,100)
  + theme(figure_size=(20,20))
 )
 ```
+
+*This QC metric requires component images, so the above example is not sufficent. This is an example output.*
+
+> ![Histogram Example](https://github.com/jason-weirather/pythologist/blob/master/images/histogram_example.png?raw=true)
 
 ### Merge CellDataFrames that have the same image segmentations but different scored calls
 
