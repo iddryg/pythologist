@@ -215,7 +215,7 @@ hist = qc.channel_histograms(0,20,100)
 )
 ```
 
-*This QC metric requires component images, so the above example is not sufficent. This is an example output.*
+*This QC metric requires component images, since the provided test data doesn't have component images, this is just an example.*
 
 > ![Histogram Example](https://github.com/jason-weirather/pythologist/blob/master/images/histogram_example.png?raw=true)
 
@@ -233,12 +233,31 @@ merged,fail = cdf1.merge_scores(cdf2,on=['sample_name','frame_name','x','y'])
 cdf.scored_names
 ```
 
-### Combine two or more phenotypes into one or rename a phenotype
+> ['PD1', 'PDL1']
+
+### Show phenotypes
 ```python
-collapsed = cdf.collapse_phenotypes(['CD68 PDL1+','CD68 PDL1-'],'CD68')
+cdf.phenotypes
 ```
 
-### Rename a tisssue
+> ['CD8+', 'OTHER', 'SOX10+']
+
+### Show regions
+```python
+cdf.regions
+```
+
+> ['Margin', 'Stroma', 'Tumor']
+
+### Combine two or more phenotypes into one or rename a phenotype
+```python
+collapsed = cdf.collapse_phenotypes(['CD8+','OTHER'],'non-Tumor')
+collapsed.phenotypes
+```
+
+> ['SOX10+', 'non-Tumor']
+
+### Rename a region
 
 Rename *TUMOR* to *Tumor*
 
