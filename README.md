@@ -132,9 +132,70 @@ plt.show()
 Check general status of the CellDataFrame
 
 ```python
-import pythologist
-
+cdf = cpi.cdf
+cdf.db = cpi
 cdf.qc(verbose=True).print_results()
+```
+
+```
+==========
+Check microns per pixel attribute
+PASS
+Microns per pixel is 0.496
+==========
+Check storage object is set
+PASS
+h5 object is set
+==========
+Is there a 1:1 correspondence between sample_name and sample_id?
+PASS
+Good concordance.
+Issue count: 0/2
+==========
+Is there a 1:1 correspondence between frame_name and frame_id?
+PASS
+Good concordance.
+Issue count: 0/4
+==========
+Is there a 1:1 correspondence between project_name and project_id?
+PASS
+Good concordance.
+Issue count: 0/1
+==========
+Is the same frame name present in multiple samples?
+PASS
+frame_name's are all in their own samples
+Issue count: 0/4
+==========
+Are the same phenotypes listed and following rules for mutual exclusion?
+PASS
+phenotype_calls and phenotype_label follows expected rules
+==========
+Are the same phenotypes included on all images?
+PASS
+Consistent phenotypes
+Issue count: 0/4
+==========
+Are the same scored names included on all images?
+PASS
+Consistent scored_names
+Issue count: 0/4
+==========
+Are the same regions represented the same with an image and across images?
+PASS
+Consistent regions
+Issue count: 0/5
+==========
+Are the same regions listed matching a valid region_label
+PASS
+regions and region_label follows expected rules
+==========
+Do we have any region sizes so small they should consider being excluded?
+WARNING
+[
+    "Very small non-zero regions are included in the data['IrisSpatialFeatures', 'MEL2', 'MEL2_7', {'Margin': 495640, 'Tumor': 947369, 'Stroma': 116}]"
+]
+Issue count: 1/2
 ```
 
 View histograms of pixel intensity and the scoring of binary markers on each image
