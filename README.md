@@ -105,17 +105,16 @@ print(f.frame_name)
 print('hand drawn margin')
 plt.imshow(f.get_image(f.get_data('custom_images').set_index('custom_label').loc['Drawn','image_id']))
 plt.show()
-#print('margin after expansion')
+print('Margin, Tumor, and Stroma')
 plt.imshow(f.get_image(f.get_data('regions').set_index('region_label').loc['Margin','image_id']))
 plt.show()
-#print('tumor (minus margin)')
 plt.imshow(f.get_image(f.get_data('regions').set_index('region_label').loc['Tumor','image_id']))
 plt.show()
-#print('stroma')
 plt.imshow(f.get_image(f.get_data('regions').set_index('region_label').loc['Stroma','image_id']))
 plt.show()
 ``` 
 > MEL2_2
+>
 > hand drawn margin
 >
 > ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_drawn.png?raw=true)
