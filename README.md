@@ -58,22 +58,24 @@ The assumption here is that the exports are grouped so that sample folders conta
 ```python
 from pythologist_test_images import TestImages
 from pythologist_reader.formats.inform.sets import CellProjectInForm
+import matplotlib.pyplot as plt
 
 # Get the path of the test dataset
 path = TestImages().raw('IrisSpatialFeatures')
-
 # Create the storage opbject where the project will be saved
 cpi = CellProjectInForm('pythologist.h5',mode='w')
-
 # Read the project data
-cpi.read_path(path,project_name='IrisSpatialFeatures',
-                   name_index=-1,
-                   verbose='True',
-                   microns_per_pixel=0.496)
-
+cpi.read_path(path,require=False,verbose=True,microns_per_pixel=0.496,sample_name_index=-1)
 # Create a cell dataframe for downstream analysis
-cdf = cpi.cdf
+for f in cpi.frame_iter():
+    break
+print(f.frame_name)
+plt.imshow(f.cell_map_image(),origin='upper')
+plt.show()
 ```
+
+> MEL2_7
+![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_7_cell_map.png?raw=true)
 
 #### Custom region annotations from tumor and invasive margin image drawings
 
