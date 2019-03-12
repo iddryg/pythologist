@@ -247,10 +247,11 @@ class CellDataFrame(pd.DataFrame):
                             on = on,
                             how = 'left'
                         )
-        df['_sub1'] = self['scored_calls'].apply(lambda x:
+
+        df['_sub1'] = df['scored_calls'].apply(lambda x:
                 dict((k,x[k]) for k in reference_markers)
             )
-        df['_sub2'] = df_addition['scored_calls'].apply(lambda x:
+        df['_sub2'] = df['_addition'].apply(lambda x:
                 dict((k,x[k]) for k in addition_markers)
             )
         # combine the two dictionaries
