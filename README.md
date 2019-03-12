@@ -117,7 +117,11 @@ plt.show()
 ``` 
 > MEL2_2
 > hand drawn margin
+>
 > ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_drawn.png?raw=true)
+>
+> Margin, Tumor, and Stroma
+>
 > ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Margin.png?raw=true)
 > ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Tumor.png?raw=true)
 > ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Stroma.png?raw=true)
