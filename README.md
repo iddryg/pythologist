@@ -66,7 +66,7 @@ path = TestImages().raw('IrisSpatialFeatures')
 cpi = CellProjectInForm('pythologist.h5',mode='w')
 # Read the project data
 cpi.read_path(path,require=False,verbose=True,microns_per_pixel=0.496,sample_name_index=-1)
-# Create a cell dataframe for downstream analysis
+# Display one of the cell map images
 for f in cpi.frame_iter():
     break
 print(f.frame_name)
@@ -88,10 +88,8 @@ from pythologist_reader.formats.inform.custom import CellProjectInFormLineArea
 
 # Get the path of the test dataset
 path = TestImages().raw('IrisSpatialFeatures')
-
 # Specify where the data read-in will be stored as an h5 object
 cpi = CellProjectInFormLineArea('pythologist.h5',mode='w')
-
 # Read in the data (gets stored on the fly into the h5 object)
 cpi.read_path(path,
               sample_name_index=-1,
@@ -101,13 +99,28 @@ cpi.read_path(path,
               project_name='IrisSpatialFeatures',
               channel_abbreviations={'PD-1 (Opal 540)':'PD1','PD-Ligand-1 (Opal 690)':'PDL1'},
               microns_per_pixel=0.496)
-
-# Create a cell dataframe for downstream analysis
-cdf = cpi.cdf
-
-# Write out the cell dataframe
-cdf.to_hdf('pythologist.cdf.h5','data')
+for f in cpi.frame_iter():
+    break
+print(f.frame_name)
+print('hand drawn margin')
+plt.imshow(f.get_image(f.get_data('custom_images').set_index('custom_label').loc['Drawn','image_id']))
+plt.show()
+#print('margin after expansion')
+plt.imshow(f.get_image(f.get_data('regions').set_index('region_label').loc['Margin','image_id']))
+plt.show()
+#print('tumor (minus margin)')
+plt.imshow(f.get_image(f.get_data('regions').set_index('region_label').loc['Tumor','image_id']))
+plt.show()
+#print('stroma')
+plt.imshow(f.get_image(f.get_data('regions').set_index('region_label').loc['Stroma','image_id']))
+plt.show()
 ``` 
+> MEL2_2
+> hand drawn margin
+> ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_drawn.png?raw=true)
+> ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Margin.png?raw=true)
+> ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Tumor.png?raw=true)
+> ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Stroma.png?raw=true)
 
 *Note: we need to swap in an optimized watershed algorithm to speed up all these read operations.*
 
