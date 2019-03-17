@@ -244,19 +244,23 @@ shape = cdf.iloc[0]['frame_shape']
 View histograms of pixel intensity and the scoring of binary markers on each image
 
 ```python
-qc = cdf.db.qc(verbose=True)
-hist = qc.channel_histograms(0,20,100)
-(ggplot(hist[hist['channel_label']=='CD86 (Opal 540)'],
-        aes(x='bins',y='counts',fill='sample_name'))
+from pythologist_test_images import TestImages
+from plotnine import *
+proj = TestImages().project('IrisSpatialFeatures')
+cdf = TestImages().celldataframe('IrisSpatialFeatures')
+cdf.db = proj
+ch = cdf.db.qc().channel_histograms()
+sub = ch.loc[(~ch['threshold_value'].isna())&(ch['channel_label']=='PDL1')]
+(ggplot(sub,aes(x='bins',y='counts'))
  + geom_bar(stat='identity')
- + geom_vline(aes(xintercept='threshold_value',color='feature_label'))
- + facet_wrap(['sample_name','frame_name'])
+ + facet_wrap('frame_name')
+ + geom_vline(aes(xintercept='threshold_value'),color='red')
  + theme_bw()
- + theme(figure_size=(20,20))
+ + ggtitle('Thresholding of PDL1\ngiven image pixel intensities')
 )
 ```
 
-*This QC metric requires component images, since the provided test data doesn't have component images, this is just an example.*
+*The original component images were not available for IrisSpatialFeatures example, so pixel intensities are simulated and don't necessarily match the those which would have been used to set the original threshold values.*
 
 > ![Histogram Example](https://github.com/jason-weirather/pythologist/blob/master/images/histogram_example.png?raw=true)
 
