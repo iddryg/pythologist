@@ -22,7 +22,7 @@ Features Pythologist add are:
 
 ## Class documentation
 
-* `pythologist-reader` Cell Project Storage Object [Read the Docs](https://jason-weirather.github.io/pythologist-reader/) [ [github](https://github.com/jason-weirather/pythologist-reader) ]
+* `pythologist-reader` Cell Project Storage Object [Read the Docs](https://jason-weirather.github.io/pythologist-reader/) [[github](https://github.com/jason-weirather/pythologist-reader)]
 
 # Installation
 
