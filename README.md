@@ -2,6 +2,8 @@
 
 *Read and analyze cell image data.*
 
+## Intro
+
 Pythologist 1) reads exports from InForm software or other sources into a common storage format, and 2) extracts basic analysis features from cell image data.  This software is generally intended to be run from a jupyter notebook and provides hooks into the image data so that the user can have the flexability to execute analyses they design or find in the primary literature.
 
 [List of large-scale image analysis publications](https://github.com/jason-weirather/pythologist/wiki/list-of-large-scale-image-analysis-publications)
@@ -17,6 +19,10 @@ Features Pythologist add are:
 * Customizable images based on the cell segmentation or heatmaps spaninng the cartesian coordinates.
 * Specify cell populations through a SubsetLogic syntax for quick selection of mutually exclusive phenotypes or binary features
 * A set of Quality Check functions to identify potential issues in imported data.
+
+## Class documentation
+
+* Cell Project Storage Object [Read the Docs](https://jason-weirather.github.io/pythologist-reader/)
 
 # Installation
 
