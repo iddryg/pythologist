@@ -20,7 +20,7 @@ Features Pythologist add are:
 * Specify cell populations through a SubsetLogic syntax for quick selection of mutually exclusive phenotypes or binary features
 * A set of Quality Check functions to identify potential issues in imported data.
 
-## Class documentation
+## Module documentation
 
 * `pythologist` CellDataFrame class to modify and execute analysses [[github](https://github.com/jason-weirather/pythologist)]
 * `pythologist-reader` CellProject Storage Object [Read the Docs](https://jason-weirather.github.io/pythologist-reader/) [[github](https://github.com/jason-weirather/pythologist-reader)]
