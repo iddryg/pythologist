@@ -74,23 +74,26 @@ class Cartesian(Measurement):
         df2 = self.copy()
         d1 = df2.groupby(['frame_id','phenotype_label']).\
             min()[['fraction']].reset_index().rename(columns={'fraction':'minimum'})
+        d1['minimum'] = 0
         d2 = df2.groupby(['frame_id','phenotype_label']).\
             max()[['fraction']].reset_index().rename(columns={'fraction':'maximum'})
         d3 = df2.groupby(['frame_id','phenotype_label']).\
             quantile(max_quantile_color)[['fraction']].reset_index().rename(columns={'fraction':'p95'})
-        df2 = d1.merge(d2,on=['frame_id','phenotype_label']).merge(df2,on=['frame_id','phenotype_label']).\
-            merge(d3,on=['frame_id','phenotype_label'])
+        df2 = d1.merge(d2,on=['frame_id','phenotype_label'],how='outer').merge(df2,on=['frame_id','phenotype_label'],how='outer').\
+            merge(d3,on=['frame_id','phenotype_label'],how='outer')
+        df2 = df2.fillna(0)
         df2['maximum'] = df2['p95']
         df2['fraction'] = df2.apply(lambda x: x['fraction'] if x['fraction'] < x['p95'] else x['p95'],1)
         df2['range'] = df2['maximum'].subtract(df2['minimum'])
-        df2 = df2.fillna(0)
-        df2['standardized'] = df2['fraction'].divide(df2['range']).multiply(255).astype(int)
+        df2.loc[df2['range']<=0,'range'] =1
+        df2['standardized'] = (df2['fraction'].subtract(df2['minimum'])).divide(df2['range']).multiply(255).astype(int)
 
         df3 = df2.set_index(self.cdf.frame_columns+['coord_id','frame_x','frame_y','frame_shape','step_pixels'])[['phenotype_label','standardized']].\
             pivot(columns='phenotype_label')
         df3.columns = df3.columns.droplevel(0)
         df3 = df3.reset_index()
         df3['zero'] = 0
+        #return df3
         if red is None: red = 'zero'
         if green is None: green = 'zero'
         if blue is None: blue = 'zero'

@@ -82,6 +82,7 @@ plt.show()
 
 Another format supported for a project import is one with a custom tumor and invasive margin definition.  Similar to above, the project is organized into sample folders, and each image within each sample folder has a *tif* file defining the tumor and invasive margin.  These come in the form of a `<image name prefix>_Tumor.tif` and `<image name prefix>_Invasive_Margin.tif` for each image.  The `_Tumor.tif` is an area filled in where the tumor is, and transparent elsewhere.  The `_Invasive_Margin.tif` is a drawn line of a known width.  `steps` is used to grow the margin out that many pixels in each direction to establish an invasive margin region.  Here we also rename some markers during read-in to clean up the syntax of thresholding on binary features.
 
+
 ```python
 from pythologist_test_images import TestImages
 from pythologist_reader.formats.inform.custom import CellProjectInFormLineArea
@@ -89,41 +90,51 @@ from pythologist_reader.formats.inform.custom import CellProjectInFormLineArea
 # Get the path of the test dataset
 path = TestImages().raw('IrisSpatialFeatures')
 # Specify where the data read-in will be stored as an h5 object
-cpi = CellProjectInFormLineArea('pythologist.h5',mode='w')
+cpi = CellProjectInFormLineArea('test.h5',mode='w')
 # Read in the data (gets stored on the fly into the h5 object)
 cpi.read_path(path,
               sample_name_index=-1,
-              require=False,
               verbose=True,
               steps=76,
               project_name='IrisSpatialFeatures',
-              channel_abbreviations={'PD-1 (Opal 540)':'PD1','PD-Ligand-1 (Opal 690)':'PDL1'},
               microns_per_pixel=0.496)
 for f in cpi.frame_iter():
     break
 print(f.frame_name)
 print('hand drawn margin')
-plt.imshow(f.get_image(f.get_data('custom_images').set_index('custom_label').loc['Drawn','image_id']))
+plt.imshow(f.get_image(f.get_data('custom_images').\
+    set_index('custom_label').loc['Drawn','image_id']),origin='upper')
 plt.show()
-print('Margin, Tumor, and Stroma')
-plt.imshow(f.get_image(f.get_data('regions').set_index('region_label').loc['Margin','image_id']))
+print('hand drawn tumor area')
+plt.imshow(f.get_image(f.get_data('custom_images').\
+    set_index('custom_label').loc['Area','image_id']),origin='upper')
 plt.show()
-plt.imshow(f.get_image(f.get_data('regions').set_index('region_label').loc['Tumor','image_id']))
+print('Mutually exclusive Margin, Tumor, and Stroma')
+plt.imshow(f.get_image(f.get_data('regions').\
+    set_index('region_label').loc['Margin','image_id']),origin='upper')
 plt.show()
-plt.imshow(f.get_image(f.get_data('regions').set_index('region_label').loc['Stroma','image_id']))
+plt.imshow(f.get_image(f.get_data('regions').\
+    set_index('region_label').loc['Tumor','image_id']),origin='upper')
+plt.show()
+plt.imshow(f.get_image(f.get_data('regions').\
+    set_index('region_label').loc['Stroma','image_id']),origin='upper')
 plt.show()
 ``` 
 > MEL2_2
 >
 > hand drawn margin
 >
-> ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_drawn.png?raw=true)
+> ![MEL2_2_drawn_line](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_drawn.png?raw=true)
 >
-> Margin, Tumor, and Stroma
+> hand drawn tumor area
 >
-> ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Margin.png?raw=true)
-> ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Tumor.png?raw=true)
-> ![MEL2_7_cell_map](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Stroma.png?raw=true)
+> ![MEL2_2_drawn_line](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_area.png?raw=true)
+>
+> Mutually exclusive Margin, Tumor, and Stroma
+>
+> ![MEL2_2_margin](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Margin.png?raw=true)
+> ![MEL2_2_tumor](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Tumor.png?raw=true)
+> ![MEL2_2_stroma](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Stroma.png?raw=true)
 
 *Note: we need to swap in an optimized watershed algorithm to speed up all these read operations.*
 
@@ -199,6 +210,36 @@ WARNING
 ]
 Issue count: 1/2
 ```
+
+View density plots based on cell phenotype frequencies. 
+The cell phenotypes set prior to calling `cartesian` are the phenotypes available to plot.
+
+```python
+from pythologist_test_images import TestImages
+from plotnine import *
+proj = TestImages().project('IrisSpatialFeatures')
+cdf = TestImages().celldataframe('IrisSpatialFeatures')
+cdf.db = proj
+cart = cdf.cartesian(verbose=True,step_pixels=50,max_distance_pixels=75)
+df,cols = cart.rgb_dataframe(red='CD8+',green='SOX10+')
+shape = cdf.iloc[0]['frame_shape']
+(ggplot(df,aes(x='frame_x',y='frame_y',fill='color_str'))
+ + geom_point(shape='h',size=4.5,color='#777777',stroke=0.2)
+ + geom_vline(xintercept=-1,color="#555555")
+ + geom_vline(xintercept=shape[1],color="#555555")
+ + geom_hline(yintercept=-1,color="#555555")
+ + geom_hline(yintercept=shape[0],color="#555555")
+ + facet_wrap('frame_name')
+ + scale_fill_manual(cols,guide=False)
+ + theme_bw()
+ + theme(figure_size=(8,8))
+ + theme(aspect_ratio=shape[0]/shape[1])
+ + scale_y_reverse()
+)
+```
+
+> ![Density Example](https://github.com/jason-weirather/pythologist/blob/master/images/density_plots.png?raw=true)
+
 
 View histograms of pixel intensity and the scoring of binary markers on each image
 
