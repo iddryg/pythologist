@@ -211,7 +211,8 @@ WARNING
 Issue count: 1/2
 ```
 
-View density plots based on cell phenotype frequencies. 
+### View density plots based on cell phenotype frequencies. 
+
 The cell phenotypes set prior to calling `cartesian` are the phenotypes available to plot.
 
 ```python
@@ -241,7 +242,7 @@ shape = cdf.iloc[0]['frame_shape']
 > ![Density Example](https://github.com/jason-weirather/pythologist/blob/master/images/density_plots.png?raw=true)
 
 
-View histograms of pixel intensity and the scoring of binary markers on each image
+### View histograms of pixel intensity and the scoring of binary markers on each image
 
 ```python
 from pythologist_test_images import TestImages
@@ -362,30 +363,6 @@ The follow command creates a new CellDataFrame that has an additional binary fea
 
 ```python
 cdf = cdf.nearestneighbors().threshold('T cell','T cell/within 75um',distance_um=75)
-```
-
-### Create a cartesian map heatmap to show features
-
-```python
-df = sub.cartesian(subsets=[SL(phenotypes=['HRS+'],label='HRS+'),
-                            SL(scored_calls={'CD86':'+'},label='CD86+'),
-                            SL(phenotypes=['CTLA4+'],label='CTLA4+')],
-                   step_pixels=75,max_distance_pixels=100,verbose=True)
-fshape = df.iloc[0]['frame_shape']
-rgbdf, col_list = df.rgb_dataframe(blue='CD86+')
-line_color = '#444444'
-(ggplot(rgbdf,aes(x='frame_x',y='frame_y',fill='color_str'))
- + geom_point(shape='h',stroke=0.6,size=10.2,color=line_color)
- + geom_hline(yintercept=0,color='gray')
- + geom_hline(yintercept=fshape[0]-1,color=line_color)
- + geom_vline(xintercept=0,color='gray')
- + geom_vline(xintercept=fshape[1]-1,color=line_color)
- + theme_bw()
- + theme(figure_size=(12,12),aspect_ratio=fshape[0]/fshape[1])
- + scale_fill_manual(col_list,guide=False)
- + scale_color_gradient(low='#555555',high='#5555FF')
- + scale_y_reverse()
-)
 ```
 
 ### Create an image of cell-cell contacts between features of interest
