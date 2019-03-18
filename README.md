@@ -359,6 +359,8 @@ sio.write_to_path('test_edges',overwrite=True)
 >
 > ![Visualize Contacts](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_7-contacts.png?raw=true)
 
+*Image is zoomed-in and cropped to show the contours better.*
+
 ### Merge CellDataFrames that have the same image segmentations but different scored calls
 
 This happens frequently because current InForm exports only permit two features to be scored per export
