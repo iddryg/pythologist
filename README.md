@@ -174,8 +174,10 @@ for f in cpi.frame_iter():
 >
 > Tumor
 >
-> ![MEL2_2_tumor](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_tumor-b.png?raw=true) 
+> ![MEL2_2_tumor](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_tumor-b.png?raw=true)
+> 
 > Not-Tumor
+>
 > ![MEL2_2_not_tumor](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_not-tumor-b.png?raw=true) 
 
 ### Quality check samples
