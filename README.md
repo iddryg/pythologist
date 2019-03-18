@@ -166,7 +166,7 @@ for f in cpi.frame_iter():
     rs = f.get_data('regions').set_index('region_label')
     for r in rs.index:
         print(r)
-        plt.imshow(f.get_image(rs.loc[r]['image_id']))
+        plt.imshow(f.get_image(rs.loc[r]['image_id']),origin='upper')
         plt.show()
     break
 ```
