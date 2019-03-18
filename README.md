@@ -145,7 +145,38 @@ plt.show()
 > ![MEL2_2_tumor](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Tumor.png?raw=true)
 > ![MEL2_2_stroma](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Stroma.png?raw=true)
 
-*Note: we need to swap in an optimized watershed algorithm to speed up all these read operations.*
+
+### Read a project with a custom tumor mask (but no margin line)
+
+Here we will use the mask, but not expand or subtract from it.
+
+```python
+from pythologist_test_images import TestImages
+from pythologist_reader.formats.inform.custom import CellProjectInFormCustomMask
+import matplotlib.pyplot as plt
+path = TestImages().raw('IrisSpatialFeatures')
+cpi = CellProjectInFormCustomMask('test.h5',mode='w')
+cpi.read_path(path,
+              microns_per_pixel=0.496,
+              sample_name_index=-1,
+              verbose=True,
+              custom_mask_name='Tumor',
+              other_mask_name='Not-Tumor')
+for f in cpi.frame_iter():
+    rs = f.get_data('regions').set_index('region_label')
+    for r in rs.index:
+        print(r)
+        plt.imshow(f.get_image(rs.loc[r]['image_id']))
+        plt.show()
+    break
+```
+> MEL2_2
+>
+> Tumor
+>
+> ![MEL2_2_tumor](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_tumor-b.png?raw=true) 
+> Not-Tumor
+> ![MEL2_2_not_tumor](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_not-tumor-b.png?raw=true) 
 
 ### Quality check samples
 
