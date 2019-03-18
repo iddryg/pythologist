@@ -1,0 +1,844 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Welcome to pythologist’s documentation! &mdash; pythologist 1.0.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="#" class="icon icon-home"> pythologist
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <!-- Local TOC -->
+              <div class="local-toc"><ul>
+<li><a class="reference internal" href="#">Welcome to pythologist’s documentation!</a></li>
+<li><a class="reference internal" href="#readme-file">Readme File</a></li>
+<li><a class="reference internal" href="#pythologist">pythologist</a><ul>
+<li><a class="reference internal" href="#intro">Intro</a></li>
+<li><a class="reference internal" href="#module-documentation">Module documentation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#installation">Installation</a><ul>
+<li><a class="reference internal" href="#docker-jupyter-labs-quickstart">Docker jupyter labs quickstart</a></li>
+<li><a class="reference internal" href="#install-by-pip">Install by pip</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#common-tasks">Common tasks</a></li>
+<li><a class="reference internal" href="#comparison-to-irisspatialfeatures">Comparison to IrisSpatialFeatures</a></li>
+<li><a class="reference internal" href="#modules">Modules</a></li>
+<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+</ul>
+</div>
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">pythologist</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="#">Docs</a> &raquo;</li>
+        
+      <li>Welcome to pythologist’s documentation!</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="welcome-to-pythologist-s-documentation">
+<h1>Welcome to pythologist’s documentation!<a class="headerlink" href="#welcome-to-pythologist-s-documentation" title="Permalink to this headline">¶</a></h1>
+</div>
+<div class="section" id="readme-file">
+<h1>Readme File<a class="headerlink" href="#readme-file" title="Permalink to this headline">¶</a></h1>
+</div>
+<div class="section" id="pythologist">
+<h1>pythologist<a class="headerlink" href="#pythologist" title="Permalink to this headline">¶</a></h1>
+<p><em>Read and analyze cell image data.</em></p>
+<div class="section" id="intro">
+<h2>Intro<a class="headerlink" href="#intro" title="Permalink to this headline">¶</a></h2>
+<p>Pythologist 1) reads exports from InForm software or other sources into a common storage format, and 2) extracts basic analysis features from cell image data.  This software is generally intended to be run from a jupyter notebook and provides hooks into the image data so that the user can have the flexability to execute analyses they design or find in the primary literature.</p>
+<p><a class="reference external" href="https://github.com/jason-weirather/pythologist/wiki/list-of-large-scale-image-analysis-publications">List of large-scale image analysis publications</a></p>
+<p>Pythologist is based on <a class="reference external" href="https://github.com/gusef/IrisSpatialFeatures">**IrisSpatialFeatures**</a> (C.D. Carey, ,D. Gusenleitner, M. Lipshitz, et al. Blood. 2017) <a class="reference external" href="https://doi.org/10.1182/blood-2017-03-770719">https://doi.org/10.1182/blood-2017-03-770719</a>, and is implemented in the python programming language.</p>
+<p>Features Pythologist add are:</p>
+<ul class="simple">
+<li>An common CellProjectGeneric storage class, and classical inheritance conventions to organize the importation of different data types.</li>
+<li>A mutable CellDataFrame class that can be used for slicing, and combining projects.</li>
+<li>The ability to add binary features to cells based on cell-cell contacts or cell proximity.</li>
+<li>Customizable images based on the cell segmentation or heatmaps spaninng the cartesian coordinates.</li>
+<li>Specify cell populations through a SubsetLogic syntax for quick selection of mutually exclusive phenotypes or binary features</li>
+<li>A set of Quality Check functions to identify potential issues in imported data.</li>
+</ul>
+</div>
+<div class="section" id="module-documentation">
+<h2>Module documentation<a class="headerlink" href="#module-documentation" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">pythologist</span></code> CellDataFrame class to modify and execute analysses [<a class="reference external" href="https://github.com/jason-weirather/pythologist">source</a>]</li>
+<li><code class="docutils literal notranslate"><span class="pre">pythologist-reader</span></code> CellProject Storage Object [<a class="reference external" href="https://jason-weirather.github.io/pythologist-reader/">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist-reader">source</a>]</li>
+<li><code class="docutils literal notranslate"><span class="pre">pythologist-test-images</span></code> Example data [<a class="reference external" href="https://github.com/jason-weirather/pythologist-test-images">source</a>]</li>
+<li><code class="docutils literal notranslate"><span class="pre">pythologist-image-utilities</span></code> Helper functions to work with images [<a class="reference external" href="https://jason-weirather.github.io/pythologist-image-utilities/">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist-image-utilities">source</a>]</li>
+</ul>
+</div>
+</div>
+<div class="section" id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="docker-jupyter-labs-quickstart">
+<h2>Docker jupyter labs quickstart<a class="headerlink" href="#docker-jupyter-labs-quickstart" title="Permalink to this headline">¶</a></h2>
+<p>To start a jupyter notebook in the current working directory on port 8885 you can use the following docker command.</p>
+<p><strong>First build a docker image that will use your own user/group name and id.</strong></p>
+<div class="highlight-guess notranslate"><div class="highlight"><pre><span></span>$ docker build -t pythologist:latest --build-arg <span class="nv">user</span><span class="o">=</span><span class="nv">$USERNAME</span> <span class="se">\</span>
+                                     --build-arg <span class="nv">group</span><span class="o">=</span><span class="nv">$GROUPNAME</span> <span class="se">\</span>
+                                     --build-arg <span class="nv">user_id</span><span class="o">=</span><span class="nv">$USERID</span> <span class="se">\</span>
+                                     --build-arg <span class="nv">group_id</span><span class="o">=</span><span class="nv">$GROUPID</span> .
+</pre></div>
+</div>
+<p><strong>Now start the docker image.</strong></p>
+<div class="highlight-guess notranslate"><div class="highlight"><pre><span></span>$ docker run --rm -p <span class="m">8885</span>:8888 -v <span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>:/home/<span class="nv">$USERNAME</span>/work pythologist:latest
+</pre></div>
+</div>
+<p>where <code class="docutils literal notranslate"><span class="pre">$USERNAME</span></code>, <code class="docutils literal notranslate"><span class="pre">$GROUPNAME</span></code>, <code class="docutils literal notranslate"><span class="pre">$USERID</span></code>, <code class="docutils literal notranslate"><span class="pre">$GROUPID</span></code> correspond to your user/group name/id.</p>
+</div>
+<div class="section" id="install-by-pip">
+<h2>Install by pip<a class="headerlink" href="#install-by-pip" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-guess notranslate"><div class="highlight"><pre><span></span>$ pip install pythologist
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="common-tasks">
+<h1>Common tasks<a class="headerlink" href="#common-tasks" title="Permalink to this headline">¶</a></h1>
+<p>The assumption here is that the exports are grouped so that sample folders contain one or more image exports, and that sample name can be inferred from the last folder name.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pythologist_test_images</span> <span class="kn">import</span> <span class="n">TestImages</span>
+<span class="kn">from</span> <span class="nn">pythologist_reader.formats.inform.sets</span> <span class="kn">import</span> <span class="n">CellProjectInForm</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
+
+<span class="c1"># Get the path of the test dataset</span>
+<span class="n">path</span> <span class="o">=</span> <span class="n">TestImages</span><span class="p">()</span><span class="o">.</span><span class="n">raw</span><span class="p">(</span><span class="s1">&#39;IrisSpatialFeatures&#39;</span><span class="p">)</span>
+<span class="c1"># Create the storage opbject where the project will be saved</span>
+<span class="n">cpi</span> <span class="o">=</span> <span class="n">CellProjectInForm</span><span class="p">(</span><span class="s1">&#39;pythologist.h5&#39;</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span>
+<span class="c1"># Read the project data</span>
+<span class="n">cpi</span><span class="o">.</span><span class="n">read_path</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="n">require</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span><span class="n">verbose</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span><span class="n">microns_per_pixel</span><span class="o">=</span><span class="mf">0.496</span><span class="p">,</span><span class="n">sample_name_index</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+<span class="c1"># Display one of the cell map images</span>
+<span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">cpi</span><span class="o">.</span><span class="n">frame_iter</span><span class="p">():</span>
+    <span class="k">break</span>
+<span class="k">print</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">frame_name</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">cell_map_image</span><span class="p">(),</span><span class="n">origin</span><span class="o">=</span><span class="s1">&#39;upper&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<blockquote>
+<div><p>MEL2_7</p>
+<a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_7_cell_map.png?raw=true"><img alt="MEL2_7_cell_map" src="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_7_cell_map.png?raw=true" /></a>
+</div></blockquote>
+<p>Another format supported for a project import is one with a custom tumor and invasive margin definition.  Similar to above, the project is organized into sample folders, and each image within each sample folder has a <em>tif</em> file defining the tumor and invasive margin.  These come in the form of a <code class="docutils literal notranslate"><span class="pre">&lt;image</span> <span class="pre">name</span> <span class="pre">prefix&gt;_Tumor.tif</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;image</span> <span class="pre">name</span> <span class="pre">prefix&gt;_Invasive_Margin.tif</span></code> for each image.  The <code class="docutils literal notranslate"><span class="pre">_Tumor.tif</span></code> is an area filled in where the tumor is, and transparent elsewhere.  The <code class="docutils literal notranslate"><span class="pre">_Invasive_Margin.tif</span></code> is a drawn line of a known width.  <code class="docutils literal notranslate"><span class="pre">steps</span></code> is used to grow the margin out that many pixels in each direction to establish an invasive margin region.  Here we also rename some markers during read-in to clean up the syntax of thresholding on binary features.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pythologist_test_images</span> <span class="kn">import</span> <span class="n">TestImages</span>
+<span class="kn">from</span> <span class="nn">pythologist_reader.formats.inform.custom</span> <span class="kn">import</span> <span class="n">CellProjectInFormLineArea</span>
+
+<span class="c1"># Get the path of the test dataset</span>
+<span class="n">path</span> <span class="o">=</span> <span class="n">TestImages</span><span class="p">()</span><span class="o">.</span><span class="n">raw</span><span class="p">(</span><span class="s1">&#39;IrisSpatialFeatures&#39;</span><span class="p">)</span>
+<span class="c1"># Specify where the data read-in will be stored as an h5 object</span>
+<span class="n">cpi</span> <span class="o">=</span> <span class="n">CellProjectInFormLineArea</span><span class="p">(</span><span class="s1">&#39;test.h5&#39;</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span>
+<span class="c1"># Read in the data (gets stored on the fly into the h5 object)</span>
+<span class="n">cpi</span><span class="o">.</span><span class="n">read_path</span><span class="p">(</span><span class="n">path</span><span class="p">,</span>
+              <span class="n">sample_name_index</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+              <span class="n">verbose</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+              <span class="n">steps</span><span class="o">=</span><span class="mi">76</span><span class="p">,</span>
+              <span class="n">project_name</span><span class="o">=</span><span class="s1">&#39;IrisSpatialFeatures&#39;</span><span class="p">,</span>
+              <span class="n">microns_per_pixel</span><span class="o">=</span><span class="mf">0.496</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">cpi</span><span class="o">.</span><span class="n">frame_iter</span><span class="p">():</span>
+    <span class="k">break</span>
+<span class="k">print</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">frame_name</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="s1">&#39;hand drawn margin&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">get_image</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="s1">&#39;custom_images&#39;</span><span class="p">)</span><span class="o">.</span>\
+    <span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;custom_label&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Drawn&#39;</span><span class="p">,</span><span class="s1">&#39;image_id&#39;</span><span class="p">]),</span><span class="n">origin</span><span class="o">=</span><span class="s1">&#39;upper&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="k">print</span><span class="p">(</span><span class="s1">&#39;hand drawn tumor area&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">get_image</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="s1">&#39;custom_images&#39;</span><span class="p">)</span><span class="o">.</span>\
+    <span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;custom_label&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Area&#39;</span><span class="p">,</span><span class="s1">&#39;image_id&#39;</span><span class="p">]),</span><span class="n">origin</span><span class="o">=</span><span class="s1">&#39;upper&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="k">print</span><span class="p">(</span><span class="s1">&#39;Mutually exclusive Margin, Tumor, and Stroma&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">get_image</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="s1">&#39;regions&#39;</span><span class="p">)</span><span class="o">.</span>\
+    <span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;region_label&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Margin&#39;</span><span class="p">,</span><span class="s1">&#39;image_id&#39;</span><span class="p">]),</span><span class="n">origin</span><span class="o">=</span><span class="s1">&#39;upper&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">get_image</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="s1">&#39;regions&#39;</span><span class="p">)</span><span class="o">.</span>\
+    <span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;region_label&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Tumor&#39;</span><span class="p">,</span><span class="s1">&#39;image_id&#39;</span><span class="p">]),</span><span class="n">origin</span><span class="o">=</span><span class="s1">&#39;upper&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">get_image</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="s1">&#39;regions&#39;</span><span class="p">)</span><span class="o">.</span>\
+    <span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;region_label&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">&#39;Stroma&#39;</span><span class="p">,</span><span class="s1">&#39;image_id&#39;</span><span class="p">]),</span><span class="n">origin</span><span class="o">=</span><span class="s1">&#39;upper&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<blockquote>
+<div><p>MEL2_2</p>
+<p>hand drawn margin</p>
+<a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_drawn.png?raw=true"><img alt="MEL2_2_drawn_line" src="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_drawn.png?raw=true" /></a>
+<p>hand drawn tumor area</p>
+<a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_area.png?raw=true"><img alt="MEL2_2_drawn_line" src="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_area.png?raw=true" /></a>
+<p>Mutually exclusive Margin, Tumor, and Stroma</p>
+<a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Margin.png?raw=true"><img alt="MEL2_2_margin" src="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Margin.png?raw=true" /></a>
+<a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Tumor.png?raw=true"><img alt="MEL2_2_tumor" src="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Tumor.png?raw=true" /></a>
+<a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Stroma.png?raw=true"><img alt="MEL2_2_stroma" src="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Stroma.png?raw=true" /></a>
+</div></blockquote>
+<p><em>Note: we need to swap in an optimized watershed algorithm to speed up all these read operations.</em></p>
+<p>Check general status of the CellDataFrame</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cdf</span> <span class="o">=</span> <span class="n">cpi</span><span class="o">.</span><span class="n">cdf</span>
+<span class="n">cdf</span><span class="o">.</span><span class="n">db</span> <span class="o">=</span> <span class="n">cpi</span>
+<span class="n">cdf</span><span class="o">.</span><span class="n">qc</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span><span class="o">.</span><span class="n">print_results</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><em>prints the following QC metrics to stdout</em></p>
+<div class="highlight-guess notranslate"><div class="highlight"><pre><span></span>==========
+Check microns per pixel attribute
+PASS
+Microns per pixel is 0.496
+==========
+Check storage object is set
+PASS
+h5 object is set
+==========
+Is there a 1:1 correspondence between sample_name and sample_id?
+PASS
+Good concordance.
+Issue count: 0/2
+==========
+Is there a 1:1 correspondence between frame_name and frame_id?
+PASS
+Good concordance.
+Issue count: 0/4
+==========
+Is there a 1:1 correspondence between project_name and project_id?
+PASS
+Good concordance.
+Issue count: 0/1
+==========
+Is the same frame name present in multiple samples?
+PASS
+frame_name&#39;s are all in their own samples
+Issue count: 0/4
+==========
+Are the same phenotypes listed and following rules for mutual exclusion?
+PASS
+phenotype_calls and phenotype_label follows expected rules
+==========
+Are the same phenotypes included on all images?
+PASS
+Consistent phenotypes
+Issue count: 0/4
+==========
+Are the same scored names included on all images?
+PASS
+Consistent scored_names
+Issue count: 0/4
+==========
+Are the same regions represented the same with an image and across images?
+PASS
+Consistent regions
+Issue count: 0/5
+==========
+Are the same regions listed matching a valid region_label
+PASS
+regions and region_label follows expected rules
+==========
+Do we have any region sizes so small they should consider being excluded?
+WARNING
+[
+    &quot;Very small non-zero regions are included in the data[&#39;IrisSpatialFeatures&#39;, &#39;MEL2&#39;, &#39;MEL2_7&#39;, {&#39;Margin&#39;: 495640, &#39;Tumor&#39;: 947369, &#39;Stroma&#39;: 116}]&quot;
+]
+Issue count: 1/2
+</pre></div>
+</div>
+<p>The cell phenotypes set prior to calling <code class="docutils literal notranslate"><span class="pre">cartesian</span></code> are the phenotypes available to plot.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pythologist_test_images</span> <span class="kn">import</span> <span class="n">TestImages</span>
+<span class="kn">from</span> <span class="nn">plotnine</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="n">proj</span> <span class="o">=</span> <span class="n">TestImages</span><span class="p">()</span><span class="o">.</span><span class="n">project</span><span class="p">(</span><span class="s1">&#39;IrisSpatialFeatures&#39;</span><span class="p">)</span>
+<span class="n">cdf</span> <span class="o">=</span> <span class="n">TestImages</span><span class="p">()</span><span class="o">.</span><span class="n">celldataframe</span><span class="p">(</span><span class="s1">&#39;IrisSpatialFeatures&#39;</span><span class="p">)</span>
+<span class="n">cdf</span><span class="o">.</span><span class="n">db</span> <span class="o">=</span> <span class="n">proj</span>
+<span class="n">cart</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">cartesian</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span><span class="n">step_pixels</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span><span class="n">max_distance_pixels</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+<span class="n">df</span><span class="p">,</span><span class="n">cols</span> <span class="o">=</span> <span class="n">cart</span><span class="o">.</span><span class="n">rgb_dataframe</span><span class="p">(</span><span class="n">red</span><span class="o">=</span><span class="s1">&#39;CD8+&#39;</span><span class="p">,</span><span class="n">green</span><span class="o">=</span><span class="s1">&#39;SOX10+&#39;</span><span class="p">)</span>
+<span class="n">shape</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;frame_shape&#39;</span><span class="p">]</span>
+<span class="p">(</span><span class="n">ggplot</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="s1">&#39;frame_x&#39;</span><span class="p">,</span><span class="n">y</span><span class="o">=</span><span class="s1">&#39;frame_y&#39;</span><span class="p">,</span><span class="n">fill</span><span class="o">=</span><span class="s1">&#39;color_str&#39;</span><span class="p">))</span>
+ <span class="o">+</span> <span class="n">geom_point</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="s1">&#39;h&#39;</span><span class="p">,</span><span class="n">size</span><span class="o">=</span><span class="mf">4.5</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;#777777&#39;</span><span class="p">,</span><span class="n">stroke</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+ <span class="o">+</span> <span class="n">geom_vline</span><span class="p">(</span><span class="n">xintercept</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;#555555&quot;</span><span class="p">)</span>
+ <span class="o">+</span> <span class="n">geom_vline</span><span class="p">(</span><span class="n">xintercept</span><span class="o">=</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;#555555&quot;</span><span class="p">)</span>
+ <span class="o">+</span> <span class="n">geom_hline</span><span class="p">(</span><span class="n">yintercept</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;#555555&quot;</span><span class="p">)</span>
+ <span class="o">+</span> <span class="n">geom_hline</span><span class="p">(</span><span class="n">yintercept</span><span class="o">=</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;#555555&quot;</span><span class="p">)</span>
+ <span class="o">+</span> <span class="n">facet_wrap</span><span class="p">(</span><span class="s1">&#39;frame_name&#39;</span><span class="p">)</span>
+ <span class="o">+</span> <span class="n">scale_fill_manual</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span><span class="n">guide</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+ <span class="o">+</span> <span class="n">theme_bw</span><span class="p">()</span>
+ <span class="o">+</span> <span class="n">theme</span><span class="p">(</span><span class="n">figure_size</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">8</span><span class="p">))</span>
+ <span class="o">+</span> <span class="n">theme</span><span class="p">(</span><span class="n">aspect_ratio</span><span class="o">=</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">/</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+ <span class="o">+</span> <span class="n">scale_y_reverse</span><span class="p">()</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<blockquote>
+<div><a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/density_plots.png?raw=true"><img alt="Density Example" src="https://github.com/jason-weirather/pythologist/blob/master/images/density_plots.png?raw=true" /></a>
+</div></blockquote>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pythologist_test_images</span> <span class="kn">import</span> <span class="n">TestImages</span>
+<span class="kn">from</span> <span class="nn">plotnine</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="n">proj</span> <span class="o">=</span> <span class="n">TestImages</span><span class="p">()</span><span class="o">.</span><span class="n">project</span><span class="p">(</span><span class="s1">&#39;IrisSpatialFeatures&#39;</span><span class="p">)</span>
+<span class="n">cdf</span> <span class="o">=</span> <span class="n">TestImages</span><span class="p">()</span><span class="o">.</span><span class="n">celldataframe</span><span class="p">(</span><span class="s1">&#39;IrisSpatialFeatures&#39;</span><span class="p">)</span>
+<span class="n">cdf</span><span class="o">.</span><span class="n">db</span> <span class="o">=</span> <span class="n">proj</span>
+<span class="n">ch</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">qc</span><span class="p">()</span><span class="o">.</span><span class="n">channel_histograms</span><span class="p">()</span>
+<span class="n">sub</span> <span class="o">=</span> <span class="n">ch</span><span class="o">.</span><span class="n">loc</span><span class="p">[(</span><span class="o">~</span><span class="n">ch</span><span class="p">[</span><span class="s1">&#39;threshold_value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">())</span><span class="o">&amp;</span><span class="p">(</span><span class="n">ch</span><span class="p">[</span><span class="s1">&#39;channel_label&#39;</span><span class="p">]</span><span class="o">==</span><span class="s1">&#39;PDL1&#39;</span><span class="p">)]</span>
+<span class="p">(</span><span class="n">ggplot</span><span class="p">(</span><span class="n">sub</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="s1">&#39;bins&#39;</span><span class="p">,</span><span class="n">y</span><span class="o">=</span><span class="s1">&#39;counts&#39;</span><span class="p">))</span>
+ <span class="o">+</span> <span class="n">geom_bar</span><span class="p">(</span><span class="n">stat</span><span class="o">=</span><span class="s1">&#39;identity&#39;</span><span class="p">)</span>
+ <span class="o">+</span> <span class="n">facet_wrap</span><span class="p">(</span><span class="s1">&#39;frame_name&#39;</span><span class="p">)</span>
+ <span class="o">+</span> <span class="n">geom_vline</span><span class="p">(</span><span class="n">aes</span><span class="p">(</span><span class="n">xintercept</span><span class="o">=</span><span class="s1">&#39;threshold_value&#39;</span><span class="p">),</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">)</span>
+ <span class="o">+</span> <span class="n">theme_bw</span><span class="p">()</span>
+ <span class="o">+</span> <span class="n">ggtitle</span><span class="p">(</span><span class="s1">&#39;Thresholding of PDL1</span><span class="se">\n</span><span class="s1">given image pixel intensities&#39;</span><span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><em>The original component images were not available for IrisSpatialFeatures example, so pixel intensities are simulated and don’t necessarily match the those which would have been used to set the original threshold values.</em></p>
+<blockquote>
+<div><a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/histogram_example.png?raw=true"><img alt="Histogram Example" src="https://github.com/jason-weirather/pythologist/blob/master/images/histogram_example.png?raw=true" /></a>
+</div></blockquote>
+<p>This happens frequently because current InForm exports only permit two features to be scored per export</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">merged</span><span class="p">,</span><span class="n">fail</span> <span class="o">=</span> <span class="n">cdf1</span><span class="o">.</span><span class="n">merge_scores</span><span class="p">(</span><span class="n">cdf2</span><span class="p">,</span><span class="n">on</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;sample_name&#39;</span><span class="p">,</span><span class="s1">&#39;frame_name&#39;</span><span class="p">,</span><span class="s1">&#39;x&#39;</span><span class="p">,</span><span class="s1">&#39;y&#39;</span><span class="p">])</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cdf</span><span class="o">.</span><span class="n">scored_names</span>
+</pre></div>
+</div>
+<blockquote>
+<div>[‘PD1’, ‘PDL1’]</div></blockquote>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cdf</span><span class="o">.</span><span class="n">phenotypes</span>
+</pre></div>
+</div>
+<blockquote>
+<div>[‘CD8+’, ‘OTHER’, ‘SOX10+’]</div></blockquote>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cdf</span><span class="o">.</span><span class="n">regions</span>
+</pre></div>
+</div>
+<blockquote>
+<div>[‘Margin’, ‘Stroma’, ‘Tumor’]</div></blockquote>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">collapsed</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">collapse_phenotypes</span><span class="p">([</span><span class="s1">&#39;CD8+&#39;</span><span class="p">,</span><span class="s1">&#39;OTHER&#39;</span><span class="p">],</span><span class="s1">&#39;non-Tumor&#39;</span><span class="p">)</span>
+<span class="n">collapsed</span><span class="o">.</span><span class="n">phenotypes</span>
+</pre></div>
+</div>
+<blockquote>
+<div>[‘SOX10+’, ‘non-Tumor’]</div></blockquote>
+<p>Rename <em>TUMOR</em> to <em>Tumor</em></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">renamed</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">rename_region</span><span class="p">(</span><span class="s1">&#39;TUMOR&#39;</span><span class="p">,</span><span class="s1">&#39;Tumor&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">renamed</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">rename_scored_calls</span><span class="p">({</span><span class="s1">&#39;PDL1 (Opal 520)&#39;</span><span class="p">:</span><span class="s1">&#39;PDL1&#39;</span><span class="p">})</span>
+</pre></div>
+</div>
+<p>Make <em>CYTOK</em> into <em>CYTOK PDL1+</em> and <em>CYTOK PDL1-</em></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">raw_thresh</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">threshold</span><span class="p">(</span><span class="s1">&#39;CYTOK&#39;</span><span class="p">,</span><span class="s1">&#39;PDL1&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">CD68_CD163</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">threshold</span><span class="p">(</span><span class="s1">&#39;CD68&#39;</span><span class="p">,</span><span class="s1">&#39;CD163&#39;</span><span class="p">)</span><span class="o">.</span>\
+    <span class="n">threshold</span><span class="p">(</span><span class="s1">&#39;CD68 CD163+&#39;</span><span class="p">,</span><span class="s1">&#39;PDL1&#39;</span><span class="p">)</span><span class="o">.</span>\
+    <span class="n">threshold</span><span class="p">(</span><span class="s1">&#39;CD68 CD163-&#39;</span><span class="p">,</span><span class="s1">&#39;PDL1&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>generate counts and fractions of the current phenotypes and export them to a csv</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cdf</span><span class="o">.</span><span class="n">counts</span><span class="p">()</span><span class="o">.</span><span class="n">frame_counts</span><span class="p">()</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">&#39;my_frame_counts.csv&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>generate counts and fractions of the current phenotypes and export them to a csv</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cdf</span><span class="o">.</span><span class="n">counts</span><span class="p">()</span><span class="o">.</span><span class="n">sample_counts</span><span class="p">()</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">&#39;my_sample_counts.csv&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The follow command creates a new CellDataFrame that has an additional binary feature representative of the contact with ‘T cell’ phenotype cells.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cdf</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">contacts</span><span class="p">()</span><span class="o">.</span><span class="n">threshold</span><span class="p">(</span><span class="s1">&#39;T cell&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The follow command creates a new CellDataFrame that has an additional binary feature representative of being inside or outisde 75 microns of ‘T cell’ phenotype cells.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cdf</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">nearestneighbors</span><span class="p">()</span><span class="o">.</span><span class="n">threshold</span><span class="p">(</span><span class="s1">&#39;T cell&#39;</span><span class="p">,</span><span class="s1">&#39;T cell/within 75um&#39;</span><span class="p">,</span><span class="n">distance_um</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="comparison-to-irisspatialfeatures">
+<h1>Comparison to IrisSpatialFeatures<a class="headerlink" href="#comparison-to-irisspatialfeatures" title="Permalink to this headline">¶</a></h1>
+</div>
+<div class="section" id="modules">
+<h1>Modules<a class="headerlink" href="#modules" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
+<dt id="pythologist.CellDataFrame">
+<em class="property">class </em><code class="descclassname">pythologist.</code><code class="descname">CellDataFrame</code><span class="sig-paren">(</span><em>*args</em>, <em>**kw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <strong>CellDataFrame</strong> class is an extension of a pandas.DataFrame with
+per-cell rows that have region, binary calls, mutually exclusive phenotypes,
+cell locations, and cell-cell contact.</p>
+<dl class="docutils">
+<dt>Params:</dt>
+<dd>microns_per_pixel (float): conversion factor that gets saved along with the dataframe once its set.  (20x vectra is a 0.496)
+db (CellProject): a storage class that has all the image and mask data</dd>
+</dl>
+<dl class="attribute">
+<dt id="pythologist.CellDataFrame.db">
+<code class="descname">db</code><a class="headerlink" href="#pythologist.CellDataFrame.db" title="Permalink to this definition">¶</a></dt>
+<dd><p>Assign to this or read from this, the CellProject storage object</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.fill_phenotype_label">
+<code class="descname">fill_phenotype_label</code><span class="sig-paren">(</span><em>inplace=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.fill_phenotype_label"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.fill_phenotype_label" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the phenotype_label column according to our rules for mutual exclusion</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pythologist.CellDataFrame.frame_columns">
+<code class="descname">frame_columns</code><a class="headerlink" href="#pythologist.CellDataFrame.frame_columns" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list of fields suitable for identifying the unique image frames</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.get_measured_regions">
+<code class="descname">get_measured_regions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.get_measured_regions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.get_measured_regions" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">Output a dataframe with regions and region sizes</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">pandas.DataFrame</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.get_valid_cell_indecies">
+<code class="descname">get_valid_cell_indecies</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.get_valid_cell_indecies"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.get_valid_cell_indecies" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a dataframe of images present with ‘valid’ being a list of cell indecies that can be included</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.is_uniform">
+<code class="descname">is_uniform</code><span class="sig-paren">(</span><em>verbose=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.is_uniform"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.is_uniform" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check to make sure phenotype calls, or scored calls are consistent across all images / samples</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pythologist.CellDataFrame.microns_per_pixel">
+<code class="descname">microns_per_pixel</code><a class="headerlink" href="#pythologist.CellDataFrame.microns_per_pixel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read or store the micron’s per pixel (float) value by reading or asigning to this</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.nearestneighbors">
+<code class="descname">nearestneighbors</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.nearestneighbors"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.nearestneighbors" title="Permalink to this definition">¶</a></dt>
+<dd><p>Use the segmented images to create per-image graphics</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>verbose</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.7)"><em>bool</em></a>) – output more details if true</li>
+<li><strong>measured_regions</strong> (<em>pandas.DataFrame</em>) – explicitly list the measured images and regions</li>
+<li><strong>measured_phenotypes</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.7)"><em>list</em></a>) – explicitly list the phenotypes present</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">returns a class that holds nearest neighbor information for whatever phenotypes were in the CellDataFrame before execution.  This class is suitable for nearest neighbor and proximity operations.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference internal" href="#pythologist.measurements.spatial.nearestneighbors.NearestNeighbors" title="pythologist.measurements.spatial.nearestneighbors.NearestNeighbors">NearestNeighbors</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pythologist.CellDataFrame.phenotypes">
+<code class="descname">phenotypes</code><a class="headerlink" href="#pythologist.CellDataFrame.phenotypes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the list of phenotypes present</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pythologist.CellDataFrame.project_columns">
+<code class="descname">project_columns</code><a class="headerlink" href="#pythologist.CellDataFrame.project_columns" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list of fields suitable for identifying the unique projects</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.prune_neighbors">
+<code class="descname">prune_neighbors</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.prune_neighbors"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.prune_neighbors" title="Permalink to this definition">¶</a></dt>
+<dd><p>If the CellDataFrame has been subsetted, some of the cell-cell contacts may no longer be part of the the dataset.  This prunes those no-longer existant connections.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">A CellDataFrame with only valid cell-cell contacts</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference internal" href="#pythologist.CellDataFrame" title="pythologist.CellDataFrame">CellDataFrame</a></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="pythologist.CellDataFrame.read_hdf">
+<em class="property">classmethod </em><code class="descname">read_hdf</code><span class="sig-paren">(</span><em>path</em>, <em>key=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.read_hdf"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.read_hdf" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read a CellDataFrame from an hdf5 file.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – the path to read from</li>
+<li><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – the name of the location to read from</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">CellDataFrame</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pythologist.CellDataFrame.regions">
+<code class="descname">regions</code><a class="headerlink" href="#pythologist.CellDataFrame.regions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the list of region names</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.rename_phenotype">
+<code class="descname">rename_phenotype</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.rename_phenotype"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.rename_phenotype" title="Permalink to this definition">¶</a></dt>
+<dd><p>simple alias for collapse phenotypes</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.rename_region">
+<code class="descname">rename_region</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.rename_region"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.rename_region" title="Permalink to this definition">¶</a></dt>
+<dd><p>simple alias for combine phenotypes</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pythologist.CellDataFrame.sample_columns">
+<code class="descname">sample_columns</code><a class="headerlink" href="#pythologist.CellDataFrame.sample_columns" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list of fields suitable for identifying the unique samples</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pythologist.CellDataFrame.scored_names">
+<code class="descname">scored_names</code><a class="headerlink" href="#pythologist.CellDataFrame.scored_names" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the list of binary feature names</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.segmentation_images">
+<code class="descname">segmentation_images</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.segmentation_images"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.segmentation_images" title="Permalink to this definition">¶</a></dt>
+<dd><p>Use the segmented images to create per-image graphics</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>verbose</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.7)"><em>bool</em></a>) – output more details if true</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">returns a class used to construct the image graphics</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference internal" href="#pythologist.interface.SegmentationImages" title="pythologist.interface.SegmentationImages">SegmentationImages</a></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.serialize">
+<code class="descname">serialize</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.serialize"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.serialize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert the data to one that can be saved in h5 structures</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">like a cell data frame but serialized. columns</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">pandas.DataFrame</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.to_hdf">
+<code class="descname">to_hdf</code><span class="sig-paren">(</span><em>path</em>, <em>key</em>, <em>mode='a'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.to_hdf"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.to_hdf" title="Permalink to this definition">¶</a></dt>
+<dd><p>Save the CellDataFrame to an hdf5 file.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – the path to save to</li>
+<li><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – the name of the location to save it to</li>
+<li><strong>mode</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – write mode</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pythologist.interface.SegmentationImages">
+<em class="property">class </em><code class="descclassname">pythologist.interface.</code><code class="descname">SegmentationImages</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist/interface.html#SegmentationImages"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.interface.SegmentationImages" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class suitable for generating image outputs</p>
+<dl class="method">
+<dt id="pythologist.interface.SegmentationImages.build_segmentation_image">
+<code class="descname">build_segmentation_image</code><span class="sig-paren">(</span><em>schema</em>, <em>background=(0</em>, <em>0</em>, <em>0</em>, <em>0)</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist/interface.html#SegmentationImages.build_segmentation_image"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.interface.SegmentationImages.build_segmentation_image" title="Permalink to this definition">¶</a></dt>
+<dd><p>Put together an image.  Defined by a list of layers with RGBA colors</p>
+<p>Make the schema example</p>
+<div class="line-block">
+<div class="line">schema = [</div>
+<div class="line-block">
+<div class="line">{‘subset_logic’:SL(phenotypes=[‘SOX10+’]),</div>
+<div class="line-block">
+<div class="line">‘edge_color’:(31, 31, 46,255),</div>
+<div class="line">‘watershed_steps’:0,</div>
+<div class="line">‘fill_color’:(51, 51, 77,255)</div>
+</div>
+<div class="line">},</div>
+<div class="line">{‘subset_logic’:SL(phenotypes=[‘CD8+’],scored_calls={‘PD1’:’+’}),</div>
+<div class="line-block">
+<div class="line">‘edge_color’:(255,0,0,255),</div>
+<div class="line">‘watershed_steps’:1,</div>
+<div class="line">‘fill_color’:(0,0,0,255)</div>
+</div>
+<div class="line">},</div>
+<div class="line">{‘subset_logic’:SL(phenotypes=[‘CD8+’],scored_calls={‘PD1’:’-‘}),</div>
+<div class="line-block">
+<div class="line">‘edge_color’:(255,0,255,255),</div>
+<div class="line">‘watershed_steps’:1,</div>
+<div class="line">‘fill_color’:(0,0,255,255)</div>
+</div>
+<div class="line">}</div>
+</div>
+<div class="line">]</div>
+<div class="line">imgs = imageaccess.build_segmentation_image(schema,background=(0,0,0,255))</div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>schema</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.7)"><em>list</em></a>) – a list of layers (see example above)</li>
+<li><strong>background</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.7)"><em>tuple</em></a>) – a color RGBA 0-255 tuple for the. background color</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">an output suitable for writing images</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference internal" href="#pythologist.interface.SegmentationImageOutput" title="pythologist.interface.SegmentationImageOutput">SegmentationImageOutput</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pythologist.interface.SegmentationImageOutput">
+<em class="property">class </em><code class="descclassname">pythologist.interface.</code><code class="descname">SegmentationImageOutput</code><span class="sig-paren">(</span><em>*args</em>, <em>**kw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist/interface.html#SegmentationImageOutput"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.interface.SegmentationImageOutput" title="Permalink to this definition">¶</a></dt>
+<dd><p>The Segmentation Image Output class</p>
+<dl class="method">
+<dt id="pythologist.interface.SegmentationImageOutput.write_to_path">
+<code class="descname">write_to_path</code><span class="sig-paren">(</span><em>path</em>, <em>suffix=''</em>, <em>format='png'</em>, <em>overwrite=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist/interface.html#SegmentationImageOutput.write_to_path"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.interface.SegmentationImageOutput.write_to_path" title="Permalink to this definition">¶</a></dt>
+<dd><p>Output the data the dataframe’s ‘image’ column to a directory structured by project-&gt;sample and named by frame</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>path</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – Where to write the directory of images</li>
+<li><strong>suffix</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – for labeling the imaages you write</li>
+<li><strong>format</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><em>str</em></a>) – default ‘png’ format to write the file</li>
+<li><strong>overwrite</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.7)"><em>bool</em></a>) – default False. if true can overwrite files in the path</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="docutils">
+<dt>Modifies:</dt>
+<dd>Creates path folder if necessary and writes images to path</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="pythologist.measurements.spatial.nearestneighbors.NearestNeighbors">
+<em class="property">class </em><code class="descclassname">pythologist.measurements.spatial.nearestneighbors.</code><code class="descname">NearestNeighbors</code><span class="sig-paren">(</span><em>*args</em>, <em>**kw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist/measurements/spatial/nearestneighbors.html#NearestNeighbors"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.measurements.spatial.nearestneighbors.NearestNeighbors" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<div class="toctree-wrapper compound">
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></li>
+<li><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></li>
+<li><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></li>
+</ul>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Jason L Weirather
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

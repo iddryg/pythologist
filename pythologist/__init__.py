@@ -19,6 +19,15 @@ class CellDataSeries(pd.Series):
     
 
 class CellDataFrame(pd.DataFrame):
+    """
+    The **CellDataFrame** class is an extension of a pandas.DataFrame with
+    per-cell rows that have region, binary calls, mutually exclusive phenotypes,
+    cell locations, and cell-cell contact.
+
+    Params: 
+        microns_per_pixel (float): conversion factor that gets saved along with the dataframe once its set.  (20x vectra is a 0.496)
+        db (CellProject): a storage class that has all the image and mask data
+    """
     _metadata = ['_microns_per_pixel','_db'] # for extending dataframe to include this property
     @property
     def _constructor(self):
@@ -44,6 +53,12 @@ class CellDataFrame(pd.DataFrame):
             reset_index().rename(columns={0:'valid'})
 
     def prune_neighbors(self):
+        """
+        If the CellDataFrame has been subsetted, some of the cell-cell contacts may no longer be part of the the dataset.  This prunes those no-longer existant connections.
+
+        Returns:
+            CellDataFrame: A CellDataFrame with only valid cell-cell contacts
+        """
         def _neighbor_check(neighbors,valid):
             if not neighbors==neighbors: return np.nan
             valid_keys = set(valid)&set(neighbors.keys())
@@ -61,22 +76,35 @@ class CellDataFrame(pd.DataFrame):
 
     @property
     def frame_columns(self):
-        # These fields isolate individual images
+        """
+        Returns a list of fields suitable for identifying the unique image frames
+        """
         return ['project_id','project_name',
                 'sample_id','sample_name',
                 'frame_id','frame_name']
     @property
     def sample_columns(self):
-        # These fields isolate individual samples
+        """
+        Returns a list of fields suitable for identifying the unique samples
+        """
         return ['project_id','project_name',
                 'sample_id','sample_name']
     @property
     def project_columns(self):
-        # These fields isolate projects
+        """
+        Returns a list of fields suitable for identifying the unique projects
+        """
         return ['project_id','project_name']
 
     def to_hdf(self,path,key,mode='a'):
-        # overwrite pandas to write to a dataframe
+        """
+        Save the CellDataFrame to an hdf5 file.
+
+        Args:
+            path (str): the path to save to
+            key (str): the name of the location to save it to
+            mode (str): write mode
+        """
         pd.DataFrame(self.serialize()).to_hdf(path,key,mode=mode,format='table',complib='zlib',complevel=9)
         f = h5py.File(path,'r+')
         f[key].attrs["microns_per_pixel"] = float(self.microns_per_pixel) if self.microns_per_pixel is not None else np.nan
@@ -84,6 +112,16 @@ class CellDataFrame(pd.DataFrame):
 
     @classmethod
     def read_hdf(cls,path,key=None):
+        """
+        Read a CellDataFrame from an hdf5 file.
+
+        Args:
+            path (str): the path to read from
+            key (str): the name of the location to read from
+
+        Returns:
+            CellDataFrame
+        """
         df = pd.read_hdf(path,key)
         df['scored_calls'] = df['scored_calls'].apply(lambda x: json.loads(x))
         df['channel_values'] = df['channel_values'].apply(lambda x: json.loads(x))
@@ -102,6 +140,12 @@ class CellDataFrame(pd.DataFrame):
         return df
 
     def serialize(self):
+        """
+        Convert the data to one that can be saved in h5 structures
+
+        Returns:
+            pandas.DataFrame: like a cell data frame but serialized. columns
+        """
         df = self.copy()
         df['scored_calls'] = df['scored_calls'].apply(lambda x: json.dumps(x))
         df['channel_values'] = df['channel_values'].apply(lambda x: json.dumps(x))
@@ -113,6 +157,9 @@ class CellDataFrame(pd.DataFrame):
 
     @property
     def microns_per_pixel(self):
+        """
+        Read or store the micron's per pixel (float) value by reading or asigning to this
+        """
         if not hasattr(self,'_microns_per_pixel'): return None
         return self._microns_per_pixel
     @microns_per_pixel.setter
@@ -120,6 +167,9 @@ class CellDataFrame(pd.DataFrame):
         self._microns_per_pixel = value
 
     def is_uniform(self,verbose=True):
+        """
+        Check to make sure phenotype calls, or scored calls are consistent across all images / samples
+        """
         uni = pd.Series(self['phenotype_calls'].apply(lambda x: json.dumps(x)).unique()).\
             apply(lambda x: json.loads(x)).apply(lambda x: tuple(sorted(x.keys()))).unique()
         if len(uni) > 1: 
@@ -134,6 +184,9 @@ class CellDataFrame(pd.DataFrame):
 
     @property
     def db(self):
+        """
+        Assign to this or read from this, the CellProject storage object
+        """
         if not hasattr(self,'_db'): return None
         return self._db
     @db.setter
@@ -142,19 +195,30 @@ class CellDataFrame(pd.DataFrame):
 
     @property
     def phenotypes(self):
-        # The mutually exclusive phenotypes present in the CellDataFrame
+        """
+        Return the list of phenotypes present
+        """
         return _extract_unique_keys_from_series(self['phenotype_calls'])
 
     @property
     def scored_names(self):
+        """
+        Return the list of binary feature names
+        """
         return _extract_unique_keys_from_series(self['scored_calls'])
 
     @property
     def regions(self):
+        """
+        Return the list of region names
+        """
         return _extract_unique_keys_from_series(self['regions'])
 
     def get_measured_regions(self):
-        # get measurable areas
+        """
+        Returns:
+            pandas.DataFrame: Output a dataframe with regions and region sizes
+        """
         mergeon = ['project_id','project_name',
                 'sample_id','sample_name',
                 'frame_id','frame_name',
@@ -177,12 +241,32 @@ class CellDataFrame(pd.DataFrame):
         return rows
 
     def segmentation_images(self,*args,**kwargs):
+        """
+        Use the segmented images to create per-image graphics
+
+        Args:
+            verbose (bool): output more details if true
+
+        Returns:
+            SegmentationImages: returns a class used to construct the image graphics
+        """
         if not self.db: raise ValueError("Need to set db")
         segs = SegmentationImages.read_cellframe(self,*args,**kwargs)
         segs.microns_per_pixel = segs.microns_per_pixel
         return segs
 
     def nearestneighbors(self,*args,**kwargs):
+        """
+        Use the segmented images to create per-image graphics
+
+        Args:
+            verbose (bool): output more details if true
+            measured_regions (pandas.DataFrame): explicitly list the measured images and regions
+            measured_phenotypes (list): explicitly list the phenotypes present
+
+        Returns:
+            NearestNeighbors: returns a class that holds nearest neighbor information for whatever phenotypes were in the CellDataFrame before execution.  This class is suitable for nearest neighbor and proximity operations.
+        """
         n = NearestNeighbors.read_cellframe(self,*args,**kwargs)
         if 'measured_regions' in kwargs: n.measured_regions = kwargs['measured_regions']
         else: n.measured_regions = self.get_measured_regions()

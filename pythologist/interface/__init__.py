@@ -7,6 +7,9 @@ import imageio
 from PIL import Image
 
 class SegmentationImageOutput(pd.DataFrame):
+    """
+    The Segmentation Image Output class 
+    """
     _metadata = []
     def __init__(self,*args, **kw):
         super(SegmentationImageOutput, self).__init__(*args, **kw) 
@@ -17,6 +20,15 @@ class SegmentationImageOutput(pd.DataFrame):
     def write_to_path(self,path,suffix='',format='png',overwrite=False):
         """
         Output the data the dataframe's 'image' column to a directory structured by project->sample and named by frame
+
+        Args:
+            path (str): Where to write the directory of images
+            suffix (str): for labeling the imaages you write
+            format (str): default 'png' format to write the file
+            overwrite (bool): default False. if true can overwrite files in the path
+
+        Modifies:
+            Creates path folder if necessary and writes images to path
         """
         if os.path.exists(path) and overwrite is False: raise ValueError("Error: use ovewrite=True to overwrite images")
         if not os.path.exists(path): os.makedirs(path)
@@ -29,7 +41,14 @@ class SegmentationImageOutput(pd.DataFrame):
             imageio.imwrite(fname, r['image'],format=format)
 
 class SegmentationImages(Measurement):
+    """
+    Class suitable for generating image outputs
+    """
     def __init__(self,*args,**kwargs):
+        """
+        Args:
+            verbose (bool): output more details if True
+        """
         super(SegmentationImages,self).__init__(*args,**kwargs)
         self._edge_map_cache = None
         self._cell_map_cache = None
@@ -49,21 +68,6 @@ class SegmentationImages(Measurement):
 
         base = base.merge(pd.DataFrame(data,columns=['sample_id','frame_id','shape']),on=['sample_id','frame_id'])
         return base
-
-    def write_segmentation_images(self,schema,path,suffix='',format='png',overwrite=False,background=(0,0,0,255)):
-        """
-        executes the build_segmentation_image and write_segmentation_image for each frame
-                 rather than executing on all frames at once.
-        """
-        if os.path.exists(path) and overwrite is False: raise ValueError("Error: use ovewrite=True to overwrite images")
-        for i,r in self.iterrows():
-            subcdf = self.cdf.loc[self.cdf['frame_id']==r['frame_id']].copy()
-            if self.verbose: sys.stderr.write("==============\nWriting schema for: \n"+str(r)+"\n\n")
-            subsegs = subcdf.segmentation_images(verbose=self.verbose)
-            layers = subsegs.build_segmentation_image(schema,background=background)
-            layers.write_to_path(path,overwrite=True)
-            if self.verbose: sys.stderr.write("Finished writing schema.\n")
-
 
 
     def get_coordinates(self):
@@ -86,8 +90,6 @@ class SegmentationImages(Measurement):
         return imgs
 
     def get_segmentation_map_images(self,type='edge',subset_logic=None,color=None,watershed_steps=0,blank=(0,0,0,255)):
-        # if subset logic is set only plot those cells
-        # if color is set color all cells that color
         if self.verbose: sys.stderr.write("getting segmap "+str(type)+"\n")
         ems = self.get_segmentation_maps(type=type)
         if subset_logic is not None: 
@@ -138,25 +140,33 @@ class SegmentationImages(Measurement):
         """
         Put together an image.  Defined by a list of layers with RGBA colors
 
-        Example:
-            schema = [
-                {'subset_logic':SL(phenotypes=['SOX10+']),
-                 'edge_color':(31, 31, 46,255),
-                 'watershed_steps':0,
-                 'fill_color':(51, 51, 77,255)
-                },
-                {'subset_logic':SL(phenotypes=['CD8+'],scored_calls={'PD1':'+'}),
-                 'edge_color':(255,0,0,255),
-                 'watershed_steps':1,
-                 'fill_color':(0,0,0,255)
-                },
-                {'subset_logic':SL(phenotypes=['CD8+'],scored_calls={'PD1':'-'}),
-                 'edge_color':(255,0,255,255),
-                 'watershed_steps':1,
-                 'fill_color':(0,0,255,255)
-                }
-            ]
-            imgs = imageaccess.build_segmentation_image(schema,background=(0,0,0,255))
+        Make the schema example
+        
+        |    schema = [
+        |        {'subset_logic':SL(phenotypes=['SOX10+']),
+        |         'edge_color':(31, 31, 46,255),
+        |         'watershed_steps':0,
+        |         'fill_color':(51, 51, 77,255)
+        |        },
+        |        {'subset_logic':SL(phenotypes=['CD8+'],scored_calls={'PD1':'+'}),
+        |         'edge_color':(255,0,0,255),
+        |         'watershed_steps':1,
+        |         'fill_color':(0,0,0,255)
+        |        },
+        |        {'subset_logic':SL(phenotypes=['CD8+'],scored_calls={'PD1':'-'}),
+        |         'edge_color':(255,0,255,255),
+        |         'watershed_steps':1,
+        |         'fill_color':(0,0,255,255)
+        |        }
+        |    ]
+        |    imgs = imageaccess.build_segmentation_image(schema,background=(0,0,0,255))
+        
+
+        Args:
+            schema (list): a list of layers (see example above)
+            background (tuple): a color RGBA 0-255 tuple for the. background color
+        Returns:
+            SegmentationImageOutput: an output suitable for writing images
         """
         cummulative = self.copy()
         def _set_blank(img,blank):
