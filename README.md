@@ -307,6 +307,58 @@ sub = ch.loc[(~ch['threshold_value'].isna())&(ch['channel_label']=='PDL1')]
 
 > ![Histogram Example](https://github.com/jason-weirather/pythologist/blob/master/images/histogram_example.png?raw=true)
 
+### View cell-cell contacts
+
+```python
+from pythologist_test_images import TestImages
+from pythologist_reader.formats.inform.custom import CellProjectInFormCustomMask
+from pythologist import SubsetLogic as SL
+cpi = TestImages().project('IrisSpatialFeatures')
+cdf = cpi.cdf
+cdf.db = cpi
+sub = cdf.loc[cdf['frame_name']=='MEL2_7'].dropna()
+cont = sub.contacts().threshold('CD8+','CD8+/contact').contacts().threshold('SOX10+','SOX10+/contact')
+cont = cont.threshold('CD8+','SOX10+/contact',
+                      positive_label='CD8+ contact',
+                      negative_label='CD8+').\
+    threshold('SOX10+','CD8+/contact',
+              positive_label='SOX10+ contact',
+              negative_label='SOX10+')
+schema = [
+    {'subset_logic':SL(phenotypes=['OTHER']),
+     'edge_color':(50,50,50,255),
+     'watershed_steps':0,
+     'fill_color':(0,0,0,255)
+    },
+    {'subset_logic':SL(phenotypes=['SOX10+']),
+     'edge_color':(166,206,227,255),
+     'watershed_steps':0,
+     'fill_color':(0,0,0,0)
+    },
+    {'subset_logic':SL(phenotypes=['CD8+']),
+     'edge_color':(253,191,111,255),
+     'watershed_steps':0,
+     'fill_color':(0,0,0,0)
+    },
+    {'subset_logic':SL(phenotypes=['CD8+ contact']),
+     'edge_color':(253,191,111,255),
+     'watershed_steps':0,
+     'fill_color':(255,127,0,255)
+    },
+    {'subset_logic':SL(phenotypes=['SOX10+ contact']),
+     'edge_color':(166,206,227,255),
+     'watershed_steps':0,
+     'fill_color':(31,120,180,255)
+    }
+]
+sio = cont.segmentation_images().build_segmentation_image(schema,background=(0,0,0,255))
+sio.write_to_path('test_edges',overwrite=True)
+```
+
+> MEL2_7
+>
+> ![Visualize Contacts](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_7-contacts.png?raw=true)
+
 ### Merge CellDataFrames that have the same image segmentations but different scored calls
 
 This happens frequently because current InForm exports only permit two features to be scored per export

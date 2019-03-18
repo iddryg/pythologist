@@ -71,6 +71,8 @@ class CellDataFrame(pd.DataFrame):
             rename(columns={0:'new_neighbors'})
         fixed = fixed.merge(valid,on=self.frame_columns+['cell_index']).drop(columns='neighbors').\
             rename(columns={'new_neighbors':'neighbors'})
+        fixed.microns_per_pixel = self.microns_per_pixel
+        fixed.db = self.db
         #fixed.loc[:,'neighbors'] = list(new_neighbors)
         return fixed
 
@@ -401,6 +403,7 @@ class CellDataFrame(pd.DataFrame):
         if update: 
             data['phenotype_calls'] = data['phenotype_calls'].apply(lambda x: {logic.label:1})
         data.fill_phenotype_label(inplace=True)
+        data.db = self.db
         return data
 
     def threshold(self,phenotype,scored_name,positive_label=None,negative_label=None):
