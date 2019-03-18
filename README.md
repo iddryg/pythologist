@@ -22,10 +22,10 @@ Features Pythologist add are:
 
 ## Module documentation
 
-* `pythologist` CellDataFrame class to modify and execute analysses [[github](https://github.com/jason-weirather/pythologist)]
-* `pythologist-reader` CellProject Storage Object [Read the Docs](https://jason-weirather.github.io/pythologist-reader/) [[github](https://github.com/jason-weirather/pythologist-reader)]
-* `pythologist-test-images` Example data [[github](https://github.com/jason-weirather/pythologist-test-images)]
-* `pythologist-image-utilities` Helper functions to work with images [Read the Docs](https://jason-weirather.github.io/pythologist-image-utilities/) [[github](https://github.com/jason-weirather/pythologist-image-utilities)] 
+* `pythologist` CellDataFrame class to modify and execute analysses [[source](https://github.com/jason-weirather/pythologist)]
+* `pythologist-reader` CellProject Storage Object [[Read the Docs](https://jason-weirather.github.io/pythologist-reader/)] [[source](https://github.com/jason-weirather/pythologist-reader)]
+* `pythologist-test-images` Example data [[source](https://github.com/jason-weirather/pythologist-test-images)]
+* `pythologist-image-utilities` Helper functions to work with images [[Read the Docs](https://jason-weirather.github.io/pythologist-image-utilities/)] [[source](https://github.com/jason-weirather/pythologist-image-utilities)] 
 
 # Installation
 
