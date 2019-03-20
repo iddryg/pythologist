@@ -27,6 +27,16 @@ Features Pythologist add are:
 * `pythologist-test-images` Example data [[source](https://github.com/jason-weirather/pythologist-test-images)]
 * `pythologist-image-utilities` Helper functions to work with images [[Read the Docs](https://jason-weirather.github.io/pythologist-image-utilities/)] [[source](https://github.com/jason-weirather/pythologist-image-utilities)] 
 
+# Quickstart
+
+To start a jupyter lab notebook with the required software as your user in your current drectory you can use the following command 
+
+`docker run --rm -p 8888:8888 --user $(id -u):$(id -g) -v $(pwd):/work vacation/pythologist:latest`
+
+This will start jupyter lab on port 8888 as your user and group. 
+
+Any of the test data examples should work fine in this environment.
+
 # Installation
 
 ## Docker jupyter labs quickstart
