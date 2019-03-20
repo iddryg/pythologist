@@ -51,13 +51,30 @@ RUN pip3 install jupyterlab \
     && pip3 install plotnine[all] \
     && pip3 install seaborn 
 
-USER $user
-RUN mkdir /home/$user/source \
-    && cd /home/$user/source \
+#USER $user
+#RUN mkdir /home/$user/source \
+#    && cd /home/$user/source \
+RUN mkdir /source \
+    && cd /source \
+    && git clone https://github.com/jason-weirather/pythologist-reader.git \
+    && git clone https://github.com/jason-weirather/pythologist-image-utilities.git \
+    && git clone https://github.com/jason-weirather/pythologist-test-images.git \
     && git clone https://github.com/jason-weirather/pythologist.git \
-    && cd pythologist \
-    && pip3 install --user .
-RUN mkdir /home/$user/work
-WORKDIR /home/$user/work
+    && cd pythologist-image-utilities \
+    && pip3 install -e . \
+    && cd ../pythologist \
+    && pip3 install -e . \
+    && cd ../pythologist-reader \
+    && pip3 install -e . \
+    && cd ../pythologist-test-images \
+    && pip3 install -e . 
+#RUN mkdir /home/$user/work
+#WORKDIR /home/$user/work
+RUN mkdir .local \
+    && chmod -R 777 .local
+RUN mkdir .jupyter \
+    && chmod -R 777 .jupyter
+RUN mkdir /work
+WORKDIR /work
 
-CMD ["jupyter","lab","--ip=0.0.0.0","--port=8888"]
+CMD ["jupyter","lab","--ip=0.0.0.0","--port=8888","--allow-root"]
