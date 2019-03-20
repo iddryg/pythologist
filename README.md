@@ -467,5 +467,8 @@ cdf = cdf.nearestneighbors().threshold('T cell','T cell/within 75um',distance_um
 
 ```
 
-# Comparison to IrisSpatialFeatures
+# Check outputs against IrisSpatialFeatures outputs
 
+To ensure we are generating expected outs we can check against the outputs of IrisSpatialFeatures [[github](https://github.com/gusef/IrisSpatialFeatures)]. 
+
+* Jupyter Notebook: [Test against IrisSpatialFeatures outputs](https://github.com/jason-weirather/pythologist/blob/master/notebooks/Test%20against%20IrisSpatialFeatures%20outputs.ipynb)
