@@ -5,6 +5,8 @@ from pythologist_image_utilities import watershed_image, map_image_ids
 import sys, os, io
 import imageio
 from PIL import Image
+from pythologist import SubsetLogic as SL
+from scipy.ndimage import gaussian_filter
 
 class SegmentationImageOutput(pd.DataFrame):
     """
@@ -92,20 +94,22 @@ class SegmentationImages(Measurement):
     def get_segmentation_map_images(self,type='edge',subset_logic=None,color=None,watershed_steps=0,blank=(0,0,0,255)):
         if self.verbose: sys.stderr.write("getting segmap "+str(type)+"\n")
         ems = self.get_segmentation_maps(type=type)
+        subset = self.cdf
         if subset_logic is not None: 
-
             subset = self.cdf.subset(subset_logic)
             ems = ems.merge(subset.loc[:,subset.frame_columns+['cell_index']],on=subset.frame_columns+['cell_index'])
-        edf = ems.set_index(list(self.columns))
+        #edf = ems.set_index(list(self.columns))
         imgs = []
         for i,r in self.iterrows():
             imsize = r['shape']
             img = pd.DataFrame(np.zeros(imsize))
             if subset.shape[0] == 0: # case where there is nothing to do
                 if self.verbose: sys.stderr.write("Empty image for this phenotype subset\n")
-                imgs.append(list(r)+[img])
+                imgs.append(list(r)+[np.array(img)])
                 continue
-            edfsub = edf.loc[tuple(r)]
+            #edfsub = edf.loc[tuple(r)]
+            edfsub = ems.loc[ems['frame_id']==r['frame_id']].copy().set_index(list(self.columns))
+
             #if self.verbose: sys.stderr.write("make image and fill zeros\n")
             fullx = pd.DataFrame({'x':list(range(0,imsize[1]))})
             fullx['_key']=1
@@ -113,6 +117,10 @@ class SegmentationImages(Measurement):
             fully['_key']=1
             full = fullx.merge(fully,on='_key').merge(edfsub,on=['x','y'],how='left').fillna(0)
             img = np.array(full.pivot(columns='x',index='y',values='cell_index').astype(int))
+            if map_image_ids(img).shape[0] == 0:
+                # There is nothing for us to draw with this phenotype and image
+                imgs.append(list(r)+[np.zeros(imsize)])
+                continue
             #if self.verbose: sys.stderr.write("finished making image and fill zeros\n")
             if watershed_steps > 0:
                 # get the zero and nonzero components
@@ -248,3 +256,91 @@ def _merge_images(image1,image2):
     pcell.paste(pedge, (0, 0), pedge)
     return np.array(pcell)
 
+
+def _get_new_regions(cdf,sample,frame_id,unset_label='undefined',gaussian_sigma=66,verbose=False):
+    sub = cdf.loc[cdf['frame_id']==frame_id]
+    #print(sub.iloc[0][['project_name','sample_name','frame_name']])
+    #print(sub.shape)
+    shape = sub.iloc[0]['frame_shape']
+    dfs = {}
+    sid = sub.iloc[0]['sample_id']
+    fid = sub.iloc[0]['frame_id']
+    proc = cdf.db.get_sample(sid).get_frame(fid).processed_image
+    present = sub['phenotype_label'].unique()
+    for p in sub.phenotypes:
+        empty = np.zeros(shape)
+        if p not in present:
+            dfs[p] = empty.copy().astype(float)
+            continue
+        emap = pd.DataFrame(empty).stack().reset_index().astype(int)
+        emap.columns = ['y','x','id']
+        emap = emap.drop(columns='id')
+        
+        sel = sub.subset(SL(phenotypes=[p]))[['x','y']].drop_duplicates()
+        sel['id'] = 1
+        sel = emap.merge(sel,on=['x','y'],how='left').fillna(0).pivot(columns='x',index='y',values='id')
+        sel = np.array(sel).astype(float)
+        blur = gaussian_filter(sel,gaussian_sigma)
+        dfs[p] = blur
+    regions = {}
+    
+    #print('mask')
+    remainder = np.ones(shape).astype(bool)
+    for p in dfs:
+        others = set(dfs.keys())-set([p])
+        result = np.ones(dfs[p].shape).astype(bool)
+        for o in others:
+            result = (dfs[p] > dfs[o])&result&proc
+        #print(p)
+        result = result.astype(np.uint8)
+        remainder = remainder&(~result.astype(bool))
+        regions[p] = result.astype(np.uint8)
+    regions[unset_label] = (remainder&proc).astype(np.uint8)
+    return regions
+
+def phenotypes_to_regions(cdf,path,
+                          gaussian_sigma=66,
+                          verbose=False,
+                          overwrite=False,
+                          unset_label='undefined',
+                          project_name='region-refactor'):
+    def _get_label(regions_dict,x,y):
+        for label in regions_dict:
+                if regions_dict[label][y][x] == 1: return label
+        return np.nan
+
+    if os.path.exists(path) and not overwrite: raise ValueError("cannot overwrite unless overwrite is True")
+    if cdf.db is None: raise ValueError("You need the storage object set for this function")
+    output = cdf.db.__class__(path,mode='w')
+    output.project_name = project_name
+    dfs = {}
+    ocdf = cdf.copy()
+    subs = []
+    for sample_id in cdf['sample_id'].unique():
+        sample = cdf.db.get_sample(sample_id)
+        if verbose: sys.stderr.write("==========\nSample: "+sample.sample_name+"\n")
+        for frame_id in cdf.loc[(cdf['sample_id']==sample_id),'frame_id'].unique():
+            #sub = ocdf.loc[(ocdf['sample_id']==sample_id)&(ocdf['frame_id']==frame_id)].copy()
+            regions = _get_new_regions(cdf,sample,frame_id,
+                          verbose=verbose,
+                          gaussian_sigma=gaussian_sigma,
+                          unset_label = unset_label
+                          )
+            dfs[frame_id] = regions
+            f = sample.get_frame(frame_id)
+            f.set_regions(regions,
+                          use_processed_region=True,
+                          unset_label='undefined2',
+                          verbose=verbose)
+            if verbose: sys.stderr.write("    "+f.frame_name+"\n")
+        output.append_sample(sample)
+    # Now update the cell dataframe
+    if verbose: sys.stderr.write("update phenotype_labels\n")
+    ocdf['region_label'] = ocdf.apply(lambda x: _get_label(dfs[x['frame_id']],x['x'],x['y']),1)
+    ocdf = ocdf.loc[~ocdf['region_label'].isna()].copy()
+    region_sizes = {}
+    for fid in dfs: 
+        region_sizes[fid] = {}
+        for label in dfs[fid]: region_sizes[fid][label] = int(dfs[fid][label].astype(int).sum().sum())
+    ocdf['regions'] = ocdf.apply(lambda x: region_sizes[x['frame_id']],1)
+    return ocdf, output

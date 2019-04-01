@@ -6,7 +6,7 @@ from pythologist.measurements.counts import Counts
 from pythologist.measurements.spatial.contacts import Contacts
 from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
 from pythologist.measurements.spatial.cartesian import Cartesian
-from pythologist.interface import SegmentationImages
+from pythologist.interface import SegmentationImages, phenotypes_to_regions
 from pythologist.qc import QC
 
 class CellDataSeries(pd.Series):
@@ -111,6 +111,57 @@ class CellDataFrame(pd.DataFrame):
         f = h5py.File(path,'r+')
         f[key].attrs["microns_per_pixel"] = float(self.microns_per_pixel) if self.microns_per_pixel is not None else np.nan
         f.close()
+
+    def phenotypes_to_scored(self,phenotypes=None,overwrite=False):
+        """
+        Add mutually exclusive phenotypes to the scored calls
+
+        Args:
+            phenotypes (list): a list of phenotypes to add to scored calls.  if none or not set, add them all
+            overwrite (bool): if True allow the overwrite of a phenotype, if False, the phenotype must not exist in the scored calls
+        Returns:
+            CellDataFrame
+        """
+        if not self.is_uniform(): raise ValueError("inconsistent phenotypes")
+        if phenotypes is None: 
+            phenotypes = self.phenotypes
+        elif isinstance(phenotypes,str):
+            phenotypes = [phenotypes]
+        def _post(binary,phenotype_label,phenotypes,overwrite):
+            d = binary.copy()
+            if len(set(phenotypes)&set(list(binary.keys()))) > 0 and overwrite==False:
+                raise ValueError("Error, phenotype already exists as a scored type")
+            for label in phenotypes: d[label] = 0
+            if phenotype_label == phenotype_label and phenotype_label in phenotypes:
+                d[phenotype_label] = 1
+            return d
+        output = self.copy()
+        output['scored_calls'] = output.apply(lambda x: 
+                _post(x['scored_calls'],x['phenotype_label'],phenotypes,overwrite)
+            ,1)
+        return output
+
+
+    @classmethod
+    def concat(self,array_like):
+        """
+        Concatonate multiple CellDataFrames
+
+        throws an error if the microns_per_pixel is not uniform across the frames
+
+        Args:
+            array_like (list): a list of CellDataFrames with 1 or more CellDataFrames
+
+        Returns:
+            CellDataFrame
+        """
+        arr = list(array_like)
+        if len(set([x.microns_per_pixel for x in arr])) != 1:
+            raise ValueError("Multiple microns per pixel set")
+        cdf = CellDataFrame(pd.concat([pd.DataFrame(x) for x in arr]))
+        cdf.microns_per_pixel = arr[0].microns_per_pixel
+        return cdf
+
 
     @classmethod
     def read_hdf(cls,path,key=None):
@@ -463,7 +514,13 @@ class CellDataFrame(pd.DataFrame):
         data['phenotype_calls'] = data.apply(lambda x:
             _swap_in(x['phenotype_calls'],input_phenotype_labels,output_phenotype_label)
             ,1)
+        def _set_label(d):
+            vals = [k for k,v in d.items() if v==1]
+            return np.nan if len(vals) == 0 else vals[0]
+        data['phenotype_label'] = data.apply(lambda x:
+                _set_label(x['phenotype_calls']),1)
         return data
+
     def rename_phenotype(self,*args,**kwargs): 
         """simple alias for collapse phenotypes"""
         return self.collapse_phenotypes(*args,**kwargs)
@@ -506,6 +563,53 @@ class CellDataFrame(pd.DataFrame):
         fixed = self.copy()
         fixed['phenotype_label'] = fixed.apply(lambda x: _get_phenotype(x['phenotype_calls']),1)
         return fixed
+
+    def phenotypes_to_regions(self,*args,**kwargs):
+        """
+        Create a new Project where regions are replaced to be based on regions defined as phenotypes
+
+        Args:
+            path (str): Location to store a new hdf5 file containing a database update with new region images
+            gaussian_sigma (float): the sigma parameter to the gaussian_filter function that says how much to 'blur'
+            overwrite (bool): if True allows you to overwrite the path default (False)
+            unset_label (str): A label to give regions that are unaccounted for
+            project_name (str): the project name 
+
+        Returns:
+            CellProject: The new cell project
+            CellDataFrame: The updated cell project
+        """
+        return phenotypes_to_regions(self,*args,**kwargs)
+
+    def scored_to_phenotype(self,phenotypes):
+        """
+        Convert binary pehnotypes to mutually exclusive phenotypes. 
+        If none of the phenotypes are set, then phenotype_label becomes nan
+        If any of the phenotypes are multiply set then it throws a fatal error.
+
+        Args:
+            phenotypes (list): a list of scored_names to convert to phenotypes
+
+        Returns:
+            CellDataFrame
+        """
+        def _apply_score(scored_calls,phenotypes):
+            present = sorted(list(set(phenotypes)&set(scored_calls.keys())))
+            total = sum([scored_calls[x] for x in present])
+            if total > 1: 
+                raise ValueError("You cant extract phenotypes from scores if they are not mutually exclusive")
+            if total == 0: return np.nan
+            for label in present:
+                if scored_calls[label] == 1: return label
+            raise ValueError("Should have hit an exit criteria already")
+        output = self.copy()
+        output['phenotype_label'] = output.apply(lambda x: _apply_score(x['scored_calls'],phenotypes),1)
+        # now update the phenotypes with these
+        output['phenotype_calls'] = output.apply(lambda x: 
+            dict([(y,1 if x['phenotype_label']==y else 0) for y in phenotypes])
+        ,1)
+        return output
+
 def _extract_unique_keys_from_series(s):
     uni = pd.Series(s.apply(lambda x: json.dumps(x)).unique()).\
             apply(lambda x: json.loads(x)).apply(lambda x: set(sorted(x.keys())))

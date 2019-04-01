@@ -60,6 +60,7 @@ RUN mkdir /source \
     && git clone https://github.com/jason-weirather/pythologist-image-utilities.git \
     && git clone https://github.com/jason-weirather/pythologist-test-images.git \
     && git clone https://github.com/jason-weirather/pythologist.git \
+    && git clone https://github.com/jason-weirather/good-neighbors.git \
     && cd pythologist-image-utilities \
     && pip3 install -e . \
     && cd ../pythologist \
@@ -67,7 +68,9 @@ RUN mkdir /source \
     && cd ../pythologist-reader \
     && pip3 install -e . \
     && cd ../pythologist-test-images \
-    && pip3 install -e . 
+    && pip3 install -e . \ 
+    && cp ../good-neighbors \
+    && pip3 install -e .
 #RUN mkdir /home/$user/work
 #WORKDIR /home/$user/work
 RUN mkdir .local \

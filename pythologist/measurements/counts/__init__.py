@@ -82,7 +82,7 @@ class Counts(Measurement):
         totals = cnts.groupby(mergeon).sum()[['cummulative_count']].\
             rename(columns={'cummulative_count':'sample_total_count'}).reset_index()
         cnts = cnts.merge(totals,on=mergeon)
-        cnts['fraction'] = cnts.apply(lambda x: x['cummulative_count']/x['sample_total_count'],1)
+        cnts['fraction'] = cnts.apply(lambda x: np.nan if x['sample_total_count']==0 else x['cummulative_count']/x['sample_total_count'],1)
         return cnts
     def project_counts(self,subsets=None):
         mergeon = self.cdf.project_columns+['region_label']
