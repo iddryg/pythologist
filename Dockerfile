@@ -69,7 +69,7 @@ RUN mkdir /source \
     && pip3 install -e . \
     && cd ../pythologist-test-images \
     && pip3 install -e . \ 
-    && cp ../good-neighbors \
+    && cd ../good-neighbors \
     && pip3 install -e .
 #RUN mkdir /home/$user/work
 #WORKDIR /home/$user/work
