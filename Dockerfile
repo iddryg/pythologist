@@ -2,6 +2,7 @@
 #     docker build -t cio_image_lab:20181129 --build-arg user=USERNAME --build-arg group=GROUPNAME --build-arg user_id=USERID --build-arg group_id=GROUPID .
 FROM ubuntu:18.04
 RUN apt-get update \
+    && upgrade -y \
     && DEBIAN_FRONTEND='noninteractive' apt-get install -y \
                python3-pip \
                python3-dev \
