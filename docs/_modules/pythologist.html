@@ -149,7 +149,7 @@
 <span class="kn">from</span> <span class="nn">pythologist.measurements.spatial.contacts</span> <span class="k">import</span> <span class="n">Contacts</span>
 <span class="kn">from</span> <span class="nn">pythologist.measurements.spatial.nearestneighbors</span> <span class="k">import</span> <span class="n">NearestNeighbors</span>
 <span class="kn">from</span> <span class="nn">pythologist.measurements.spatial.cartesian</span> <span class="k">import</span> <span class="n">Cartesian</span>
-<span class="kn">from</span> <span class="nn">pythologist.interface</span> <span class="k">import</span> <span class="n">SegmentationImages</span>
+<span class="kn">from</span> <span class="nn">pythologist.interface</span> <span class="k">import</span> <span class="n">SegmentationImages</span><span class="p">,</span> <span class="n">phenotypes_to_regions</span>
 <span class="kn">from</span> <span class="nn">pythologist.qc</span> <span class="k">import</span> <span class="n">QC</span>
 
 <span class="k">class</span> <span class="nc">CellDataSeries</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">):</span>
@@ -214,6 +214,8 @@
             <span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="mi">0</span><span class="p">:</span><span class="s1">&#39;new_neighbors&#39;</span><span class="p">})</span>
         <span class="n">fixed</span> <span class="o">=</span> <span class="n">fixed</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">valid</span><span class="p">,</span><span class="n">on</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">frame_columns</span><span class="o">+</span><span class="p">[</span><span class="s1">&#39;cell_index&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="s1">&#39;neighbors&#39;</span><span class="p">)</span><span class="o">.</span>\
             <span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;new_neighbors&#39;</span><span class="p">:</span><span class="s1">&#39;neighbors&#39;</span><span class="p">})</span>
+        <span class="n">fixed</span><span class="o">.</span><span class="n">microns_per_pixel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">microns_per_pixel</span>
+        <span class="n">fixed</span><span class="o">.</span><span class="n">db</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span>
         <span class="c1">#fixed.loc[:,&#39;neighbors&#39;] = list(new_neighbors)</span>
         <span class="k">return</span> <span class="n">fixed</span></div>
 
@@ -252,6 +254,57 @@
         <span class="n">f</span> <span class="o">=</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="s1">&#39;r+&#39;</span><span class="p">)</span>
         <span class="n">f</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;microns_per_pixel&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">microns_per_pixel</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">microns_per_pixel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
         <span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="CellDataFrame.phenotypes_to_scored"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.phenotypes_to_scored">[docs]</a>    <span class="k">def</span> <span class="nf">phenotypes_to_scored</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">phenotypes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add mutually exclusive phenotypes to the scored calls</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            phenotypes (list): a list of phenotypes to add to scored calls.  if none or not set, add them all</span>
+<span class="sd">            overwrite (bool): if True allow the overwrite of a phenotype, if False, the phenotype must not exist in the scored calls</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_uniform</span><span class="p">():</span> <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;inconsistent phenotypes&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">phenotypes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> 
+            <span class="n">phenotypes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phenotypes</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">phenotypes</span><span class="p">,</span><span class="nb">str</span><span class="p">):</span>
+            <span class="n">phenotypes</span> <span class="o">=</span> <span class="p">[</span><span class="n">phenotypes</span><span class="p">]</span>
+        <span class="k">def</span> <span class="nf">_post</span><span class="p">(</span><span class="n">binary</span><span class="p">,</span><span class="n">phenotype_label</span><span class="p">,</span><span class="n">phenotypes</span><span class="p">,</span><span class="n">overwrite</span><span class="p">):</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">binary</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">phenotypes</span><span class="p">)</span><span class="o">&amp;</span><span class="nb">set</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">binary</span><span class="o">.</span><span class="n">keys</span><span class="p">())))</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">overwrite</span><span class="o">==</span><span class="kc">False</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Error, phenotype already exists as a scored type&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">phenotypes</span><span class="p">:</span> <span class="n">d</span><span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">if</span> <span class="n">phenotype_label</span> <span class="o">==</span> <span class="n">phenotype_label</span> <span class="ow">and</span> <span class="n">phenotype_label</span> <span class="ow">in</span> <span class="n">phenotypes</span><span class="p">:</span>
+                <span class="n">d</span><span class="p">[</span><span class="n">phenotype_label</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="k">return</span> <span class="n">d</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">output</span><span class="p">[</span><span class="s1">&#39;scored_calls&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> 
+                <span class="n">_post</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;scored_calls&#39;</span><span class="p">],</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;phenotype_label&#39;</span><span class="p">],</span><span class="n">phenotypes</span><span class="p">,</span><span class="n">overwrite</span><span class="p">)</span>
+            <span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="CellDataFrame.concat"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.concat">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">concat</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">array_like</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Concatonate multiple CellDataFrames</span>
+
+<span class="sd">        throws an error if the microns_per_pixel is not uniform across the frames</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            array_like (list): a list of CellDataFrames with 1 or more CellDataFrames</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">arr</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">array_like</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">([</span><span class="n">x</span><span class="o">.</span><span class="n">microns_per_pixel</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">arr</span><span class="p">]))</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Multiple microns per pixel set&quot;</span><span class="p">)</span>
+        <span class="n">cdf</span> <span class="o">=</span> <span class="n">CellDataFrame</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">arr</span><span class="p">]))</span>
+        <span class="n">cdf</span><span class="o">.</span><span class="n">microns_per_pixel</span> <span class="o">=</span> <span class="n">arr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">microns_per_pixel</span>
+        <span class="k">return</span> <span class="n">cdf</span></div>
+
 
 <div class="viewcode-block" id="CellDataFrame.read_hdf"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.read_hdf">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">read_hdf</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span><span class="n">path</span><span class="p">,</span><span class="n">key</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -418,35 +471,64 @@
         <span class="n">n</span><span class="o">.</span><span class="n">microns_per_pixel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">microns_per_pixel</span>
         <span class="k">return</span> <span class="n">n</span></div>
 
-    <span class="k">def</span> <span class="nf">contacts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<div class="viewcode-block" id="CellDataFrame.contacts"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.contacts">[docs]</a>    <span class="k">def</span> <span class="nf">contacts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Use assess the cell-to-cell contacts recorded in the celldataframe</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Contacts: returns a class that holds cell-to-cell contact information for whatever phenotypes were in the CellDataFrame before execution.  </span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">n</span> <span class="o">=</span> <span class="n">Contacts</span><span class="o">.</span><span class="n">read_cellframe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">prune_neighbors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">if</span> <span class="s1">&#39;measured_regions&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span> <span class="n">n</span><span class="o">.</span><span class="n">measured_regions</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;measured_regions&#39;</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span> <span class="n">n</span><span class="o">.</span><span class="n">measured_regions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_measured_regions</span><span class="p">()</span>
         <span class="k">if</span> <span class="s1">&#39;measured_phenotypes&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span> <span class="n">n</span><span class="o">.</span><span class="n">measured_phenotypes</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;measured_phenotypes&#39;</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span> <span class="n">n</span><span class="o">.</span><span class="n">measured_phenotypes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phenotypes</span>
         <span class="n">n</span><span class="o">.</span><span class="n">microns_per_pixel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">microns_per_pixel</span>
-        <span class="k">return</span> <span class="n">n</span>
+        <span class="k">return</span> <span class="n">n</span></div>
 
-    <span class="k">def</span> <span class="nf">cartesian</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">subsets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">step_pixels</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span><span class="n">max_distance_pixels</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<div class="viewcode-block" id="CellDataFrame.cartesian"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.cartesian">[docs]</a>    <span class="k">def</span> <span class="nf">cartesian</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">subsets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">step_pixels</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span><span class="n">max_distance_pixels</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a class that can be used to create honeycomb plots</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            subsets (list): list of SubsetLogic objects</span>
+<span class="sd">            step_pixels (int): distance between hexagons</span>
+<span class="sd">            max_distance_pixels (int): the distance from each point by which to caclulate the quanitty of the phenotype for that area</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Cartesian: returns a class that holds the layout of the points to plot.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">n</span> <span class="o">=</span> <span class="n">Cartesian</span><span class="o">.</span><span class="n">read_cellframe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">subsets</span><span class="o">=</span><span class="n">subsets</span><span class="p">,</span><span class="n">step_pixels</span><span class="o">=</span><span class="n">step_pixels</span><span class="p">,</span><span class="n">max_distance_pixels</span><span class="o">=</span><span class="n">max_distance_pixels</span><span class="p">,</span><span class="n">prune_neighbors</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="k">if</span> <span class="s1">&#39;measured_regions&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span> <span class="n">n</span><span class="o">.</span><span class="n">measured_regions</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;measured_regions&#39;</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span> <span class="n">n</span><span class="o">.</span><span class="n">measured_regions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_measured_regions</span><span class="p">()</span>
         <span class="k">if</span> <span class="s1">&#39;measured_phenotypes&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span> <span class="n">n</span><span class="o">.</span><span class="n">measured_phenotypes</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;measured_phenotypes&#39;</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span> <span class="n">n</span><span class="o">.</span><span class="n">measured_phenotypes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phenotypes</span>
         <span class="n">n</span><span class="o">.</span><span class="n">microns_per_pixel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">microns_per_pixel</span>
-        <span class="k">return</span> <span class="n">n</span>
+        <span class="k">return</span> <span class="n">n</span></div>
 
-    <span class="k">def</span> <span class="nf">counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<div class="viewcode-block" id="CellDataFrame.counts"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.counts">[docs]</a>    <span class="k">def</span> <span class="nf">counts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a class that can be used to access count densities</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Counts: returns a class that holds the counts.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">n</span> <span class="o">=</span> <span class="n">Counts</span><span class="o">.</span><span class="n">read_cellframe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">prune_neighbors</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
         <span class="k">if</span> <span class="s1">&#39;measured_regions&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span> <span class="n">n</span><span class="o">.</span><span class="n">measured_regions</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;measured_regions&#39;</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span> <span class="n">n</span><span class="o">.</span><span class="n">measured_regions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_measured_regions</span><span class="p">()</span>
         <span class="k">if</span> <span class="s1">&#39;measured_phenotypes&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span> <span class="n">n</span><span class="o">.</span><span class="n">measured_phenotypes</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;measured_phenotypes&#39;</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span> <span class="n">n</span><span class="o">.</span><span class="n">measured_phenotypes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phenotypes</span>
         <span class="n">n</span><span class="o">.</span><span class="n">microns_per_pixel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">microns_per_pixel</span>
-        <span class="k">return</span> <span class="n">n</span>
+        <span class="k">return</span> <span class="n">n</span></div>
 
-    <span class="k">def</span> <span class="nf">qc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">QC</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+<div class="viewcode-block" id="CellDataFrame.qc"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.qc">[docs]</a>    <span class="k">def</span> <span class="nf">qc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a class that can be used to access QC reports</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            QC: returns a class that can be used to interrogate the QC.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">QC</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
     <span class="k">def</span> <span class="nf">_shuffle_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">together</span> <span class="o">=</span> <span class="p">[]</span>
@@ -459,8 +541,20 @@
         <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">together</span><span class="p">)</span>
 
     <span class="c1">### Modifying functions</span>
-    <span class="k">def</span> <span class="nf">merge_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">df_addition</span><span class="p">,</span><span class="n">reference_markers</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">,</span>
+<div class="viewcode-block" id="CellDataFrame.merge_scores"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.merge_scores">[docs]</a>    <span class="k">def</span> <span class="nf">merge_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">df_addition</span><span class="p">,</span><span class="n">reference_markers</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">,</span>
                                       <span class="n">addition_markers</span><span class="o">=</span><span class="s1">&#39;all&#39;</span><span class="p">,</span><span class="n">on</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;project_name&#39;</span><span class="p">,</span><span class="s1">&#39;sample_name&#39;</span><span class="p">,</span><span class="s1">&#39;frame_name&#39;</span><span class="p">,</span><span class="s1">&#39;cell_index&#39;</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Combine CellDataFrames that differ by score composition</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            df_addition (CellDataFrame): The CellDataFrame to merge scores in from</span>
+<span class="sd">            reference_markers (list): which scored call names to keep in the this object (default: all)</span>
+<span class="sd">            addition_markers (list): which scored call names to merge in (default: all)</span>
+<span class="sd">            on (list): the features to merge cells on</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame,CellDataFrame: returns a passing CellDataFrame where merge criteria were met and a fail CellDataFrame where merge criteria were not met.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">reference_markers</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
             <span class="n">reference_markers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scored_names</span>
         <span class="k">elif</span> <span class="n">reference_markers</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> <span class="n">reference_markers</span> <span class="o">=</span> <span class="p">[]</span>
@@ -489,18 +583,31 @@
         <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="s1">&#39;_key&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span><span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;_key&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()]</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="s1">&#39;_key&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">microns_per_pixel</span><span class="p">:</span> <span class="n">df</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">microns_per_pixel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">microns_per_pixel</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">microns_per_pixel</span><span class="p">:</span> <span class="n">df</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">microns_per_pixel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">microns_per_pixel</span>
-        <span class="k">return</span> <span class="n">df</span>
+        <span class="k">return</span> <span class="n">df</span></div>
 
-    <span class="k">def</span> <span class="nf">rename_scored_calls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">change</span><span class="p">):</span>
-        <span class="c1"># input dictionary change with {&lt;current name&gt;:&lt;new name&gt;} format, new name must not already exist</span>
+<div class="viewcode-block" id="CellDataFrame.rename_scored_calls"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.rename_scored_calls">[docs]</a>    <span class="k">def</span> <span class="nf">rename_scored_calls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">change</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Change the names of scored call names, input dictionary change with {&lt;current name&gt;:&lt;new name&gt;} format, new name must not already exist</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            change (dict): a dictionary of current name keys and new name values</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame: The CellDataFrame modified.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">output</span><span class="p">[</span><span class="s1">&#39;scored_calls&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span>
           <span class="n">_dict_rename</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;scored_calls&#39;</span><span class="p">],</span><span class="n">change</span><span class="p">)</span>
           <span class="p">,</span><span class="mi">1</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">output</span>
+        <span class="k">return</span> <span class="n">output</span></div>
 
-    <span class="k">def</span> <span class="nf">zero_fill_missing_phenotypes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="c1"># Fill in missing phenotypes and scored types by listing any missing data as negative</span>
+<div class="viewcode-block" id="CellDataFrame.zero_fill_missing_phenotypes"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.zero_fill_missing_phenotypes">[docs]</a>    <span class="k">def</span> <span class="nf">zero_fill_missing_phenotypes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fill in missing phenotypes and scored types by listing any missing data as negative</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame: The CellDataFrame modified.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_uniform</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span> <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="k">def</span> <span class="nf">_do_fill</span><span class="p">(</span><span class="n">d</span><span class="p">,</span><span class="n">names</span><span class="p">):</span>
@@ -513,13 +620,43 @@
         <span class="n">output</span><span class="p">[</span><span class="s1">&#39;phenotype_calls&#39;</span><span class="p">]</span><span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span>
             <span class="n">_do_fill</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;phenotype_calls&#39;</span><span class="p">],</span><span class="n">pnames</span><span class="p">)</span>
             <span class="p">,</span><span class="mi">1</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">output</span>
+        <span class="k">return</span> <span class="n">output</span></div>
 
-    <span class="k">def</span> <span class="nf">subset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">logic</span><span class="p">,</span><span class="n">update</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-        <span class="c1"># subset create a specific phenotype based on a logic</span>
-        <span class="c1"># logic is a &#39;SubsetLogic&#39; class</span>
-        <span class="c1"># take union of all the phenotypes listed.  If none are listed use all phenotypes.</span>
-        <span class="c1"># take the intersection of all the scored calls</span>
+<div class="viewcode-block" id="CellDataFrame.drop_scored_calls"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.drop_scored_calls">[docs]</a>    <span class="k">def</span> <span class="nf">drop_scored_calls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">names</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Take a name or list of scored call names and drop those from the scored calls</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            names (list): list of names to drop or a single string name to drop</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame: The CellDataFrame modified.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">_remove</span><span class="p">(</span><span class="n">calls</span><span class="p">,</span><span class="n">names</span><span class="p">):</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">([(</span><span class="n">k</span><span class="p">,</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span><span class="n">v</span> <span class="ow">in</span> <span class="n">calls</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">names</span><span class="p">])</span>
+            <span class="k">return</span> <span class="n">d</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">names</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="n">names</span><span class="p">]</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">output</span><span class="p">[</span><span class="s1">&#39;scored_calls&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">output</span><span class="p">[</span><span class="s1">&#39;scored_calls&#39;</span><span class="p">]</span><span class="o">.</span>\
+            <span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">_remove</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">names</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="CellDataFrame.subset"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.subset">[docs]</a>    <span class="k">def</span> <span class="nf">subset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">logic</span><span class="p">,</span><span class="n">update</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        subset create a specific phenotype based on a logic, </span>
+<span class="sd">        logic is a &#39;SubsetLogic&#39; class, </span>
+<span class="sd">        take union of all the phenotypes listed.  If none are listed use all phenotypes. </span>
+<span class="sd">        take the intersection of all the scored calls.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            logic (SubsetLogic): A subsetlogic object to slice on</span>
+<span class="sd">            update (bool): (default False) change the name of the phenotype according to the label in the subset logic</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame: The CellDataFrame modified.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">pnames</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phenotypes</span>
         <span class="n">snames</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scored_names</span>
         <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
@@ -544,12 +681,24 @@
         <span class="k">if</span> <span class="n">update</span><span class="p">:</span> 
             <span class="n">data</span><span class="p">[</span><span class="s1">&#39;phenotype_calls&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;phenotype_calls&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="p">{</span><span class="n">logic</span><span class="o">.</span><span class="n">label</span><span class="p">:</span><span class="mi">1</span><span class="p">})</span>
         <span class="n">data</span><span class="o">.</span><span class="n">fill_phenotype_label</span><span class="p">(</span><span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">data</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">db</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span>
+        <span class="k">return</span> <span class="n">data</span></div>
 
-    <span class="k">def</span> <span class="nf">threshold</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">phenotype</span><span class="p">,</span><span class="n">scored_name</span><span class="p">,</span><span class="n">positive_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">negative_label</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="c1"># split a phenotype on a scored_call and if no label is specified</span>
-        <span class="c1">#       use the format &#39;&lt;phenotype&gt; &lt;scored_call&gt;&lt;+/-&gt;&#39;</span>
-        <span class="c1"># to specify a label give the positive and negative label</span>
+<div class="viewcode-block" id="CellDataFrame.threshold"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.threshold">[docs]</a>    <span class="k">def</span> <span class="nf">threshold</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">phenotype</span><span class="p">,</span><span class="n">scored_name</span><span class="p">,</span><span class="n">positive_label</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">negative_label</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Split a phenotype on a scored_call and if no label is specified</span>
+<span class="sd">        use the format &#39;&lt;phenotype&gt; &lt;scored_call&gt;&lt;+/-&gt;&#39;</span>
+<span class="sd">        to specify a label give the positive and negative label</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            phenotype (str): name of the phenotype to threshold</span>
+<span class="sd">            scored_name (str): scored call name to apply value from</span>
+<span class="sd">            positive_label (str): name to apply for positive lable (default: &lt;phenotype&gt; &lt;scored_call&gt;+)</span>
+<span class="sd">            negative_label (str): name to apply for negative lable (default: &lt;phenotype&gt; &lt;scored_call&gt;-)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame: The CellDataFrame modified.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">positive_label</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">negative_label</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> \
            <span class="n">negative_label</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">positive_label</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span> <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Error if you want to specify labels, give both positive and negative&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">phenotype</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">phenotypes</span><span class="p">:</span> <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Error phenotype &quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">phenotype</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot; is not in the data.&quot;</span><span class="p">)</span>
@@ -582,10 +731,20 @@
         <span class="n">data</span><span class="p">[</span><span class="s1">&#39;phenotype_label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span>
                 <span class="n">_set_label</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;phenotype_calls&#39;</span><span class="p">])</span>
             <span class="p">,</span><span class="mi">1</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
 
-    <span class="k">def</span> <span class="nf">collapse_phenotypes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">input_phenotype_labels</span><span class="p">,</span><span class="n">output_phenotype_label</span><span class="p">,</span><span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-        <span class="c1"># Rename one or more input phenotypes to a single output phenotype</span>
+<div class="viewcode-block" id="CellDataFrame.collapse_phenotypes"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.collapse_phenotypes">[docs]</a>    <span class="k">def</span> <span class="nf">collapse_phenotypes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">input_phenotype_labels</span><span class="p">,</span><span class="n">output_phenotype_label</span><span class="p">,</span><span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Rename one or more input phenotypes to a single output phenotype</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            input_phenotype_labels (list): A str name or list of names to combine</span>
+<span class="sd">            output_phenotype_label (list): A str name to change the phenotype names to</span>
+<span class="sd">            verbose (bool): output more details</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame: The CellDataFrame modified.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_phenotype_labels</span><span class="p">,</span><span class="nb">str</span><span class="p">):</span> <span class="n">input_phenotype_labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">input_phenotype_labels</span><span class="p">]</span>
         <span class="n">bad_phenotypes</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">input_phenotype_labels</span><span class="p">)</span><span class="o">-</span><span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phenotypes</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">bad_phenotypes</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Error phenotype(s) &quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">bad_phenotypes</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot; are not in the data.&quot;</span><span class="p">)</span>
@@ -603,13 +762,29 @@
         <span class="n">data</span><span class="p">[</span><span class="s1">&#39;phenotype_calls&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span>
             <span class="n">_swap_in</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;phenotype_calls&#39;</span><span class="p">],</span><span class="n">input_phenotype_labels</span><span class="p">,</span><span class="n">output_phenotype_label</span><span class="p">)</span>
             <span class="p">,</span><span class="mi">1</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">data</span>
+        <span class="k">def</span> <span class="nf">_set_label</span><span class="p">(</span><span class="n">d</span><span class="p">):</span>
+            <span class="n">vals</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span><span class="n">v</span> <span class="ow">in</span> <span class="n">d</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">v</span><span class="o">==</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">vals</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;phenotype_label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span>
+                <span class="n">_set_label</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;phenotype_calls&#39;</span><span class="p">]),</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
 <div class="viewcode-block" id="CellDataFrame.rename_phenotype"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.rename_phenotype">[docs]</a>    <span class="k">def</span> <span class="nf">rename_phenotype</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span> 
         <span class="sd">&quot;&quot;&quot;simple alias for collapse phenotypes&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">collapse_phenotypes</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
-    <span class="k">def</span> <span class="nf">combine_regions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">input_region_labels</span><span class="p">,</span><span class="n">output_region_label</span><span class="p">,</span><span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-        <span class="c1"># Rename one or more input phenotypes to a single output phenotype</span>
+<div class="viewcode-block" id="CellDataFrame.combine_regions"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.combine_regions">[docs]</a>    <span class="k">def</span> <span class="nf">combine_regions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">input_region_labels</span><span class="p">,</span><span class="n">output_region_label</span><span class="p">,</span><span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Combine/rename one or more input regions to a single output region</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            input_region_labels (list): A str name or list of names to combine</span>
+<span class="sd">            output_region_label (list): A str name to change the phenotype names to</span>
+<span class="sd">            verbose (bool): output more details</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame: The CellDataFrame modified.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_region_labels</span><span class="p">,</span><span class="nb">str</span><span class="p">):</span> <span class="n">input_region_labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">input_region_labels</span><span class="p">]</span>
         <span class="n">bad_regions</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">input_region_labels</span><span class="p">)</span><span class="o">-</span><span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">regions</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">bad_regions</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span> <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Error regions(s) &quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">bad_regions</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot; are not in the data.&quot;</span><span class="p">)</span>
@@ -628,7 +803,7 @@
             <span class="n">_swap_in</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;regions&#39;</span><span class="p">],</span><span class="n">input_region_labels</span><span class="p">,</span><span class="n">output_region_label</span><span class="p">)</span>
             <span class="p">,</span><span class="mi">1</span><span class="p">)</span>
         <span class="n">data</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;region_label&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">input_region_labels</span><span class="p">),</span><span class="s1">&#39;region_label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">output_region_label</span>
-        <span class="k">return</span> <span class="n">data</span>
+        <span class="k">return</span> <span class="n">data</span></div>
 <div class="viewcode-block" id="CellDataFrame.rename_region"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.rename_region">[docs]</a>    <span class="k">def</span> <span class="nf">rename_region</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span> 
         <span class="sd">&quot;&quot;&quot;simple alias for combine phenotypes&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">combine_regions</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
@@ -645,7 +820,54 @@
             <span class="k">return</span>
         <span class="n">fixed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">fixed</span><span class="p">[</span><span class="s1">&#39;phenotype_label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fixed</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">_get_phenotype</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;phenotype_calls&#39;</span><span class="p">]),</span><span class="mi">1</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">fixed</span></div></div>
+        <span class="k">return</span> <span class="n">fixed</span></div>
+
+<div class="viewcode-block" id="CellDataFrame.phenotypes_to_regions"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.phenotypes_to_regions">[docs]</a>    <span class="k">def</span> <span class="nf">phenotypes_to_regions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a new Project where regions are replaced to be based on regions defined as phenotypes</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            path (str): Location to store a new hdf5 file containing a database update with new region images</span>
+<span class="sd">            gaussian_sigma (float): the sigma parameter to the gaussian_filter function that says how much to &#39;blur&#39;</span>
+<span class="sd">            overwrite (bool): if True allows you to overwrite the path default (False)</span>
+<span class="sd">            unset_label (str): A label to give regions that are unaccounted for</span>
+<span class="sd">            project_name (str): the project name </span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellProject: The new cell project</span>
+<span class="sd">            CellDataFrame: The updated cell project</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">phenotypes_to_regions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="o">*</span><span class="n">args</span><span class="p">,</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CellDataFrame.scored_to_phenotype"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.scored_to_phenotype">[docs]</a>    <span class="k">def</span> <span class="nf">scored_to_phenotype</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">phenotypes</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Convert binary pehnotypes to mutually exclusive phenotypes. </span>
+<span class="sd">        If none of the phenotypes are set, then phenotype_label becomes nan</span>
+<span class="sd">        If any of the phenotypes are multiply set then it throws a fatal error.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            phenotypes (list): a list of scored_names to convert to phenotypes</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">_apply_score</span><span class="p">(</span><span class="n">scored_calls</span><span class="p">,</span><span class="n">phenotypes</span><span class="p">):</span>
+            <span class="n">present</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">phenotypes</span><span class="p">)</span><span class="o">&amp;</span><span class="nb">set</span><span class="p">(</span><span class="n">scored_calls</span><span class="o">.</span><span class="n">keys</span><span class="p">())))</span>
+            <span class="n">total</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="n">scored_calls</span><span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">present</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">total</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span> 
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;You cant extract phenotypes from scores if they are not mutually exclusive&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">total</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+            <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">present</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">scored_calls</span><span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span> <span class="k">return</span> <span class="n">label</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Should have hit an exit criteria already&quot;</span><span class="p">)</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">output</span><span class="p">[</span><span class="s1">&#39;phenotype_label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">_apply_score</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;scored_calls&#39;</span><span class="p">],</span><span class="n">phenotypes</span><span class="p">),</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># now update the phenotypes with these</span>
+        <span class="n">output</span><span class="p">[</span><span class="s1">&#39;phenotype_calls&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> 
+            <span class="nb">dict</span><span class="p">([(</span><span class="n">y</span><span class="p">,</span><span class="mi">1</span> <span class="k">if</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;phenotype_label&#39;</span><span class="p">]</span><span class="o">==</span><span class="n">y</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">phenotypes</span><span class="p">])</span>
+        <span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">output</span></div></div>
+
 <span class="k">def</span> <span class="nf">_extract_unique_keys_from_series</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
     <span class="n">uni</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">x</span><span class="p">))</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span><span class="o">.</span>\
             <span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">x</span><span class="p">))</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">set</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">keys</span><span class="p">())))</span>
