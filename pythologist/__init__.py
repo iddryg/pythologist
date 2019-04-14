@@ -329,6 +329,12 @@ class CellDataFrame(pd.DataFrame):
         return n
 
     def contacts(self,*args,**kwargs):
+        """
+        Use assess the cell-to-cell contacts recorded in the celldataframe
+
+        Returns:
+            Contacts: returns a class that holds cell-to-cell contact information for whatever phenotypes were in the CellDataFrame before execution.  
+        """
         n = Contacts.read_cellframe(self,prune_neighbors=True)
         if 'measured_regions' in kwargs: n.measured_regions = kwargs['measured_regions']
         else: n.measured_regions = self.get_measured_regions()
@@ -338,6 +344,17 @@ class CellDataFrame(pd.DataFrame):
         return n
 
     def cartesian(self,subsets=None,step_pixels=100,max_distance_pixels=150,*args,**kwargs):
+        """
+        Return a class that can be used to create honeycomb plots
+
+        Args:
+            subsets (list): list of SubsetLogic objects
+            step_pixels (int): distance between hexagons
+            max_distance_pixels (int): the distance from each point by which to caclulate the quanitty of the phenotype for that area
+
+        Returns:
+            Cartesian: returns a class that holds the layout of the points to plot.
+        """
         n = Cartesian.read_cellframe(self,subsets=subsets,step_pixels=step_pixels,max_distance_pixels=max_distance_pixels,prune_neighbors=False,*args,**kwargs)
         if 'measured_regions' in kwargs: n.measured_regions = kwargs['measured_regions']
         else: n.measured_regions = self.get_measured_regions()
@@ -347,6 +364,12 @@ class CellDataFrame(pd.DataFrame):
         return n
 
     def counts(self,*args,**kwargs):
+        """
+        Return a class that can be used to access count densities
+
+        Returns:
+            Counts: returns a class that holds the counts.
+        """
         n = Counts.read_cellframe(self,prune_neighbors=False)
         if 'measured_regions' in kwargs: n.measured_regions = kwargs['measured_regions']
         else: n.measured_regions = self.get_measured_regions()
@@ -356,6 +379,12 @@ class CellDataFrame(pd.DataFrame):
         return n
 
     def qc(self,*args,**kwargs):
+        """
+        Return a class that can be used to access QC reports
+
+        Returns:
+            QC: returns a class that can be used to interrogate the QC.
+        """
         return QC(self,*args,**kwargs)
 
     def _shuffle_ids(self):
@@ -371,6 +400,18 @@ class CellDataFrame(pd.DataFrame):
     ### Modifying functions
     def merge_scores(self,df_addition,reference_markers='all',
                                       addition_markers='all',on=['project_name','sample_name','frame_name','cell_index']):
+        """
+        Combine CellDataFrames that differ by score composition
+
+        Args:
+            df_addition (CellDataFrame): The CellDataFrame to merge scores in from
+            reference_markers (list): which scored call names to keep in the this object (default: all)
+            addition_markers (list): which scored call names to merge in (default: all)
+            on (list): the features to merge cells on
+
+        Returns:
+            CellDataFrame,CellDataFrame: returns a passing CellDataFrame where merge criteria were met and a fail CellDataFrame where merge criteria were not met.
+        """
         if isinstance(reference_markers, str):
             reference_markers = self.scored_names
         elif reference_markers is None: reference_markers = []
@@ -402,7 +443,15 @@ class CellDataFrame(pd.DataFrame):
         return df
 
     def rename_scored_calls(self,change):
-        # input dictionary change with {<current name>:<new name>} format, new name must not already exist
+        """
+        Change the names of scored call names, input dictionary change with {<current name>:<new name>} format, new name must not already exist
+
+        Args:
+            change (dict): a dictionary of current name keys and new name values
+
+        Returns:
+            CellDataFrame: The CellDataFrame modified.
+        """
         output = self.copy()
         output['scored_calls'] = output.apply(lambda x:
           _dict_rename(x['scored_calls'],change)
@@ -410,7 +459,12 @@ class CellDataFrame(pd.DataFrame):
         return output
 
     def zero_fill_missing_phenotypes(self):
-        # Fill in missing phenotypes and scored types by listing any missing data as negative
+        """
+        Fill in missing phenotypes and scored types by listing any missing data as negative
+
+        Returns:
+            CellDataFrame: The CellDataFrame modified.
+        """
         if self.is_uniform(verbose=False): return self.copy()
         output = self.copy()
         def _do_fill(d,names):
@@ -425,11 +479,41 @@ class CellDataFrame(pd.DataFrame):
             ,1)
         return output
 
+    def drop_scored_calls(self,names):
+        """
+        Take a name or list of scored call names and drop those from the scored calls
+
+        Args:
+            names (list): list of names to drop or a single string name to drop
+
+        Returns:
+            CellDataFrame: The CellDataFrame modified.
+        """
+        def _remove(calls,names):
+            d = dict([(k,v) for k,v in calls.items() if k not in names])
+            return d
+        if isinstance(names, str):
+            names = [names]
+        output = self.copy()
+        output['scored_calls'] = output['scored_calls'].\
+            apply(lambda x: _remove(x,names))
+        return output
+
+
     def subset(self,logic,update=False):
-        # subset create a specific phenotype based on a logic
-        # logic is a 'SubsetLogic' class
-        # take union of all the phenotypes listed.  If none are listed use all phenotypes.
-        # take the intersection of all the scored calls
+        """
+        subset create a specific phenotype based on a logic, 
+        logic is a 'SubsetLogic' class, 
+        take union of all the phenotypes listed.  If none are listed use all phenotypes. 
+        take the intersection of all the scored calls.
+
+        Args:
+            logic (SubsetLogic): A subsetlogic object to slice on
+            update (bool): (default False) change the name of the phenotype according to the label in the subset logic
+
+        Returns:
+            CellDataFrame: The CellDataFrame modified.
+        """
         pnames = self.phenotypes
         snames = self.scored_names
         data = self.copy()
@@ -458,9 +542,20 @@ class CellDataFrame(pd.DataFrame):
         return data
 
     def threshold(self,phenotype,scored_name,positive_label=None,negative_label=None):
-        # split a phenotype on a scored_call and if no label is specified
-        #       use the format '<phenotype> <scored_call><+/->'
-        # to specify a label give the positive and negative label
+        """
+        Split a phenotype on a scored_call and if no label is specified
+        use the format '<phenotype> <scored_call><+/->'
+        to specify a label give the positive and negative label
+
+        Args:
+            phenotype (str): name of the phenotype to threshold
+            scored_name (str): scored call name to apply value from
+            positive_label (str): name to apply for positive lable (default: <phenotype> <scored_call>+)
+            negative_label (str): name to apply for negative lable (default: <phenotype> <scored_call>-)
+
+        Returns:
+            CellDataFrame: The CellDataFrame modified.
+        """
         if positive_label is None and negative_label is not None or \
            negative_label is None and positive_label is not None: raise ValueError("Error if you want to specify labels, give both positive and negative")
         if phenotype not in self.phenotypes: raise ValueError("Error phenotype "+str(phenotype)+" is not in the data.")
@@ -496,7 +591,17 @@ class CellDataFrame(pd.DataFrame):
         return data.copy()
 
     def collapse_phenotypes(self,input_phenotype_labels,output_phenotype_label,verbose=True):
-        # Rename one or more input phenotypes to a single output phenotype
+        """
+        Rename one or more input phenotypes to a single output phenotype
+
+        Args:
+            input_phenotype_labels (list): A str name or list of names to combine
+            output_phenotype_label (list): A str name to change the phenotype names to
+            verbose (bool): output more details
+
+        Returns:
+            CellDataFrame: The CellDataFrame modified.
+        """
         if isinstance(input_phenotype_labels,str): input_phenotype_labels = [input_phenotype_labels]
         bad_phenotypes = set(input_phenotype_labels)-set(self.phenotypes)
         if len(bad_phenotypes) > 0: raise ValueError("Error phenotype(s) "+str(bad_phenotypes)+" are not in the data.")
@@ -526,7 +631,17 @@ class CellDataFrame(pd.DataFrame):
         return self.collapse_phenotypes(*args,**kwargs)
 
     def combine_regions(self,input_region_labels,output_region_label,verbose=True):
-        # Rename one or more input phenotypes to a single output phenotype
+        """
+        Combine/rename one or more input regions to a single output region
+
+        Args:
+            input_region_labels (list): A str name or list of names to combine
+            output_region_label (list): A str name to change the phenotype names to
+            verbose (bool): output more details
+
+        Returns:
+            CellDataFrame: The CellDataFrame modified.
+        """
         if isinstance(input_region_labels,str): input_region_labels = [input_region_labels]
         bad_regions = set(input_region_labels)-set(self.regions)
         if len(bad_regions) > 0: raise ValueError("Error regions(s) "+str(bad_regions)+" are not in the data.")
