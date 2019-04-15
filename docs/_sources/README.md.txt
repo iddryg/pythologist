@@ -22,10 +22,20 @@ Features Pythologist add are:
 
 ## Module documentation
 
-* `pythologist` CellDataFrame class to modify and execute analysses [[source](https://github.com/jason-weirather/pythologist)]
+* `pythologist` CellDataFrame class to modify and execute analysses [[Read the Docs](https://jason-weirather.github.io/pythologist/#modules)] [[source](https://github.com/jason-weirather/pythologist)]
 * `pythologist-reader` CellProject Storage Object [[Read the Docs](https://jason-weirather.github.io/pythologist-reader/)] [[source](https://github.com/jason-weirather/pythologist-reader)]
 * `pythologist-test-images` Example data [[source](https://github.com/jason-weirather/pythologist-test-images)]
 * `pythologist-image-utilities` Helper functions to work with images [[Read the Docs](https://jason-weirather.github.io/pythologist-image-utilities/)] [[source](https://github.com/jason-weirather/pythologist-image-utilities)] 
+
+# Quickstart
+
+To start a jupyter lab notebook with the required software as your user in your current drectory you can use the following command 
+
+`docker run --rm -p 8888:8888 --user $(id -u):$(id -g) -v $(pwd):/work vacation/pythologist:latest`
+
+This will start jupyter lab on port 8888 as your user and group. 
+
+Any of the test data examples should work fine in this environment.
 
 # Installation
 
@@ -145,7 +155,40 @@ plt.show()
 > ![MEL2_2_tumor](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Tumor.png?raw=true)
 > ![MEL2_2_stroma](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Stroma.png?raw=true)
 
-*Note: we need to swap in an optimized watershed algorithm to speed up all these read operations.*
+
+### Read a project with a custom tumor mask (but no margin line)
+
+Here we will use the mask, but not expand or subtract from it.
+
+```python
+from pythologist_test_images import TestImages
+from pythologist_reader.formats.inform.custom import CellProjectInFormCustomMask
+import matplotlib.pyplot as plt
+path = TestImages().raw('IrisSpatialFeatures')
+cpi = CellProjectInFormCustomMask('test.h5',mode='w')
+cpi.read_path(path,
+              microns_per_pixel=0.496,
+              sample_name_index=-1,
+              verbose=True,
+              custom_mask_name='Tumor',
+              other_mask_name='Not-Tumor')
+for f in cpi.frame_iter():
+    rs = f.get_data('regions').set_index('region_label')
+    for r in rs.index:
+        print(r)
+        plt.imshow(f.get_image(rs.loc[r]['image_id']),origin='upper')
+        plt.show()
+    break
+```
+> MEL2_2
+>
+> Tumor
+>
+> ![MEL2_2_tumor](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_tumor-b.png?raw=true)
+> 
+> Not-Tumor
+>
+> ![MEL2_2_not_tumor](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_not-tumor-b.png?raw=true) 
 
 ### Quality check samples
 
@@ -274,6 +317,60 @@ sub = ch.loc[(~ch['threshold_value'].isna())&(ch['channel_label']=='PDL1')]
 
 > ![Histogram Example](https://github.com/jason-weirather/pythologist/blob/master/images/histogram_example.png?raw=true)
 
+### View cell-cell contacts
+
+```python
+from pythologist_test_images import TestImages
+from pythologist_reader.formats.inform.custom import CellProjectInFormCustomMask
+from pythologist import SubsetLogic as SL
+cpi = TestImages().project('IrisSpatialFeatures')
+cdf = cpi.cdf
+cdf.db = cpi
+sub = cdf.loc[cdf['frame_name']=='MEL2_7'].dropna()
+cont = sub.contacts().threshold('CD8+','CD8+/contact').contacts().threshold('SOX10+','SOX10+/contact')
+cont = cont.threshold('CD8+','SOX10+/contact',
+                      positive_label='CD8+ contact',
+                      negative_label='CD8+').\
+    threshold('SOX10+','CD8+/contact',
+              positive_label='SOX10+ contact',
+              negative_label='SOX10+')
+schema = [
+    {'subset_logic':SL(phenotypes=['OTHER']),
+     'edge_color':(50,50,50,255),
+     'watershed_steps':0,
+     'fill_color':(0,0,0,255)
+    },
+    {'subset_logic':SL(phenotypes=['SOX10+']),
+     'edge_color':(166,206,227,255),
+     'watershed_steps':0,
+     'fill_color':(0,0,0,0)
+    },
+    {'subset_logic':SL(phenotypes=['CD8+']),
+     'edge_color':(253,191,111,255),
+     'watershed_steps':0,
+     'fill_color':(0,0,0,0)
+    },
+    {'subset_logic':SL(phenotypes=['CD8+ contact']),
+     'edge_color':(253,191,111,255),
+     'watershed_steps':0,
+     'fill_color':(255,127,0,255)
+    },
+    {'subset_logic':SL(phenotypes=['SOX10+ contact']),
+     'edge_color':(166,206,227,255),
+     'watershed_steps':0,
+     'fill_color':(31,120,180,255)
+    }
+]
+sio = cont.segmentation_images().build_segmentation_image(schema,background=(0,0,0,255))
+sio.write_to_path('test_edges',overwrite=True)
+```
+
+> MEL2_7
+>
+> ![Visualize Contacts](https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_7-contacts.png?raw=true)
+
+*Image is zoomed-in and cropped to show the contours better.*
+
 ### Merge CellDataFrames that have the same image segmentations but different scored calls
 
 This happens frequently because current InForm exports only permit two features to be scored per export
@@ -380,5 +477,8 @@ cdf = cdf.nearestneighbors().threshold('T cell','T cell/within 75um',distance_um
 
 ```
 
-# Comparison to IrisSpatialFeatures
+# Check outputs against IrisSpatialFeatures outputs
 
+To ensure we are generating expected outs we can check against the outputs of IrisSpatialFeatures [[github](https://github.com/gusef/IrisSpatialFeatures)]. 
+
+* Jupyter Notebook: [Test against IrisSpatialFeatures outputs](https://github.com/jason-weirather/pythologist/blob/master/notebooks/Test%20against%20IrisSpatialFeatures%20outputs.ipynb)

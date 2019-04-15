@@ -8,7 +8,7 @@ with open(path.join(this_folder,'README.md'),encoding='utf-8') as inf:
 
 setup(
   name='pythologist',
-  version='1.0.1',
+  version='1.0.3',
   test_suite='nose2.collector.collector',
   description='inForm PerkinElmer Reader - Python interface to read outputs of the PerkinElmer inForm software',
   long_description=long_description,
@@ -28,8 +28,10 @@ setup(
                     'numpy',
                     'scipy',
                     'h5py',
-                    'tifffile==0.15.1',
                     'imageio',
                     'tables',
-                    'pythologist-image-utilities'],
+                    'pythologist-image-utilities>=1.0.2'],
+  extras_require = {
+        'test':  ["pythologist-test-images"]
+  },
 )

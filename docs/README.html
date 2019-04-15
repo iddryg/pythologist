@@ -85,13 +85,14 @@
 <li><a class="reference internal" href="#module-documentation">Module documentation</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#quickstart">Quickstart</a></li>
 <li><a class="reference internal" href="#installation">Installation</a><ul>
 <li><a class="reference internal" href="#docker-jupyter-labs-quickstart">Docker jupyter labs quickstart</a></li>
 <li><a class="reference internal" href="#install-by-pip">Install by pip</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#common-tasks">Common tasks</a></li>
-<li><a class="reference internal" href="#comparison-to-irisspatialfeatures">Comparison to IrisSpatialFeatures</a></li>
+<li><a class="reference internal" href="#check-outputs-against-irisspatialfeatures-outputs">Check outputs against IrisSpatialFeatures outputs</a></li>
 </ul>
 </div>
             
@@ -177,12 +178,19 @@
 <div class="section" id="module-documentation">
 <h2>Module documentation<a class="headerlink" href="#module-documentation" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
-<li><code class="docutils literal notranslate"><span class="pre">pythologist</span></code> CellDataFrame class to modify and execute analysses [<a class="reference external" href="https://github.com/jason-weirather/pythologist">source</a>]</li>
+<li><code class="docutils literal notranslate"><span class="pre">pythologist</span></code> CellDataFrame class to modify and execute analysses [<a class="reference external" href="https://jason-weirather.github.io/pythologist/#modules">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist">source</a>]</li>
 <li><code class="docutils literal notranslate"><span class="pre">pythologist-reader</span></code> CellProject Storage Object [<a class="reference external" href="https://jason-weirather.github.io/pythologist-reader/">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist-reader">source</a>]</li>
 <li><code class="docutils literal notranslate"><span class="pre">pythologist-test-images</span></code> Example data [<a class="reference external" href="https://github.com/jason-weirather/pythologist-test-images">source</a>]</li>
 <li><code class="docutils literal notranslate"><span class="pre">pythologist-image-utilities</span></code> Helper functions to work with images [<a class="reference external" href="https://jason-weirather.github.io/pythologist-image-utilities/">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist-image-utilities">source</a>]</li>
 </ul>
 </div>
+</div>
+<div class="section" id="quickstart">
+<h1>Quickstart<a class="headerlink" href="#quickstart" title="Permalink to this headline">¶</a></h1>
+<p>To start a jupyter lab notebook with the required software as your user in your current drectory you can use the following command</p>
+<p><code class="docutils literal notranslate"><span class="pre">docker</span> <span class="pre">run</span> <span class="pre">--rm</span> <span class="pre">-p</span> <span class="pre">8888:8888</span> <span class="pre">--user</span> <span class="pre">$(id</span> <span class="pre">-u):$(id</span> <span class="pre">-g)</span> <span class="pre">-v</span> <span class="pre">$(pwd):/work</span> <span class="pre">vacation/pythologist:latest</span></code></p>
+<p>This will start jupyter lab on port 8888 as your user and group.</p>
+<p>Any of the test data examples should work fine in this environment.</p>
 </div>
 <div class="section" id="installation">
 <h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
@@ -283,7 +291,34 @@
 <a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Tumor.png?raw=true"><img alt="MEL2_2_tumor" src="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Tumor.png?raw=true" /></a>
 <a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Stroma.png?raw=true"><img alt="MEL2_2_stroma" src="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_Stroma.png?raw=true" /></a>
 </div></blockquote>
-<p><em>Note: we need to swap in an optimized watershed algorithm to speed up all these read operations.</em></p>
+<p>Here we will use the mask, but not expand or subtract from it.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pythologist_test_images</span> <span class="kn">import</span> <span class="n">TestImages</span>
+<span class="kn">from</span> <span class="nn">pythologist_reader.formats.inform.custom</span> <span class="kn">import</span> <span class="n">CellProjectInFormCustomMask</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
+<span class="n">path</span> <span class="o">=</span> <span class="n">TestImages</span><span class="p">()</span><span class="o">.</span><span class="n">raw</span><span class="p">(</span><span class="s1">&#39;IrisSpatialFeatures&#39;</span><span class="p">)</span>
+<span class="n">cpi</span> <span class="o">=</span> <span class="n">CellProjectInFormCustomMask</span><span class="p">(</span><span class="s1">&#39;test.h5&#39;</span><span class="p">,</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span>
+<span class="n">cpi</span><span class="o">.</span><span class="n">read_path</span><span class="p">(</span><span class="n">path</span><span class="p">,</span>
+              <span class="n">microns_per_pixel</span><span class="o">=</span><span class="mf">0.496</span><span class="p">,</span>
+              <span class="n">sample_name_index</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+              <span class="n">verbose</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+              <span class="n">custom_mask_name</span><span class="o">=</span><span class="s1">&#39;Tumor&#39;</span><span class="p">,</span>
+              <span class="n">other_mask_name</span><span class="o">=</span><span class="s1">&#39;Not-Tumor&#39;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">cpi</span><span class="o">.</span><span class="n">frame_iter</span><span class="p">():</span>
+    <span class="n">rs</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="s1">&#39;regions&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;region_label&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rs</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">get_image</span><span class="p">(</span><span class="n">rs</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">r</span><span class="p">][</span><span class="s1">&#39;image_id&#39;</span><span class="p">]),</span><span class="n">origin</span><span class="o">=</span><span class="s1">&#39;upper&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="k">break</span>
+</pre></div>
+</div>
+<blockquote>
+<div><p>MEL2_2</p>
+<p>Tumor</p>
+<a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_tumor-b.png?raw=true"><img alt="MEL2_2_tumor" src="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_tumor-b.png?raw=true" /></a>
+<p>Not-Tumor</p>
+<a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_not-tumor-b.png?raw=true"><img alt="MEL2_2_not_tumor" src="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_2_not-tumor-b.png?raw=true" /></a>
+</div></blockquote>
 <p>Check general status of the CellDataFrame</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cdf</span> <span class="o">=</span> <span class="n">cpi</span><span class="o">.</span><span class="n">cdf</span>
 <span class="n">cdf</span><span class="o">.</span><span class="n">db</span> <span class="o">=</span> <span class="n">cpi</span>
@@ -398,6 +433,56 @@ Issue count: 1/2
 <blockquote>
 <div><a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/histogram_example.png?raw=true"><img alt="Histogram Example" src="https://github.com/jason-weirather/pythologist/blob/master/images/histogram_example.png?raw=true" /></a>
 </div></blockquote>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pythologist_test_images</span> <span class="kn">import</span> <span class="n">TestImages</span>
+<span class="kn">from</span> <span class="nn">pythologist_reader.formats.inform.custom</span> <span class="kn">import</span> <span class="n">CellProjectInFormCustomMask</span>
+<span class="kn">from</span> <span class="nn">pythologist</span> <span class="kn">import</span> <span class="n">SubsetLogic</span> <span class="k">as</span> <span class="n">SL</span>
+<span class="n">cpi</span> <span class="o">=</span> <span class="n">TestImages</span><span class="p">()</span><span class="o">.</span><span class="n">project</span><span class="p">(</span><span class="s1">&#39;IrisSpatialFeatures&#39;</span><span class="p">)</span>
+<span class="n">cdf</span> <span class="o">=</span> <span class="n">cpi</span><span class="o">.</span><span class="n">cdf</span>
+<span class="n">cdf</span><span class="o">.</span><span class="n">db</span> <span class="o">=</span> <span class="n">cpi</span>
+<span class="n">sub</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">cdf</span><span class="p">[</span><span class="s1">&#39;frame_name&#39;</span><span class="p">]</span><span class="o">==</span><span class="s1">&#39;MEL2_7&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+<span class="n">cont</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">contacts</span><span class="p">()</span><span class="o">.</span><span class="n">threshold</span><span class="p">(</span><span class="s1">&#39;CD8+&#39;</span><span class="p">,</span><span class="s1">&#39;CD8+/contact&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">contacts</span><span class="p">()</span><span class="o">.</span><span class="n">threshold</span><span class="p">(</span><span class="s1">&#39;SOX10+&#39;</span><span class="p">,</span><span class="s1">&#39;SOX10+/contact&#39;</span><span class="p">)</span>
+<span class="n">cont</span> <span class="o">=</span> <span class="n">cont</span><span class="o">.</span><span class="n">threshold</span><span class="p">(</span><span class="s1">&#39;CD8+&#39;</span><span class="p">,</span><span class="s1">&#39;SOX10+/contact&#39;</span><span class="p">,</span>
+                      <span class="n">positive_label</span><span class="o">=</span><span class="s1">&#39;CD8+ contact&#39;</span><span class="p">,</span>
+                      <span class="n">negative_label</span><span class="o">=</span><span class="s1">&#39;CD8+&#39;</span><span class="p">)</span><span class="o">.</span>\
+    <span class="n">threshold</span><span class="p">(</span><span class="s1">&#39;SOX10+&#39;</span><span class="p">,</span><span class="s1">&#39;CD8+/contact&#39;</span><span class="p">,</span>
+              <span class="n">positive_label</span><span class="o">=</span><span class="s1">&#39;SOX10+ contact&#39;</span><span class="p">,</span>
+              <span class="n">negative_label</span><span class="o">=</span><span class="s1">&#39;SOX10+&#39;</span><span class="p">)</span>
+<span class="n">schema</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">{</span><span class="s1">&#39;subset_logic&#39;</span><span class="p">:</span><span class="n">SL</span><span class="p">(</span><span class="n">phenotypes</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;OTHER&#39;</span><span class="p">]),</span>
+     <span class="s1">&#39;edge_color&#39;</span><span class="p">:(</span><span class="mi">50</span><span class="p">,</span><span class="mi">50</span><span class="p">,</span><span class="mi">50</span><span class="p">,</span><span class="mi">255</span><span class="p">),</span>
+     <span class="s1">&#39;watershed_steps&#39;</span><span class="p">:</span><span class="mi">0</span><span class="p">,</span>
+     <span class="s1">&#39;fill_color&#39;</span><span class="p">:(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">255</span><span class="p">)</span>
+    <span class="p">},</span>
+    <span class="p">{</span><span class="s1">&#39;subset_logic&#39;</span><span class="p">:</span><span class="n">SL</span><span class="p">(</span><span class="n">phenotypes</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;SOX10+&#39;</span><span class="p">]),</span>
+     <span class="s1">&#39;edge_color&#39;</span><span class="p">:(</span><span class="mi">166</span><span class="p">,</span><span class="mi">206</span><span class="p">,</span><span class="mi">227</span><span class="p">,</span><span class="mi">255</span><span class="p">),</span>
+     <span class="s1">&#39;watershed_steps&#39;</span><span class="p">:</span><span class="mi">0</span><span class="p">,</span>
+     <span class="s1">&#39;fill_color&#39;</span><span class="p">:(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">)</span>
+    <span class="p">},</span>
+    <span class="p">{</span><span class="s1">&#39;subset_logic&#39;</span><span class="p">:</span><span class="n">SL</span><span class="p">(</span><span class="n">phenotypes</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;CD8+&#39;</span><span class="p">]),</span>
+     <span class="s1">&#39;edge_color&#39;</span><span class="p">:(</span><span class="mi">253</span><span class="p">,</span><span class="mi">191</span><span class="p">,</span><span class="mi">111</span><span class="p">,</span><span class="mi">255</span><span class="p">),</span>
+     <span class="s1">&#39;watershed_steps&#39;</span><span class="p">:</span><span class="mi">0</span><span class="p">,</span>
+     <span class="s1">&#39;fill_color&#39;</span><span class="p">:(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">)</span>
+    <span class="p">},</span>
+    <span class="p">{</span><span class="s1">&#39;subset_logic&#39;</span><span class="p">:</span><span class="n">SL</span><span class="p">(</span><span class="n">phenotypes</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;CD8+ contact&#39;</span><span class="p">]),</span>
+     <span class="s1">&#39;edge_color&#39;</span><span class="p">:(</span><span class="mi">253</span><span class="p">,</span><span class="mi">191</span><span class="p">,</span><span class="mi">111</span><span class="p">,</span><span class="mi">255</span><span class="p">),</span>
+     <span class="s1">&#39;watershed_steps&#39;</span><span class="p">:</span><span class="mi">0</span><span class="p">,</span>
+     <span class="s1">&#39;fill_color&#39;</span><span class="p">:(</span><span class="mi">255</span><span class="p">,</span><span class="mi">127</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">255</span><span class="p">)</span>
+    <span class="p">},</span>
+    <span class="p">{</span><span class="s1">&#39;subset_logic&#39;</span><span class="p">:</span><span class="n">SL</span><span class="p">(</span><span class="n">phenotypes</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;SOX10+ contact&#39;</span><span class="p">]),</span>
+     <span class="s1">&#39;edge_color&#39;</span><span class="p">:(</span><span class="mi">166</span><span class="p">,</span><span class="mi">206</span><span class="p">,</span><span class="mi">227</span><span class="p">,</span><span class="mi">255</span><span class="p">),</span>
+     <span class="s1">&#39;watershed_steps&#39;</span><span class="p">:</span><span class="mi">0</span><span class="p">,</span>
+     <span class="s1">&#39;fill_color&#39;</span><span class="p">:(</span><span class="mi">31</span><span class="p">,</span><span class="mi">120</span><span class="p">,</span><span class="mi">180</span><span class="p">,</span><span class="mi">255</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">]</span>
+<span class="n">sio</span> <span class="o">=</span> <span class="n">cont</span><span class="o">.</span><span class="n">segmentation_images</span><span class="p">()</span><span class="o">.</span><span class="n">build_segmentation_image</span><span class="p">(</span><span class="n">schema</span><span class="p">,</span><span class="n">background</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">255</span><span class="p">))</span>
+<span class="n">sio</span><span class="o">.</span><span class="n">write_to_path</span><span class="p">(</span><span class="s1">&#39;test_edges&#39;</span><span class="p">,</span><span class="n">overwrite</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<blockquote>
+<div><p>MEL2_7</p>
+<a class="reference external image-reference" href="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_7-contacts.png?raw=true"><img alt="Visualize Contacts" src="https://github.com/jason-weirather/pythologist/blob/master/images/MEL2_7-contacts.png?raw=true" /></a>
+</div></blockquote>
+<p><em>Image is zoomed-in and cropped to show the contours better.</em></p>
 <p>This happens frequently because current InForm exports only permit two features to be scored per export</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">merged</span><span class="p">,</span><span class="n">fail</span> <span class="o">=</span> <span class="n">cdf1</span><span class="o">.</span><span class="n">merge_scores</span><span class="p">(</span><span class="n">cdf2</span><span class="p">,</span><span class="n">on</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;sample_name&#39;</span><span class="p">,</span><span class="s1">&#39;frame_name&#39;</span><span class="p">,</span><span class="s1">&#39;x&#39;</span><span class="p">,</span><span class="s1">&#39;y&#39;</span><span class="p">])</span>
 </pre></div>
@@ -459,8 +544,12 @@ Issue count: 1/2
 </pre></div>
 </div>
 </div>
-<div class="section" id="comparison-to-irisspatialfeatures">
-<h1>Comparison to IrisSpatialFeatures<a class="headerlink" href="#comparison-to-irisspatialfeatures" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="check-outputs-against-irisspatialfeatures-outputs">
+<h1>Check outputs against IrisSpatialFeatures outputs<a class="headerlink" href="#check-outputs-against-irisspatialfeatures-outputs" title="Permalink to this headline">¶</a></h1>
+<p>To ensure we are generating expected outs we can check against the outputs of IrisSpatialFeatures [<a class="reference external" href="https://github.com/gusef/IrisSpatialFeatures">github</a>].</p>
+<ul class="simple">
+<li>Jupyter Notebook: <a class="reference external" href="https://github.com/jason-weirather/pythologist/blob/master/notebooks/Test%20against%20IrisSpatialFeatures%20outputs.ipynb">Test against IrisSpatialFeatures outputs</a></li>
+</ul>
 </div>
 
 
