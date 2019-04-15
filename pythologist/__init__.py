@@ -550,7 +550,7 @@ class CellDataFrame(pd.DataFrame):
         """simple alias for combine phenotypes"""
         return self.combine_regions(*args,**kwargs)
 
-    def fill_phenotype_label(self,inplace=True):
+    def fill_phenotype_label(self,inplace=False):
         """
         Set the phenotype_label column according to our rules for mutual exclusion
         """
@@ -563,7 +563,22 @@ class CellDataFrame(pd.DataFrame):
         fixed = self.copy()
         fixed['phenotype_label'] = fixed.apply(lambda x: _get_phenotype(x['phenotype_calls']),1)
         return fixed
-
+    def fill_phenotype_calls(self,phenotypes=None,inplace=False):
+        """
+        Set the phenotype_calls according to the phenotype names
+        """
+        if phenotypes is None: phenotypes = list(self['phenotype_label'].unique())
+        def _get_calls(label,phenos):
+            d =  dict([(x,0) for x in phenos])
+            if label!=label: return d # np.nan case
+            d[label] = 1
+            return d
+        if inplace:
+            self['phenotype_calls'] = self.apply(lambda x: _get_calls(x['phenotype_label'],phenotypes),1)
+            return
+        fixed = self.copy()
+        fixed['phenotype_calls'] = fixed.apply(lambda x: _get_calls(x['phenotype_label'],phenotypes),1)
+        return fixed
     def phenotypes_to_regions(self,*args,**kwargs):
         """
         Create a new Project where regions are replaced to be based on regions defined as phenotypes

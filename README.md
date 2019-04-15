@@ -39,27 +39,6 @@ Any of the test data examples should work fine in this environment.
 
 # Installation
 
-## Docker jupyter labs quickstart
-
-To start a jupyter notebook in the current working directory on port 8885 you can use the following docker command.
-
-**First build a docker image that will use your own user/group name and id.**
-
-```
-$ docker build -t pythologist:latest --build-arg user=$USERNAME \
-                                     --build-arg group=$GROUPNAME \
-                                     --build-arg user_id=$USERID \
-                                     --build-arg group_id=$GROUPID .
-```
-
-**Now start the docker image.**
-
-```
-$ docker run --rm -p 8885:8888 -v $(pwd):/home/$USERNAME/work pythologist:latest
-```
-
-where `$USERNAME`, `$GROUPNAME`, `$USERID`, `$GROUPID` correspond to your user/group name/id.
-
 ## Install by pip
 
 ```
