@@ -4,6 +4,9 @@ class SubsetLogic(dict):
         if 'label' not in kwcopy: kwcopy['label'] = None
         if 'phenotypes' not in kwcopy: kwcopy['phenotypes'] = []
         if 'scored_calls' not in kwcopy: kwcopy['scored_calls'] = {}
+        for v in kwcopy.keys():
+            if v not in ['label','phenotypes','scored_calls']: 
+                raise ValueError("Illegal parameter in SubsetLogic "+str(v))
         super(SubsetLogic,self).__init__(*args,**kwcopy)
         self.itemlist = super(SubsetLogic,self).keys()
         return

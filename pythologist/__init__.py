@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import sys, json, h5py
 from pythologist.selection import SubsetLogic
+from pythologist.measurements.counts import PercentageLogic
 from pythologist.measurements.counts import Counts
 from pythologist.measurements.spatial.contacts import Contacts
 from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
@@ -290,7 +291,7 @@ class CellDataFrame(pd.DataFrame):
                 rows.append(dict(zip(a,b)))
         rows = pd.DataFrame(rows).drop(columns='regions').\
             drop_duplicates()[mergeon+['region_label','region_area_pixels']]
-        rows = rows.loc[rows['region_area_pixels']>0].copy()
+        #rows = rows.loc[rows['region_area_pixels']>0].copy()
         return rows
 
     def segmentation_images(self,*args,**kwargs):
@@ -367,6 +368,11 @@ class CellDataFrame(pd.DataFrame):
         """
         Return a class that can be used to access count densities
 
+        Args:
+            measured_regions (pandas.DataFrame): Dataframe of regions that are being measured (defaults to all the regions)
+            measured_phenotypes (list): List of phenotypes present (defaults to all the phenotypes)
+            minimum_region_size_pixels (int): Minimum region size to calculate counts on in pixels (Default: 1)
+
         Returns:
             Counts: returns a class that holds the counts.
         """
@@ -376,6 +382,8 @@ class CellDataFrame(pd.DataFrame):
         if 'measured_phenotypes' in kwargs: n.measured_phenotypes = kwargs['measured_phenotypes']
         else: n.measured_phenotypes = self.phenotypes
         n.microns_per_pixel = self.microns_per_pixel
+        if 'minimum_region_size_pixels' in kwargs: n.minimum_region_size_pixels = kwargs['minimum_region_size_pixels']
+        else: n.minimum_region_size_pixels = 1
         return n
 
     def qc(self,*args,**kwargs):
@@ -417,7 +425,7 @@ class CellDataFrame(pd.DataFrame):
         elif reference_markers is None: reference_markers = []
         if isinstance(addition_markers, str):
             addition_markers = df_addition.scored_names
-        elif additionmarkers is None: addition_markers = []
+        elif addition_markers is None: addition_markers = []
 
         df_addition = df_addition.copy()
         df_addition['_key'] = 1
@@ -430,7 +438,7 @@ class CellDataFrame(pd.DataFrame):
                 dict((k,x[k]) for k in reference_markers)
             )
         df['_sub2'] = df['_addition'].apply(lambda x:
-                dict((k,x[k]) for k in addition_markers)
+                dict({}) if x!=x else dict((k,x[k]) for k in addition_markers) # handle NaN where we fail to match properly treat as empty
             )
         # combine the two dictionaries
         df['scored_calls'] = df.apply(lambda x:
@@ -532,8 +540,8 @@ class CellDataFrame(pd.DataFrame):
         data = pd.concat(values)
         for k,v in logic.scored_calls.items():
             if k not in snames: raise ValueError("Scored name must exist in defined")
-            filter = 0 if v == '-' else 1
-            data = data.loc[data['scored_calls'].apply(lambda x: x[k]==filter)]
+            myfilter = 0 if v == '-' else 1
+            data = data.loc[data['scored_calls'].apply(lambda x: x[k]==myfilter)]
         data.microns_per_pixel = self.microns_per_pixel
         if update: 
             data['phenotype_calls'] = data['phenotype_calls'].apply(lambda x: {logic.label:1})
