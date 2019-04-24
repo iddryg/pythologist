@@ -681,9 +681,11 @@ class CellDataFrame(pd.DataFrame):
             vals = [k for k,v in d.items() if v ==  1]
             return np.nan if len(vals) == 0 else vals[0]
         if inplace:
+            if self.shape[0] == 0: return self
             self['phenotype_label'] = self.apply(lambda x: _get_phenotype(x['phenotype_calls']),1)
             return
         fixed = self.copy()
+        if fixed.shape[0] == 0: return fixed
         fixed['phenotype_label'] = fixed.apply(lambda x: _get_phenotype(x['phenotype_calls']),1)
         return fixed
     def fill_phenotype_calls(self,phenotypes=None,inplace=False):
