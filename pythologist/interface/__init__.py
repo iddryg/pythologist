@@ -344,3 +344,39 @@ def phenotypes_to_regions(cdf,path,
         for label in dfs[fid]: region_sizes[fid][label] = int(dfs[fid][label].astype(int).sum().sum())
     ocdf['regions'] = ocdf.apply(lambda x: region_sizes[x['frame_id']],1)
     return ocdf, output
+def get_region_images(cdf,output_path,colors,background_color='#000000',overwrite=False,format='png',verbose=False):
+    def hex_to_rgb(h):
+        h = h.lstrip('#')
+        v =  tuple(list(int(h[i:i+2], 16) for i in (0, 2, 4))+[255])
+        return [x/255 for x in v]
+
+    def write_regions(frame,basedir,colors,background_color,format):
+        rshape = frame.get_data('regions').iloc[0]['image_id']
+        rshape = frame.get_image(rshape).shape
+        start = np.zeros(list(rshape)+[4])
+        start[:,:]=hex_to_rgb(background_color)
+        fname = frame.frame_name
+        for i,r in frame.get_data('regions').iterrows():
+            col = colors[r['region_label']]
+            img = frame.get_image(r['image_id'])
+            start[img==1]=hex_to_rgb(col)
+        imageio.imwrite(os.path.join(basedir,fname+'.'+format), start,format=format)
+
+    if not cdf.db: raise ValueError("Need db set")
+    if os.path.exists(output_path) and not overwrite: raise ValueError("overwrite is set to False")
+    #os.makedirs(output_path)
+    #for s in cdf.db.sample_iter():
+    #    os.makedirs(os.path.join(output_path,s.sample_name))
+    values = cdf.loc[:,['project_name','sample_id','frame_name','frame_id']].drop_duplicates()
+    for pname in values['project_name'].unique():
+        samples = values.loc[values['project_name']==pname]
+        for sid in samples['sample_id'].unique():
+            s = cdf.db.get_sample(sid)
+            sname = s.sample_name
+            if verbose: sys.stderr.write(str((pname,sname))+"\n")
+            basedir = os.path.join(output_path,pname,sname)
+            if not os.path.exists(basedir):
+                os.makedirs(basedir)
+            frames = samples.loc[samples['sample_id']==sid]
+            for fid in frames['frame_id'].unique():
+                write_regions(s.get_frame(fid),basedir,colors,background_color,format)

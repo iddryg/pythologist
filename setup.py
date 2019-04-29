@@ -30,6 +30,7 @@ setup(
                     'h5py',
                     'imageio',
                     'tables',
+                    'Pillow',
                     'pythologist-image-utilities>=1.0.2'],
   extras_require = {
         'test':  ["pythologist-test-images"]
