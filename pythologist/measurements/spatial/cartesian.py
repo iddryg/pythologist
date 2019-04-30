@@ -87,7 +87,8 @@ class Cartesian(Measurement):
         df2['range'] = df2['maximum'].subtract(df2['minimum'])
         df2.loc[df2['range']<=0,'range'] =1
         df2['standardized'] = (df2['fraction'].subtract(df2['minimum'])).divide(df2['range']).multiply(255).astype(int)
-
+        rangetop = df2[self.cdf.frame_columns+['phenotype_label','p95']].drop_duplicates().\
+            rename(columns={'p95':'range_top'})
         df3 = df2.set_index(self.cdf.frame_columns+['coord_id','frame_x','frame_y','frame_shape','step_pixels'])[['phenotype_label','standardized']].\
             pivot(columns='phenotype_label')
         df3.columns = df3.columns.droplevel(0)
@@ -102,8 +103,8 @@ class Cartesian(Measurement):
         df3 = df3.sort_values(['frame_id','frame_y','frame_x']).reset_index(drop=True)
         dcols = df3[['color','color_str']].drop_duplicates()
         df3['color_str'] = pd.Categorical(df3['color_str'],categories=dcols['color_str'])
-        return df3,dcols['color_str']
-
+        return df3, dcols['color_str'], rangetop
+        
 def _get_proximal_points(cdf_lines,coords,frame_columns,phenotype_labels,max_distance_pixels):
     prox = cdf_lines.merge(coords,on=frame_columns)
     prox['x1'] = prox['x'].subtract(prox['frame_x'])
