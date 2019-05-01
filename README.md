@@ -6,7 +6,7 @@
 
 Pythologist 1) reads exports from InForm software or other sources into a common storage format, and 2) extracts basic analysis features from cell image data.  This software is generally intended to be run from a jupyter notebook and provides hooks into the image data so that the user can have the flexability to execute analyses they design or find in the primary literature.
 
-[List of large-scale image analysis publications](https://github.com/jason-weirather/pythologist/wiki/list-of-large-scale-image-analysis-publications)
+[List of image analysis publications](https://github.com/jason-weirather/pythologist/wiki/list-of-image-analysis-publications)
 
 
 Pythologist is based on [**IrisSpatialFeatures**](https://github.com/gusef/IrisSpatialFeatures) (C.D. Carey, ,D. Gusenleitner, M. Lipshitz, et al. Blood. 2017) https://doi.org/10.1182/blood-2017-03-770719, and is implemented in the python programming language. 
