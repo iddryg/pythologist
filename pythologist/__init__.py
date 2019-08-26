@@ -486,6 +486,29 @@ class CellDataFrame(pd.DataFrame):
             _do_fill(x['phenotype_calls'],pnames)
             ,1)
         return output
+    
+    def zero_fill_missing_scores(self):
+        """
+        Fill in missing phenotypes and scored types by listing any missing data as negative
+
+        Returns:
+            CellDataFrame: The CellDataFrame modified.
+        """
+        if self.is_uniform(verbose=False): return self.copy()
+        output = self.copy()
+        def _do_fill(d,names):
+            old_names = list(d.keys())
+            old_values = list(d.values())
+            missing = set(names)-set(old_names)
+            return dict(zip(old_names+list(missing),old_values+([0]*len(missing))))
+        ## Need to make these uniform
+        pnames = self.scored_names
+        output['scored_calls']= output.apply(lambda x:
+            _do_fill(x['scored_calls'],pnames)
+            ,1)
+        return output
+    
+
 
     def drop_scored_calls(self,names):
         """
