@@ -78,7 +78,8 @@ class Cartesian(Measurement):
         d2 = df2.groupby(['frame_id','phenotype_label']).\
             max()[['fraction']].reset_index().rename(columns={'fraction':'maximum'})
         d3 = df2.groupby(['frame_id','phenotype_label']).\
-            quantile(max_quantile_color)[['fraction']].reset_index().rename(columns={'fraction':'p95'})
+            apply(lambda x: x['fraction'].quantile(max_quantile_color)).reset_index().\
+            rename(columns={0:'p95'})
         df2 = d1.merge(d2,on=['frame_id','phenotype_label'],how='outer').merge(df2,on=['frame_id','phenotype_label'],how='outer').\
             merge(d3,on=['frame_id','phenotype_label'],how='outer')
         df2 = df2.fillna(0)
