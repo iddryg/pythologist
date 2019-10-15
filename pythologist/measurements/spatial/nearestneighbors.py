@@ -224,22 +224,24 @@ class NearestNeighbors(Measurement):
         ,1)
         cdf.microns_per_pixel = self.microns_per_pixel
         return cdf.drop(columns='_threshold')
-    def bin_fractions_from_neighbor(self,neighbor_phenotype,numerator_phenotypes,denominator_phenotypes,bin_size_microns=20,minimum_total_count=0):
+    def bin_fractions_from_neighbor(self,neighbor_phenotype,numerator_phenotypes,denominator_phenotypes,
+                                         bin_size_microns=20,
+                                         minimum_total_count=0,
+                                         group_strategy=['project_name','project_id','sample_name','sample_id']):
         # set our bin size in microns
         mynn = self.loc[self['neighbor_phenotype_label']==neighbor_phenotype].copy()
-        mynn['minimum_distance_microns'] = mynn['minimum_distance_pixels'].apply(lambda x: x*mynn.cdf.microns_per_pixel)
+        mynn['minimum_distance_microns'] = mynn['minimum_distance_pixels'].apply(lambda x: x*self.cdf.microns_per_pixel)
         rngs = np.arange(0,mynn['minimum_distance_microns'].max(),bin_size_microns)
         mynn['bins'] = pd.cut(mynn['minimum_distance_microns'],bins=rngs)
         numerator = mynn.loc[mynn['phenotype_label'].isin(numerator_phenotypes)]
         denominator = mynn.loc[mynn['phenotype_label'].isin(denominator_phenotypes)]
 
-        group_criteria = ['project_name','sample_name']
-        numerator = numerator.groupby(group_criteria+['bins']).count()[['cell_index']].rename(columns={'cell_index':'cell_count'}).reset_index()
+        numerator = numerator.groupby(group_strategy+['bins']).count()[['cell_index']].rename(columns={'cell_index':'cell_count'}).reset_index()
         numerator['group'] = 'numerator'
-        denominator = denominator.groupby(group_criteria+['bins']).count()[['cell_index']].rename(columns={'cell_index':'cell_count'}).reset_index()
+        denominator = denominator.groupby(group_strategy+['bins']).count()[['cell_index']].rename(columns={'cell_index':'cell_count'}).reset_index()
         denominator['group'] = 'total'
         sub = pd.concat([numerator,denominator])
-        sub = sub.set_index(group_criteria+['bins']).pivot(columns='group')
+        sub = sub.set_index(group_strategy+['bins']).pivot(columns='group')
         sub.columns = sub.columns.droplevel(0)
         sub = sub.reset_index()
         sub['fraction'] = sub['numerator'].divide(sub['total'])
