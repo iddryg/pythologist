@@ -772,6 +772,33 @@ class CellDataFrame(pd.DataFrame):
             dict([(y,1 if x['phenotype_label']==y else 0) for y in phenotypes])
         ,1)
         return output
+    def permute_phenotype_labels(self,phenotype_labels=None,
+                                      random_state=None,
+                                      group_strategy=['project_name','project_id','sample_name','sample_id','frame_name','frame_id']):
+        """
+        Shuffle phenotype labels.  Defaults to shuffleling all labels within a frame.  Adjust this by modifying group_strategy.
+
+        Args:
+            phenotype_labels (list): a list of phenotype_labels to shuffle amongst eachother if None shuffle all
+            random_state (int or numpy random state): pass to the pandas shuffle function
+            group_strategy (list): variables to group by
+
+        Returns:
+            CellDataFrame
+        """
+        if random_state is not None and isinstance(random_state, int): random_state = np.random.RandomState(random_state)
+        # if phenotype_labels is None use all phenotype labels
+        remember_order = self.index
+        if phenotype_labels is None: phenotype_labels = self.phenotypes
+        keep = self.loc[~self['phenotype_label'].isin(phenotype_labels)].copy()
+        toshuffle = self.loc[self['phenotype_label'].isin(phenotype_labels)].copy()
+        shuffled = []
+        for name, group in toshuffle.groupby(group_strategy):
+            sub = group.copy()
+            sub['phenotype_label'] = list(sub['phenotype_label'].sample(sub.shape[0],random_state=random_state).reset_index(drop=True))
+            sub = sub.fill_phenotype_calls()
+            shuffled.append(sub)
+        return CellDataFrame.concat([keep]+shuffled).loc[remember_order]
 
 def _extract_unique_keys_from_series(s):
     uni = pd.Series(s.apply(lambda x: json.dumps(x)).unique()).\
