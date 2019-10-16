@@ -227,7 +227,7 @@ class NearestNeighbors(Measurement):
     def bin_fractions_from_neighbor(self,neighbor_phenotype,numerator_phenotypes,denominator_phenotypes,
                                          bin_size_microns=20,
                                          minimum_total_count=0,
-                                         group_strategy=['project_name','project_id','sample_name','sample_id']):
+                                         group_strategy=['project_name','sample_name']):
         # set our bin size in microns
         mynn = self.loc[self['neighbor_phenotype_label']==neighbor_phenotype].copy()
         mynn['minimum_distance_microns'] = mynn['minimum_distance_pixels'].apply(lambda x: x*self.cdf.microns_per_pixel)
