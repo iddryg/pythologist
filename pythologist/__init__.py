@@ -7,7 +7,7 @@ from pythologist.measurements.counts import Counts
 from pythologist.measurements.spatial.contacts import Contacts
 from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
 from pythologist.measurements.spatial.cartesian import Cartesian
-from pythologist.interface import SegmentationImages, phenotypes_to_regions
+from pythologist.interface import SegmentationImages, phenotypes_to_regions as interface_phenotypes_to_regions
 from pythologist.qc import QC
 
 class CellDataSeries(pd.Series):
@@ -742,7 +742,27 @@ class CellDataFrame(pd.DataFrame):
             CellProject: The new cell project
             CellDataFrame: The updated cell project
         """
-        return phenotypes_to_regions(self,*args,**kwargs)
+        return interface_phenotypes_to_regions(self,*args,**kwargs)
+
+    def regions_to_scored(self,regions=[]):
+        """
+        Covert the region calls to scored_calls
+
+        Args: regions (list): a list of regions to use (default empty list will use all regions)
+        """
+        if len(regions) == 0: regions = self.regions
+        if not isinstance(regions,list): raise ValueError("ERROR: regions is a list input")
+        def _get_calls(current,region_label,regions):
+            d = current.copy()
+            for region in regions:
+                if region in d.keys(): raise ValueError("ERROR: cannot overwrite a scored call.")
+                d[region] = 0
+                if region_label == region: d[region] =1
+            return d
+        fixed = self.copy()
+        fixed['scored_calls'] = fixed.apply(lambda x: _get_calls(x['scored_calls'],x['region_label'],regions),1)
+        return fixed
+
 
     def scored_to_phenotype(self,phenotypes):
         """

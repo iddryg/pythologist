@@ -87,7 +87,6 @@
 </li>
 <li><a class="reference internal" href="#quickstart">Quickstart</a></li>
 <li><a class="reference internal" href="#installation">Installation</a><ul>
-<li><a class="reference internal" href="#docker-jupyter-labs-quickstart">Docker jupyter labs quickstart</a></li>
 <li><a class="reference internal" href="#install-by-pip">Install by pip</a></li>
 </ul>
 </li>
@@ -163,25 +162,25 @@
 <div class="section" id="intro">
 <h2>Intro<a class="headerlink" href="#intro" title="Permalink to this headline">¶</a></h2>
 <p>Pythologist 1) reads exports from InForm software or other sources into a common storage format, and 2) extracts basic analysis features from cell image data.  This software is generally intended to be run from a jupyter notebook and provides hooks into the image data so that the user can have the flexability to execute analyses they design or find in the primary literature.</p>
-<p><a class="reference external" href="https://github.com/jason-weirather/pythologist/wiki/list-of-large-scale-image-analysis-publications">List of large-scale image analysis publications</a></p>
+<p><a class="reference external" href="https://github.com/jason-weirather/pythologist/wiki/list-of-image-analysis-publications">List of image analysis publications</a></p>
 <p>Pythologist is based on <a class="reference external" href="https://github.com/gusef/IrisSpatialFeatures">**IrisSpatialFeatures**</a> (C.D. Carey, ,D. Gusenleitner, M. Lipshitz, et al. Blood. 2017) <a class="reference external" href="https://doi.org/10.1182/blood-2017-03-770719">https://doi.org/10.1182/blood-2017-03-770719</a>, and is implemented in the python programming language.</p>
 <p>Features Pythologist add are:</p>
 <ul class="simple">
-<li>An common CellProjectGeneric storage class, and classical inheritance conventions to organize the importation of different data types.</li>
-<li>A mutable CellDataFrame class that can be used for slicing, and combining projects.</li>
-<li>The ability to add binary features to cells based on cell-cell contacts or cell proximity.</li>
-<li>Customizable images based on the cell segmentation or heatmaps spaninng the cartesian coordinates.</li>
-<li>Specify cell populations through a SubsetLogic syntax for quick selection of mutually exclusive phenotypes or binary features</li>
-<li>A set of Quality Check functions to identify potential issues in imported data.</li>
+<li><p>An common CellProjectGeneric storage class, and classical inheritance conventions to organize the importation of different data types.</p></li>
+<li><p>A mutable CellDataFrame class that can be used for slicing, and combining projects.</p></li>
+<li><p>The ability to add binary features to cells based on cell-cell contacts or cell proximity.</p></li>
+<li><p>Customizable images based on the cell segmentation or heatmaps spaninng the cartesian coordinates.</p></li>
+<li><p>Specify cell populations through a SubsetLogic syntax for quick selection of mutually exclusive phenotypes or binary features</p></li>
+<li><p>A set of Quality Check functions to identify potential issues in imported data.</p></li>
 </ul>
 </div>
 <div class="section" id="module-documentation">
 <h2>Module documentation<a class="headerlink" href="#module-documentation" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
-<li><code class="docutils literal notranslate"><span class="pre">pythologist</span></code> CellDataFrame class to modify and execute analysses [<a class="reference external" href="https://jason-weirather.github.io/pythologist/#modules">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist">source</a>]</li>
-<li><code class="docutils literal notranslate"><span class="pre">pythologist-reader</span></code> CellProject Storage Object [<a class="reference external" href="https://jason-weirather.github.io/pythologist-reader/">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist-reader">source</a>]</li>
-<li><code class="docutils literal notranslate"><span class="pre">pythologist-test-images</span></code> Example data [<a class="reference external" href="https://github.com/jason-weirather/pythologist-test-images">source</a>]</li>
-<li><code class="docutils literal notranslate"><span class="pre">pythologist-image-utilities</span></code> Helper functions to work with images [<a class="reference external" href="https://jason-weirather.github.io/pythologist-image-utilities/">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist-image-utilities">source</a>]</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pythologist</span></code> CellDataFrame class to modify and execute analysses [<a class="reference external" href="https://jason-weirather.github.io/pythologist/#modules">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist">source</a>]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pythologist-reader</span></code> CellProject Storage Object [<a class="reference external" href="https://jason-weirather.github.io/pythologist-reader/">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist-reader">source</a>]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pythologist-test-images</span></code> Example data [<a class="reference external" href="https://github.com/jason-weirather/pythologist-test-images">source</a>]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pythologist-image-utilities</span></code> Helper functions to work with images [<a class="reference external" href="https://jason-weirather.github.io/pythologist-image-utilities/">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist-image-utilities">source</a>]</p></li>
 </ul>
 </div>
 </div>
@@ -194,22 +193,6 @@
 </div>
 <div class="section" id="installation">
 <h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="docker-jupyter-labs-quickstart">
-<h2>Docker jupyter labs quickstart<a class="headerlink" href="#docker-jupyter-labs-quickstart" title="Permalink to this headline">¶</a></h2>
-<p>To start a jupyter notebook in the current working directory on port 8885 you can use the following docker command.</p>
-<p><strong>First build a docker image that will use your own user/group name and id.</strong></p>
-<div class="highlight-guess notranslate"><div class="highlight"><pre><span></span>$ docker build -t pythologist:latest --build-arg <span class="nv">user</span><span class="o">=</span><span class="nv">$USERNAME</span> <span class="se">\</span>
-                                     --build-arg <span class="nv">group</span><span class="o">=</span><span class="nv">$GROUPNAME</span> <span class="se">\</span>
-                                     --build-arg <span class="nv">user_id</span><span class="o">=</span><span class="nv">$USERID</span> <span class="se">\</span>
-                                     --build-arg <span class="nv">group_id</span><span class="o">=</span><span class="nv">$GROUPID</span> .
-</pre></div>
-</div>
-<p><strong>Now start the docker image.</strong></p>
-<div class="highlight-guess notranslate"><div class="highlight"><pre><span></span>$ docker run --rm -p <span class="m">8885</span>:8888 -v <span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>:/home/<span class="nv">$USERNAME</span>/work pythologist:latest
-</pre></div>
-</div>
-<p>where <code class="docutils literal notranslate"><span class="pre">$USERNAME</span></code>, <code class="docutils literal notranslate"><span class="pre">$GROUPNAME</span></code>, <code class="docutils literal notranslate"><span class="pre">$USERID</span></code>, <code class="docutils literal notranslate"><span class="pre">$GROUPID</span></code> correspond to your user/group name/id.</p>
-</div>
 <div class="section" id="install-by-pip">
 <h2>Install by pip<a class="headerlink" href="#install-by-pip" title="Permalink to this headline">¶</a></h2>
 <div class="highlight-guess notranslate"><div class="highlight"><pre><span></span>$ pip install pythologist
@@ -491,23 +474,27 @@ Issue count: 1/2
 </pre></div>
 </div>
 <blockquote>
-<div>[‘PD1’, ‘PDL1’]</div></blockquote>
+<div><p>[‘PD1’, ‘PDL1’]</p>
+</div></blockquote>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cdf</span><span class="o">.</span><span class="n">phenotypes</span>
 </pre></div>
 </div>
 <blockquote>
-<div>[‘CD8+’, ‘OTHER’, ‘SOX10+’]</div></blockquote>
+<div><p>[‘CD8+’, ‘OTHER’, ‘SOX10+’]</p>
+</div></blockquote>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cdf</span><span class="o">.</span><span class="n">regions</span>
 </pre></div>
 </div>
 <blockquote>
-<div>[‘Margin’, ‘Stroma’, ‘Tumor’]</div></blockquote>
+<div><p>[‘Margin’, ‘Stroma’, ‘Tumor’]</p>
+</div></blockquote>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">collapsed</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">collapse_phenotypes</span><span class="p">([</span><span class="s1">&#39;CD8+&#39;</span><span class="p">,</span><span class="s1">&#39;OTHER&#39;</span><span class="p">],</span><span class="s1">&#39;non-Tumor&#39;</span><span class="p">)</span>
 <span class="n">collapsed</span><span class="o">.</span><span class="n">phenotypes</span>
 </pre></div>
 </div>
 <blockquote>
-<div>[‘SOX10+’, ‘non-Tumor’]</div></blockquote>
+<div><p>[‘SOX10+’, ‘non-Tumor’]</p>
+</div></blockquote>
 <p>Rename <em>TUMOR</em> to <em>Tumor</em></p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">renamed</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">rename_region</span><span class="p">(</span><span class="s1">&#39;TUMOR&#39;</span><span class="p">,</span><span class="s1">&#39;Tumor&#39;</span><span class="p">)</span>
 </pre></div>
@@ -548,7 +535,7 @@ Issue count: 1/2
 <h1>Check outputs against IrisSpatialFeatures outputs<a class="headerlink" href="#check-outputs-against-irisspatialfeatures-outputs" title="Permalink to this headline">¶</a></h1>
 <p>To ensure we are generating expected outs we can check against the outputs of IrisSpatialFeatures [<a class="reference external" href="https://github.com/gusef/IrisSpatialFeatures">github</a>].</p>
 <ul class="simple">
-<li>Jupyter Notebook: <a class="reference external" href="https://github.com/jason-weirather/pythologist/blob/master/notebooks/Test%20against%20IrisSpatialFeatures%20outputs.ipynb">Test against IrisSpatialFeatures outputs</a></li>
+<li><p>Jupyter Notebook: <a class="reference external" href="https://github.com/jason-weirather/pythologist/blob/master/notebooks/Test%20against%20IrisSpatialFeatures%20outputs.ipynb">Test against IrisSpatialFeatures outputs</a></p></li>
 </ul>
 </div>
 
