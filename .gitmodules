@@ -1,3 +1,6 @@
 [submodule "libs/pythologist-schemas"]
 	path = libs/pythologist-schemas
 	url = git@github.com:jason-weirather/pythologist-schemas.git
+[submodule "libs/pythologist-reader"]
+	path = libs/pythologist-reader
+	url = git@github.com:jason-weirather/pythologist-reader.git
