@@ -1,0 +1,4 @@
+[submodule "libs/pythologist-schemas"]
+	path = libs/pythologist-schemas
+	url = git@github.com:jason-weirather/pythologist-schemas.git
+        ignore = dirty
