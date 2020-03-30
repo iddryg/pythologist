@@ -4,3 +4,9 @@
 [submodule "libs/pythologist-reader"]
 	path = libs/pythologist-reader
 	url = git@github.com:jason-weirather/pythologist-reader.git
+[submodule "libs/pythologist-test-images"]
+	path = libs/pythologist-test-images
+	url = git@github.com:jason-weirather/pythologist-test-images.git
+[submodule "libs/pythologist-image-utilities"]
+	path = libs/pythologist-image-utilities
+	url = git@github.com:jason-weirather/pythologist-image-utilities.git
