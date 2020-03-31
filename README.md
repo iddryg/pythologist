@@ -22,10 +22,33 @@ Features Pythologist add are:
 
 ## Module documentation
 
+This primary module `pythologist` is comprised of submodules.
+
+All of these can be cloned at once via https with the command:
+
+```
+$ git clone --recurse-submodules https://github.com/jason-weirather/pythologist.git
+```
+
+or via ssh
+
+```
+$ git clone --recurse-submodules git@github.com:jason-weirather/pythologist.git
+```
+
+Submodules will be in the `libs/` directory. For development purposes you should 
+
+1. checkout and pull the master branch of each of these submodules
+2. install each of these submodules as editable via `pip install -e .`
+3. install the main `pythologist` as editable the same way `pip install -e .`
+
+There is probably a more elegant way to use setuptools to assist in this process that I'm not doing here.
+
 * `pythologist` CellDataFrame class to modify and execute analysses [[Read the Docs](https://jason-weirather.github.io/pythologist/#modules)] [[source](https://github.com/jason-weirather/pythologist)]
 * `pythologist-reader` CellProject Storage Object [[Read the Docs](https://jason-weirather.github.io/pythologist-reader/)] [[source](https://github.com/jason-weirather/pythologist-reader)]
 * `pythologist-test-images` Example data [[source](https://github.com/jason-weirather/pythologist-test-images)]
 * `pythologist-image-utilities` Helper functions to work with images [[Read the Docs](https://jason-weirather.github.io/pythologist-image-utilities/)] [[source](https://github.com/jason-weirather/pythologist-image-utilities)] 
+
 
 # Quickstart
 
