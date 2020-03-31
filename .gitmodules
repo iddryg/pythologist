@@ -1,12 +1,12 @@
 [submodule "libs/pythologist-schemas"]
 	path = libs/pythologist-schemas
-	url = git@github.com:jason-weirather/pythologist-schemas.git
+	url = ../pythologist-schemas.git
 [submodule "libs/pythologist-reader"]
 	path = libs/pythologist-reader
-	url = git@github.com:jason-weirather/pythologist-reader.git
+	url = ../pythologist-reader.git
 [submodule "libs/pythologist-test-images"]
 	path = libs/pythologist-test-images
-	url = git@github.com:jason-weirather/pythologist-test-images.git
+	url = ../pythologist-test-images.git
 [submodule "libs/pythologist-image-utilities"]
 	path = libs/pythologist-image-utilities
-	url = git@github.com:jason-weirather/pythologist-image-utilities.git
+	url = ../pythologist-image-utilities.git
