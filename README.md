@@ -22,7 +22,7 @@ Features Pythologist add are:
 
 ## Module documentation
 
-* `pythologist` This software package uses a CellDataFrame class, and extension of a Pandas DataFrame to modify data and execute analyses [[Read the Docs](https://jason-weirather.github.io/pythologist/#modules)] [[source](https://github.com/jason-weirather/pythologist)]
+* `pythologist` This software package uses a CellDataFrame class, an extension of a Pandas DataFrame to modify data and execute analyses [[Read the Docs](https://jason-weirather.github.io/pythologist/#modules)] [[source](https://github.com/jason-weirather/pythologist)]
 * `pythologist-schemas` This submodule documents/defines the formats of inputs and outputs expected in this pipeline. [[source](https://github.com/jason-weirather/pythologist-schemas)]
 * `pythologist-reader` This submodule facillitates reading platform-specific data into a harmonized format. [[Read the Docs](https://jason-weirather.github.io/pythologist-reader/)] [[source](https://github.com/jason-weirather/pythologist-reader)]
 * `pythologist-test-images` This submodule has some example data [[source](https://github.com/jason-weirather/pythologist-test-images)]
