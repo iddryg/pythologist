@@ -56,6 +56,11 @@ RUN pip3 install jupyterlab \
 #    && cd /home/$user/source \
 RUN mkdir /source \
     && cd /source \
+    && git clone https://github.com/jason-weirather/mibitracker-client.git \
+    && cd mibitracker-client \
+    && git checkout 7aafa8c \
+    && pip install -e . \
+    && cd .. \
     && git clone --recurse-submodules https://github.com/jason-weirather/pythologist.git \
     && git clone https://github.com/jason-weirather/good-neighbors.git \
     && cd pythologist/libs/pythologist-image-utilities \
