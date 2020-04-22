@@ -64,7 +64,7 @@ RUN mkdir /source \
     && pip3 install -e . \
     && cd libs/pythologist-reader \
     && pip3 install -e . \
-    && cd ../../pythologist-test-images \
+    && cd ../../libs/pythologist-test-images \
     && pip3 install -e . \ 
     && cd ../../../good-neighbors \
     && pip3 install -e .

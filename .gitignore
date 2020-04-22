@@ -1,5 +1,8 @@
 test.ipynb
 .DS_Store
+notebooks/pythologist.h5
+notebooks/test.h5
+notebooks/test_edges/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
