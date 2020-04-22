@@ -56,20 +56,17 @@ RUN pip3 install jupyterlab \
 #    && cd /home/$user/source \
 RUN mkdir /source \
     && cd /source \
-    && git clone https://github.com/jason-weirather/pythologist-reader.git \
-    && git clone https://github.com/jason-weirather/pythologist-image-utilities.git \
-    && git clone https://github.com/jason-weirather/pythologist-test-images.git \
-    && git clone https://github.com/jason-weirather/pythologist.git \
+    && git clone --recurse-submodules https://github.com/jason-weirather/pythologist.git \
     && git clone https://github.com/jason-weirather/good-neighbors.git \
-    && cd pythologist-image-utilities \
+    && cd pythologist/libs/pythologist-image-utilities \
     && pip3 install -e . \
-    && cd ../pythologist \
+    && cd ../.. \
     && pip3 install -e . \
-    && cd ../pythologist-reader \
+    && cd libs/pythologist-reader \
     && pip3 install -e . \
-    && cd ../pythologist-test-images \
+    && cd ../../pythologist-test-images \
     && pip3 install -e . \ 
-    && cd ../good-neighbors \
+    && cd ../../../good-neighbors \
     && pip3 install -e .
 #RUN mkdir /home/$user/work
 #WORKDIR /home/$user/work
