@@ -280,7 +280,7 @@ proj = TestImages().project('IrisSpatialFeatures')
 cdf = TestImages().celldataframe('IrisSpatialFeatures')
 cdf.db = proj
 cart = cdf.cartesian(verbose=True,step_pixels=50,max_distance_pixels=75)
-df,cols = cart.rgb_dataframe(red='CD8+',green='SOX10+')
+df,cols,rngtop = cart.rgb_dataframe(red='CD8+',green='SOX10+')
 shape = cdf.iloc[0]['frame_shape']
 (ggplot(df,aes(x='frame_x',y='frame_y',fill='color_str'))
  + geom_point(shape='h',size=4.5,color='#777777',stroke=0.2)
