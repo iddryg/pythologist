@@ -84,7 +84,10 @@
 <li><a class="reference internal" href="#readme-file">Readme File</a></li>
 <li><a class="reference internal" href="#pythologist">pythologist</a><ul>
 <li><a class="reference internal" href="#intro">Intro</a></li>
-<li><a class="reference internal" href="#module-documentation">Module documentation</a></li>
+<li><a class="reference internal" href="#module-documentation">Module documentation</a><ul>
+<li><a class="reference internal" href="#about-submodules">about submodules</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#quickstart">Quickstart</a></li>
@@ -187,11 +190,31 @@
 <div class="section" id="module-documentation">
 <h2>Module documentation<a class="headerlink" href="#module-documentation" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">pythologist</span></code> CellDataFrame class to modify and execute analysses [<a class="reference external" href="https://jason-weirather.github.io/pythologist/#modules">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist">source</a>]</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">pythologist-reader</span></code> CellProject Storage Object [<a class="reference external" href="https://jason-weirather.github.io/pythologist-reader/">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist-reader">source</a>]</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">pythologist-test-images</span></code> Example data [<a class="reference external" href="https://github.com/jason-weirather/pythologist-test-images">source</a>]</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">pythologist-image-utilities</span></code> Helper functions to work with images [<a class="reference external" href="https://jason-weirather.github.io/pythologist-image-utilities/">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist-image-utilities">source</a>]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pythologist</span></code> This software package uses a CellDataFrame class, an extension of a Pandas DataFrame to modify data and execute analyses [<a class="reference external" href="https://jason-weirather.github.io/pythologist/#modules">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist">source</a>]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pythologist-schemas</span></code> This submodule documents/defines the formats of inputs and outputs expected in this pipeline. [<a class="reference external" href="https://github.com/jason-weirather/pythologist-schemas">source</a>]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pythologist-reader</span></code> This submodule facillitates reading platform-specific data into a harmonized format. [<a class="reference external" href="https://jason-weirather.github.io/pythologist-reader/">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist-reader">source</a>]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pythologist-test-images</span></code> This submodule has some example data [<a class="reference external" href="https://github.com/jason-weirather/pythologist-test-images">source</a>]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pythologist-image-utilities</span></code> This submodule has helper functions to work with images [<a class="reference external" href="https://jason-weirather.github.io/pythologist-image-utilities/">Read the Docs</a>] [<a class="reference external" href="https://github.com/jason-weirather/pythologist-image-utilities">source</a>]</p></li>
 </ul>
+<div class="section" id="about-submodules">
+<h3>about submodules<a class="headerlink" href="#about-submodules" title="Permalink to this headline">¶</a></h3>
+<p>This primary module <code class="docutils literal notranslate"><span class="pre">pythologist</span></code> is comprised of submodules.</p>
+<p>All of these can be cloned at once via https with the command:</p>
+<div class="highlight-guess notranslate"><div class="highlight"><pre><span></span>$ git clone --recurse-submodules https://github.com/jason-weirather/pythologist.git
+</pre></div>
+</div>
+<p>or via ssh</p>
+<div class="highlight-guess notranslate"><div class="highlight"><pre><span></span>$ git clone --recurse-submodules git@github.com:jason-weirather/pythologist.git
+</pre></div>
+</div>
+<p>Submodules will be in the <code class="docutils literal notranslate"><span class="pre">libs/</span></code> directory. For development purposes you should</p>
+<ol class="arabic simple">
+<li><p>checkout and pull the master branch of each of these submodules</p></li>
+<li><p>install each of these submodules as editable via <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-e</span> <span class="pre">.</span></code></p></li>
+<li><p>install the main <code class="docutils literal notranslate"><span class="pre">pythologist</span></code> as editable the same way <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-e</span> <span class="pre">.</span></code></p></li>
+</ol>
+<p>There is probably a more elegant way to use setuptools to assist in this process that I’m not doing here.</p>
+</div>
 </div>
 </div>
 <div class="section" id="quickstart">
@@ -386,7 +409,7 @@ Issue count: 1/2
 <span class="n">cdf</span> <span class="o">=</span> <span class="n">TestImages</span><span class="p">()</span><span class="o">.</span><span class="n">celldataframe</span><span class="p">(</span><span class="s1">&#39;IrisSpatialFeatures&#39;</span><span class="p">)</span>
 <span class="n">cdf</span><span class="o">.</span><span class="n">db</span> <span class="o">=</span> <span class="n">proj</span>
 <span class="n">cart</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">cartesian</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span><span class="n">step_pixels</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span><span class="n">max_distance_pixels</span><span class="o">=</span><span class="mi">75</span><span class="p">)</span>
-<span class="n">df</span><span class="p">,</span><span class="n">cols</span> <span class="o">=</span> <span class="n">cart</span><span class="o">.</span><span class="n">rgb_dataframe</span><span class="p">(</span><span class="n">red</span><span class="o">=</span><span class="s1">&#39;CD8+&#39;</span><span class="p">,</span><span class="n">green</span><span class="o">=</span><span class="s1">&#39;SOX10+&#39;</span><span class="p">)</span>
+<span class="n">df</span><span class="p">,</span><span class="n">cols</span><span class="p">,</span><span class="n">rngtop</span> <span class="o">=</span> <span class="n">cart</span><span class="o">.</span><span class="n">rgb_dataframe</span><span class="p">(</span><span class="n">red</span><span class="o">=</span><span class="s1">&#39;CD8+&#39;</span><span class="p">,</span><span class="n">green</span><span class="o">=</span><span class="s1">&#39;SOX10+&#39;</span><span class="p">)</span>
 <span class="n">shape</span> <span class="o">=</span> <span class="n">cdf</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;frame_shape&#39;</span><span class="p">]</span>
 <span class="p">(</span><span class="n">ggplot</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="n">aes</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="s1">&#39;frame_x&#39;</span><span class="p">,</span><span class="n">y</span><span class="o">=</span><span class="s1">&#39;frame_y&#39;</span><span class="p">,</span><span class="n">fill</span><span class="o">=</span><span class="s1">&#39;color_str&#39;</span><span class="p">))</span>
  <span class="o">+</span> <span class="n">geom_point</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="s1">&#39;h&#39;</span><span class="p">,</span><span class="n">size</span><span class="o">=</span><span class="mf">4.5</span><span class="p">,</span><span class="n">color</span><span class="o">=</span><span class="s1">&#39;#777777&#39;</span><span class="p">,</span><span class="n">stroke</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
@@ -649,6 +672,25 @@ db (CellProject): a storage class that has all the image and mask data</p>
 </dd>
 <dt class="field-even">Return type</dt>
 <dd class="field-even"><p>Contacts</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.convert_cascading_scores_to_mutually_exclusive_ordinal_binary">
+<code class="sig-name descname">convert_cascading_scores_to_mutually_exclusive_ordinal_binary</code><span class="sig-paren">(</span><em class="sig-param">cascading_scored_calls</em>, <em class="sig-param">ordinal_labels</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.convert_cascading_scores_to_mutually_exclusive_ordinal_binary"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.convert_cascading_scores_to_mutually_exclusive_ordinal_binary" title="Permalink to this definition">¶</a></dt>
+<dd><p>If you have a cascade of scoring stored as binary calls, you can convert these to mutuallye exclusive binary calls for ordinal labels.</p>
+<p>Example is you have thresholds for 0/1, 1/2, and 2/3, you can convert these thresholds to
+mutually exclusive +/- for 0,1,2,3</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cascading_scored_calls</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.8)"><em>list</em></a>) – an ordered from lowest thresholds to greatest thresholds list of thresholds in scored_names</p></li>
+<li><p><strong>ordinal_labels</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.8)"><em>list</em></a>) – the list of ordinal labels to split the phenotype label into</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>CellDataFrame</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1049,6 +1091,23 @@ to specify a label give the positive and negative label</p>
 </dd>
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p><a class="reference internal" href="#pythologist.CellDataFrame" title="pythologist.CellDataFrame">CellDataFrame</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="pythologist.CellDataFrame.threshold_on_mutually_exclusive_ordinal_labels">
+<code class="sig-name descname">threshold_on_mutually_exclusive_ordinal_labels</code><span class="sig-paren">(</span><em class="sig-param">phenotype_label</em>, <em class="sig-param">ordinal_labels</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pythologist.html#CellDataFrame.threshold_on_mutually_exclusive_ordinal_labels"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pythologist.CellDataFrame.threshold_on_mutually_exclusive_ordinal_labels" title="Permalink to this definition">¶</a></dt>
+<dd><p>If mutually exclusive ordinal labels are present among the scoring, you can threshold a phenotype on these labels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>phenotype_label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.8)"><em>str</em></a>) – a phenotype_label split based on the ordinal labels</p></li>
+<li><p><strong>ordinal_labels</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.8)"><em>list</em></a>) – the list of ordinal labels to split the phenotype label on</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>CellDataFrame</p>
 </dd>
 </dl>
 </dd></dl>

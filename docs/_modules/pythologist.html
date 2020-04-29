@@ -961,7 +961,80 @@
             <span class="n">sub</span><span class="p">[</span><span class="s1">&#39;phenotype_label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sub</span><span class="p">[</span><span class="s1">&#39;phenotype_label&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sub</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
             <span class="n">sub</span> <span class="o">=</span> <span class="n">sub</span><span class="o">.</span><span class="n">fill_phenotype_calls</span><span class="p">()</span>
             <span class="n">shuffled</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">CellDataFrame</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">keep</span><span class="p">]</span><span class="o">+</span><span class="n">shuffled</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">remember_order</span><span class="p">]</span></div></div>
+        <span class="k">return</span> <span class="n">CellDataFrame</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">keep</span><span class="p">]</span><span class="o">+</span><span class="n">shuffled</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">remember_order</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="CellDataFrame.threshold_on_mutually_exclusive_ordinal_labels"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.threshold_on_mutually_exclusive_ordinal_labels">[docs]</a>    <span class="k">def</span> <span class="nf">threshold_on_mutually_exclusive_ordinal_labels</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">phenotype_label</span><span class="p">,</span><span class="n">ordinal_labels</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        If mutually exclusive ordinal labels are present among the scoring, you can threshold a phenotype on these labels.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            phenotype_label (str): a phenotype_label split based on the ordinal labels</span>
+<span class="sd">            ordinal_labels (list): the list of ordinal labels to split the phenotype label on</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame</span>
+<span class="sd">        &quot;&quot;&quot;</span>        
+        <span class="k">def</span> <span class="nf">convert_labels</span><span class="p">(</span><span class="n">scored_calls</span><span class="p">,</span><span class="n">phenotype_calls</span><span class="p">,</span><span class="n">phenotype_label</span><span class="p">,</span><span class="n">ordinal_labels</span><span class="p">):</span>
+            <span class="n">fix</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span><span class="n">v</span> <span class="ow">in</span> <span class="n">phenotype_calls</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">k</span> <span class="o">!=</span> <span class="n">phenotype_label</span><span class="p">:</span> <span class="n">fix</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+            <span class="n">sanity_check</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">ordinal_label</span> <span class="ow">in</span> <span class="n">ordinal_labels</span><span class="p">:</span>
+                <span class="n">fix</span><span class="p">[</span><span class="n">phenotype_label</span><span class="o">+</span><span class="s1">&#39; &#39;</span><span class="o">+</span><span class="n">ordinal_label</span><span class="p">]</span> <span class="o">=</span> \
+                    <span class="mi">1</span> <span class="k">if</span> <span class="p">(</span><span class="n">phenotype_calls</span><span class="p">[</span><span class="n">phenotype_label</span><span class="p">]</span><span class="o">==</span><span class="mi">1</span> <span class="ow">and</span> <span class="n">scored_calls</span><span class="p">[</span><span class="n">ordinal_label</span><span class="p">]</span><span class="o">==</span><span class="mi">1</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span>
+                <span class="n">sanity_check</span> <span class="o">+=</span> <span class="n">scored_calls</span><span class="p">[</span><span class="n">ordinal_label</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">sanity_check</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span> <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;ordinal labels not mutually exclusive.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">fix</span>
+        <span class="n">ndf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">ndf</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="n">ndf</span><span class="p">[</span><span class="s1">&#39;phenotype_calls&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ndf</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> 
+            <span class="n">convert_labels</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;scored_calls&#39;</span><span class="p">],</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;phenotype_calls&#39;</span><span class="p">],</span><span class="n">phenotype_label</span><span class="p">,</span><span class="n">ordinal_labels</span><span class="p">)</span>
+        <span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">ndf</span> <span class="o">=</span> <span class="n">ndf</span><span class="o">.</span><span class="n">fill_phenotype_label</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">ndf</span></div>
+
+<div class="viewcode-block" id="CellDataFrame.convert_cascading_scores_to_mutually_exclusive_ordinal_binary"><a class="viewcode-back" href="../index.html#pythologist.CellDataFrame.convert_cascading_scores_to_mutually_exclusive_ordinal_binary">[docs]</a>    <span class="k">def</span> <span class="nf">convert_cascading_scores_to_mutually_exclusive_ordinal_binary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">cascading_scored_calls</span><span class="p">,</span><span class="n">ordinal_labels</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        If you have a cascade of scoring stored as binary calls, you can convert these to mutuallye exclusive binary calls for ordinal labels.</span>
+
+<span class="sd">        Example is you have thresholds for 0/1, 1/2, and 2/3, you can convert these thresholds to </span>
+<span class="sd">        mutually exclusive +/- for 0,1,2,3</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            cascading_scored_calls (list): an ordered from lowest thresholds to greatest thresholds list of thresholds in scored_names</span>
+<span class="sd">            ordinal_labels (list): the list of ordinal labels to split the phenotype label into</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            CellDataFrame</span>
+<span class="sd">        &quot;&quot;&quot;</span>   
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ordinal_labels</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="o">!=</span><span class="nb">len</span><span class="p">(</span><span class="n">cascading_scored_calls</span><span class="p">):</span> 
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;You need one more ordinal label than the cascading thresholds&quot;</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">do_conv</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">cascading_scored_calls</span><span class="p">,</span><span class="n">ordinal_labels</span><span class="p">):</span>
+            <span class="n">orig</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">fix</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span><span class="n">v</span> <span class="ow">in</span> <span class="n">orig</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">cascading_scored_calls</span><span class="p">:</span>
+                    <span class="n">fix</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+            <span class="n">ordinal_label</span> <span class="o">=</span> <span class="n">ordinal_labels</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="c1"># initialize ordinal labels to zero</span>
+            <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">ordinal_labels</span><span class="p">:</span>
+                <span class="n">fix</span><span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="n">ordinal_label</span> <span class="o">=</span> <span class="n">ordinal_labels</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span><span class="n">score_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cascading_scored_calls</span><span class="p">):</span>
+                <span class="c1"># For each cascading score, see if there is something set to 1 thats greater</span>
+                <span class="c1"># if there is, set the current ordinal to zero</span>
+                <span class="n">remaining</span> <span class="o">=</span> <span class="n">cascading_scored_calls</span><span class="p">[</span><span class="n">i</span><span class="p">:]</span>
+                <span class="c1">#print([x[name] for name in remaining])</span>
+                <span class="n">v</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="n">x</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">remaining</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">v</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">fix</span><span class="p">[</span><span class="n">ordinal_labels</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]]</span><span class="o">=</span><span class="mi">0</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">fix</span><span class="p">[</span><span class="n">ordinal_labels</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">return</span> <span class="n">fix</span>
+        <span class="n">ndf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">ndf</span><span class="p">[</span><span class="s1">&#39;scored_calls&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ndf</span><span class="p">[</span><span class="s1">&#39;scored_calls&#39;</span><span class="p">]</span><span class="o">.</span>\
+            <span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">do_conv</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">cascading_scored_calls</span><span class="p">,</span><span class="n">ordinal_labels</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">ndf</span></div></div>
 
 <span class="k">def</span> <span class="nf">_extract_unique_keys_from_series</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
     <span class="n">uni</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">x</span><span class="p">))</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span><span class="o">.</span>\
