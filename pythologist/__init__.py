@@ -820,6 +820,79 @@ class CellDataFrame(pd.DataFrame):
             shuffled.append(sub)
         return CellDataFrame.concat([keep]+shuffled).loc[remember_order]
 
+    def threshold_on_mutually_exclusive_ordinal_labels(self,phenotype_label,ordinal_labels):
+        """
+        If mutually exclusive ordinal labels are present among the scoring, you can threshold a phenotype on these labels.
+
+        Args:
+            phenotype_label (str): a phenotype_label split based on the ordinal labels
+            ordinal_labels (list): the list of ordinal labels to split the phenotype label on
+
+        Returns:
+            CellDataFrame
+        """        
+        def convert_labels(scored_calls,phenotype_calls,phenotype_label,ordinal_labels):
+            fix = {}
+            for k,v in phenotype_calls.items():
+                if k != phenotype_label: fix[k] = v
+            sanity_check = 0
+            for ordinal_label in ordinal_labels:
+                fix[phenotype_label+' '+ordinal_label] = \
+                    1 if (phenotype_calls[phenotype_label]==1 and scored_calls[ordinal_label]==1) else 0
+                sanity_check += scored_calls[ordinal_label]
+            if sanity_check != 1: raise ValueError("ordinal labels not mutually exclusive.")
+            return fix
+        ndf = self.copy()
+        print(ndf.shape)
+        ndf['phenotype_calls'] = ndf.apply(lambda x: 
+            convert_labels(x['scored_calls'],x['phenotype_calls'],phenotype_label,ordinal_labels)
+        ,1)
+        ndf = ndf.fill_phenotype_label()
+        return ndf
+
+    def convert_cascading_scores_to_mutually_exclusive_ordinal_binary(self,cascading_scored_calls,ordinal_labels):
+        """
+        If you have a cascade of scoring stored as binary calls, you can convert these to mutuallye exclusive binary calls for ordinal labels.
+
+        Example is you have thresholds for 0/1, 1/2, and 2/3, you can convert these thresholds to 
+        mutually exclusive +/- for 0,1,2,3
+
+        Args:
+            cascading_scored_calls (list): an ordered from lowest thresholds to greatest thresholds list of thresholds in scored_names
+            ordinal_labels (list): the list of ordinal labels to split the phenotype label into
+
+        Returns:
+            CellDataFrame
+        """   
+        if len(ordinal_labels)-1!=len(cascading_scored_calls): 
+            raise ValueError("You need one more ordinal label than the cascading thresholds")
+        def do_conv(x,cascading_scored_calls,ordinal_labels):
+            orig = x.copy()
+            fix = {}
+            for k,v in orig.items():
+                if k not in cascading_scored_calls:
+                    fix[k] = v
+            ordinal_label = ordinal_labels[0]
+            # initialize ordinal labels to zero
+            for label in ordinal_labels:
+                fix[label] = 1
+            ordinal_label = ordinal_labels[0]
+            for i,score_name in enumerate(cascading_scored_calls):
+                # For each cascading score, see if there is something set to 1 thats greater
+                # if there is, set the current ordinal to zero
+                remaining = cascading_scored_calls[i:]
+                #print([x[name] for name in remaining])
+                v = sum([x[name] for name in remaining])
+                if v == 0:
+                    fix[ordinal_labels[i+1]]=0
+                else:
+                    fix[ordinal_labels[i]] = 0
+            return fix
+        ndf = self.copy()
+        ndf['scored_calls'] = ndf['scored_calls'].\
+            apply(lambda x: do_conv(x,cascading_scored_calls,ordinal_labels))
+        return ndf
+
 def _extract_unique_keys_from_series(s):
     uni = pd.Series(s.apply(lambda x: json.dumps(x)).unique()).\
             apply(lambda x: json.loads(x)).apply(lambda x: set(sorted(x.keys())))

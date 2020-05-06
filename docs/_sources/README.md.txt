@@ -22,10 +22,37 @@ Features Pythologist add are:
 
 ## Module documentation
 
-* `pythologist` CellDataFrame class to modify and execute analysses [[Read the Docs](https://jason-weirather.github.io/pythologist/#modules)] [[source](https://github.com/jason-weirather/pythologist)]
-* `pythologist-reader` CellProject Storage Object [[Read the Docs](https://jason-weirather.github.io/pythologist-reader/)] [[source](https://github.com/jason-weirather/pythologist-reader)]
-* `pythologist-test-images` Example data [[source](https://github.com/jason-weirather/pythologist-test-images)]
-* `pythologist-image-utilities` Helper functions to work with images [[Read the Docs](https://jason-weirather.github.io/pythologist-image-utilities/)] [[source](https://github.com/jason-weirather/pythologist-image-utilities)] 
+* `pythologist` This software package uses a CellDataFrame class, an extension of a Pandas DataFrame to modify data and execute analyses [[Read the Docs](https://jason-weirather.github.io/pythologist/#modules)] [[source](https://github.com/jason-weirather/pythologist)]
+* `pythologist-schemas` This submodule documents/defines the formats of inputs and outputs expected in this pipeline. [[source](https://github.com/jason-weirather/pythologist-schemas)]
+* `pythologist-reader` This submodule facillitates reading platform-specific data into a harmonized format. [[Read the Docs](https://jason-weirather.github.io/pythologist-reader/)] [[source](https://github.com/jason-weirather/pythologist-reader)]
+* `pythologist-test-images` This submodule has some example data [[source](https://github.com/jason-weirather/pythologist-test-images)]
+* `pythologist-image-utilities` This submodule has helper functions to work with images [[Read the Docs](https://jason-weirather.github.io/pythologist-image-utilities/)] [[source](https://github.com/jason-weirather/pythologist-image-utilities)] 
+
+### about submodules
+
+This primary module `pythologist` is comprised of submodules.
+
+All of these can be cloned at once via https with the command:
+
+```
+$ git clone --recurse-submodules https://github.com/jason-weirather/pythologist.git
+```
+
+or via ssh
+
+```
+$ git clone --recurse-submodules git@github.com:jason-weirather/pythologist.git
+```
+
+Submodules will be in the `libs/` directory. For development purposes you should 
+
+1. checkout and pull the master branch of each of these submodules
+2. install each of these submodules as editable via `pip install -e .`
+3. install the main `pythologist` as editable the same way `pip install -e .`
+
+There is probably a more elegant way to use setuptools to assist in this process that I'm not doing here.
+
+
 
 # Quickstart
 
@@ -253,7 +280,7 @@ proj = TestImages().project('IrisSpatialFeatures')
 cdf = TestImages().celldataframe('IrisSpatialFeatures')
 cdf.db = proj
 cart = cdf.cartesian(verbose=True,step_pixels=50,max_distance_pixels=75)
-df,cols = cart.rgb_dataframe(red='CD8+',green='SOX10+')
+df,cols,rngtop = cart.rgb_dataframe(red='CD8+',green='SOX10+')
 shape = cdf.iloc[0]['frame_shape']
 (ggplot(df,aes(x='frame_x',y='frame_y',fill='color_str'))
  + geom_point(shape='h',size=4.5,color='#777777',stroke=0.2)
