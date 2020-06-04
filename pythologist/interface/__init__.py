@@ -257,7 +257,7 @@ def _merge_images(image1,image2):
     return np.array(pcell)
 
 
-def _get_new_regions(cdf,sample,frame_id,unset_label='undefined',gaussian_sigma=66,verbose=False):
+def _get_new_regions(cdf,sample,frame_id,unset_label='undefined',gaussian_sigma=66,gaussian_truncate=4,verbose=False):
     sub = cdf.loc[cdf['frame_id']==frame_id]
     #print(sub.iloc[0][['project_name','sample_name','frame_name']])
     #print(sub.shape)
@@ -280,7 +280,7 @@ def _get_new_regions(cdf,sample,frame_id,unset_label='undefined',gaussian_sigma=
         sel['id'] = 1
         sel = emap.merge(sel,on=['x','y'],how='left').fillna(0).pivot(columns='x',index='y',values='id')
         sel = np.array(sel).astype(float)
-        blur = gaussian_filter(sel,gaussian_sigma)
+        blur = gaussian_filter(sel,gaussian_sigma,truncate=gaussian_truncate)
         dfs[p] = blur
     regions = {}
     
@@ -300,6 +300,7 @@ def _get_new_regions(cdf,sample,frame_id,unset_label='undefined',gaussian_sigma=
 
 def phenotypes_to_regions(cdf,path,
                           gaussian_sigma=66,
+                          gaussian_truncate=4,
                           verbose=False,
                           overwrite=False,
                           unset_label='undefined',
@@ -324,6 +325,7 @@ def phenotypes_to_regions(cdf,path,
             regions = _get_new_regions(cdf,sample,frame_id,
                           verbose=verbose,
                           gaussian_sigma=gaussian_sigma,
+                          gaussian_truncate=gaussian_truncate,
                           unset_label = unset_label
                           )
             dfs[frame_id] = regions
