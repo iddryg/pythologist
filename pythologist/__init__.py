@@ -46,6 +46,19 @@ class CellDataFrame(pd.DataFrame):
         kwcopy = kw.copy()
         super(CellDataFrame,self).__init__(*args,**kwcopy)
 
+    def copy(self,*args,**kw):
+        """
+        Create a copy. Do like a regular dataframe, but then also make sure to show copy all the individual entries with objects.
+        """
+        output = super(CellDataFrame,self).copy(*args,**kw)
+        columns_with_objects = ['regions','scored_calls','phenotype_calls','channel_values','neighbors']
+        for col_name in columns_with_objects:
+            if col_name in self.columns:
+                output[col_name] = [x if not isinstance(x,dict) else x.copy() for x in self[col_name]]
+        output.microns_per_pixel = self.microns_per_pixel
+        output.db = self.db
+        return output
+
     def get_valid_cell_indecies(self):
         """
         Return a dataframe of images present with 'valid' being a list of cell indecies that can be included
