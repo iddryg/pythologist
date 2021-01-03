@@ -385,6 +385,7 @@ class CellDataFrame(pd.DataFrame):
             measured_regions (pandas.DataFrame): Dataframe of regions that are being measured (defaults to all the regions)
             measured_phenotypes (list): List of phenotypes present (defaults to all the phenotypes)
             minimum_region_size_pixels (int): Minimum region size to calculate counts on in pixels (Default: 1)
+            minimum_denominator_count (int): Minimum denominator population count for percentage calculation (Default: 1)
 
         Returns:
             Counts: returns a class that holds the counts.
@@ -397,6 +398,10 @@ class CellDataFrame(pd.DataFrame):
         n.microns_per_pixel = self.microns_per_pixel
         if 'minimum_region_size_pixels' in kwargs: n.minimum_region_size_pixels = kwargs['minimum_region_size_pixels']
         else: n.minimum_region_size_pixels = 1
+        if n.minimum_region_size_pixels < 1: raise ValueError("minimum_region_size_pixels must be at least 1")
+        if 'minimum_denominator_count' in kwargs: n.minimum_denominator_count = kwargs['minimum_denominator_count']
+        else: n.minimum_denominator_count = 1
+        if n.minimum_denominator_count < 1: raise ValueError("minimum_denominator_count must be at least 1")
         return n
 
     def qc(self,*args,**kwargs):
