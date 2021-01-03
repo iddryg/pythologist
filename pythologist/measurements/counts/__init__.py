@@ -16,12 +16,13 @@ class Counts(Measurement):
                 [k for k,v in x['phenotype_calls'].items() if v==1]
             ,1).apply(lambda x: np.nan if len(x)==0 else x[0])
         return data
-    def frame_counts(self,subsets=None):
+    def frame_counts(self,subsets=None,_apply_pixel_filter=True):
         """
         Frame counts is the core of all the counting operations.  It counts on a per-frame/per-region basis.
 
         Args:
             subsets (list): a list of Subset Objects.  if not specified, the phenotypes are used.
+            _apply_pixel_filter (bool): specify whether or not to apply the pixel filter.  sample_counts uses this to defer application of the filter till the end.
 
         Returns:
             pandas.DataFrame: A dataframe of count data
@@ -61,7 +62,20 @@ class Counts(Measurement):
             (x['region_area_pixels']/1000000)*(self.microns_per_pixel*self.microns_per_pixel),1)
         cnts['density_mm2'] = cnts.apply(lambda x: np.nan if x['region_area_mm2'] == 0 else x['count']/x['region_area_mm2'],1)
         # make sure regions of size zero have counts of np.nan
-        cnts.loc[cnts['region_area_pixels']<self.minimum_region_size_pixels,['count','density_mm2']] = np.nan
+        if _apply_pixel_filter:
+            cnts.loc[cnts['region_area_pixels']<self.minimum_region_size_pixels,['count','density_mm2']] = np.nan
+
+        totals = cnts.groupby(mergeon).sum()[['count']].\
+            rename(columns={'count':'frame_total_count'}).reset_index()
+        cnts = cnts.merge(totals,on=mergeon)
+        cnts['fraction'] = cnts.apply(lambda x: np.nan if x['frame_total_count']==0 else x['count']/x['frame_total_count'],1)
+        cnts['percent'] = cnts['fraction'].multiply(100)
+
+        if subsets is not None:
+            cnts['fraction'] = np.nan
+            cnts['percent'] = np.nan
+        if _apply_pixel_filter:
+            cnts.loc[cnts['region_area_pixels']<self.minimum_region_size_pixels,['count','density_mm2','frame_total_count','fraction','percent']] = np.nan
         return cnts
 
     def sample_counts(self,subsets=None):
@@ -69,7 +83,39 @@ class Counts(Measurement):
         fc = self.measured_regions[self.cdf.frame_columns+['region_label']].drop_duplicates().groupby(mergeon).\
             count()[['frame_id']].rename(columns={'frame_id':'frame_count'}).\
             reset_index()
-        cnts = self.frame_counts(subsets=subsets).\
+
+        # Take one pass through where we apply the minimum pixel count
+        cnts1 = self.frame_counts(subsets=subsets).\
+            groupby(mergeon+['phenotype_label']).\
+            apply(lambda x:
+                pd.Series(dict(zip(
+                    [
+                     #'cummulative_region_area_pixels',
+                     #'cummulative_region_area_mm2',
+                     #'cummulative_count',
+                     #'cummulative_density_mm2',
+                     'mean_density_mm2',
+                     'stddev_density_mm2',
+                     'stderr_density_mm2',
+                     'measured_frame_count'
+                    ],
+                    [
+                     #x['region_area_pixels'].sum(),
+                     #x['region_area_mm2'].sum(),
+                     #x['count'].sum(),
+                     #np.nan if x['region_area_mm2'].sum() == 0 else x['count'].sum()/x['region_area_mm2'].sum(),
+                     x['density_mm2'].mean(),
+                     x['density_mm2'].std(),
+                     x['density_mm2'].std()/np.sqrt(len([y for y in x['density_mm2'] if y==y])),
+                     len([y for y in x['density_mm2'] if y==y])
+                    ]
+                )))
+            ).reset_index()
+        cnts1= cnts1.merge(fc,on=mergeon)
+        #cnts1['measured_frame_count'] = cnts1['measured_frame_count'].astype(int)
+
+        # Take one pass through ignoring the minimum pixel count at the frame level and applying it to the whole sample for cummulative measures
+        cnts2 = self.frame_counts(subsets=subsets,_apply_pixel_filter=False).\
             groupby(mergeon+['phenotype_label']).\
             apply(lambda x:
                 pd.Series(dict(zip(
@@ -78,31 +124,45 @@ class Counts(Measurement):
                      'cummulative_region_area_mm2',
                      'cummulative_count',
                      'cummulative_density_mm2',
-                     'mean_density_mm2',
-                     'stddev_density_mm2',
-                     'stderr_density_mm2',
-                     'measured_frame_count'
+                     #'mean_density_mm2',
+                     #'stddev_density_mm2',
+                     #'stderr_density_mm2',
+                     #'measured_frame_count'
                     ],
                     [
                      x['region_area_pixels'].sum(),
                      x['region_area_mm2'].sum(),
                      x['count'].sum(),
                      np.nan if x['region_area_mm2'].sum() == 0 else x['count'].sum()/x['region_area_mm2'].sum(),
-                     x['density_mm2'].mean(),
-                     x['density_mm2'].std(),
-                     x['density_mm2'].std()/np.sqrt(len([y for y in x['density_mm2'] if y==y])),
-                     len([y for y in x['density_mm2'] if y==y])
+                     #x['density_mm2'].mean(),
+                     #x['density_mm2'].std(),
+                     #x['density_mm2'].std()/np.sqrt(len([y for y in x['density_mm2'] if y==y])),
+                     #len([y for y in x['density_mm2'] if y==y])
                     ]
                 )))
             ).reset_index()
-        cnts = cnts.merge(fc,on=mergeon)
-        cnts['measured_frame_count'] = cnts['measured_frame_count'].astype(int)
+        cnts2= cnts2.merge(fc,on=mergeon)
+        cnts = cnts2.merge(cnts1,on=mergeon+['phenotype_label','frame_count'])
+
+
         # get fractions also
         totals = cnts.groupby(mergeon).sum()[['cummulative_count']].\
             rename(columns={'cummulative_count':'sample_total_count'}).reset_index()
         cnts = cnts.merge(totals,on=mergeon)
         cnts['fraction'] = cnts.apply(lambda x: np.nan if x['sample_total_count']==0 else x['cummulative_count']/x['sample_total_count'],1)
+
+        cnts['percent'] = cnts['fraction'].multiply(100)
+        if subsets is not None:
+            cnts['fraction'] = np.nan
+            cnts['percent'] = np.nan
+
+        cnts.loc[cnts['sample_total_count']==0,['fraction','percent']] = np.nan
+        cnts['measured_frame_count'] = cnts['measured_frame_count'].astype(int)
+
+        cnts.loc[cnts['cummulative_region_area_pixels']<self.minimum_region_size_pixels,['cummulative_count','cummulative_density_mm2','sample_total_count','fraction','percent']] = np.nan
+
         return cnts
+
     def project_counts(self,subsets=None):
         mergeon = self.cdf.project_columns+['region_label']
         cnts = self.sample_counts(subsets=subsets).\
