@@ -68,14 +68,19 @@ class Counts(Measurement):
         cnts['fraction'] = cnts.apply(lambda x: np.nan if x['frame_total_count']==0 else x['count']/x['frame_total_count'],1)
         cnts['percent'] = cnts['fraction'].multiply(100)
 
-        if subsets is not None:
-            cnts['fraction'] = np.nan
-            cnts['percent'] = np.nan
         # make sure regions of size zero have counts of np.nan
         if _apply_filter:
             cnts.loc[cnts['frame_total_count']<self.minimum_denominator_count,['fraction','percent']] = np.nan
             cnts.loc[cnts['region_area_pixels']<self.minimum_region_size_pixels,['density_mm2']] = np.nan
         # Deal with the percents if we are measuring them
+
+        cnts['count'] = cnts['count'].astype(int)
+
+        if subsets is not None:
+            # if we are doing subsets we've lost any relevent reference counts in the subsetting process
+            cnts['frame_total_count'] = np.nan
+            cnts['fraction'] = np.nan
+            cnts['percent'] = np.nan
 
         return cnts
 
@@ -91,10 +96,10 @@ class Counts(Measurement):
             apply(lambda x:
                 pd.Series(dict(zip(
                     [
-                     #'cummulative_region_area_pixels',
-                     #'cummulative_region_area_mm2',
-                     #'cummulative_count',
-                     #'cummulative_density_mm2',
+                     #'cumulative_region_area_pixels',
+                     #'cumulative_region_area_mm2',
+                     #'cumulative_count',
+                     #'cumulative_density_mm2',
                      'mean_density_mm2',
                      'stddev_density_mm2',
                      'stderr_density_mm2',
@@ -115,16 +120,16 @@ class Counts(Measurement):
         cnts1= cnts1.merge(fc,on=mergeon)
         #cnts1['measured_frame_count'] = cnts1['measured_frame_count'].astype(int)
 
-        # Take one pass through ignoring the minimum pixel count at the frame level and applying it to the whole sample for cummulative measures
+        # Take one pass through ignoring the minimum pixel count at the frame level and applying it to the whole sample for cumulative measures
         cnts2 = self.frame_counts(subsets=subsets,_apply_filter=False).\
             groupby(mergeon+['phenotype_label']).\
             apply(lambda x:
                 pd.Series(dict(zip(
                     [
-                     'cummulative_region_area_pixels',
-                     'cummulative_region_area_mm2',
-                     'cummulative_count',
-                     'cummulative_density_mm2',
+                     'cumulative_region_area_pixels',
+                     'cumulative_region_area_mm2',
+                     'cumulative_count',
+                     'cumulative_density_mm2',
                      #'mean_density_mm2',
                      #'stddev_density_mm2',
                      #'stderr_density_mm2',
@@ -147,20 +152,23 @@ class Counts(Measurement):
 
 
         # get fractions also
-        totals = cnts.groupby(mergeon).sum()[['cummulative_count']].\
-            rename(columns={'cummulative_count':'sample_total_count'}).reset_index()
+        totals = cnts.groupby(mergeon).sum()[['cumulative_count']].\
+            rename(columns={'cumulative_count':'sample_total_count'}).reset_index()
         cnts = cnts.merge(totals,on=mergeon)
-        cnts['fraction'] = cnts.apply(lambda x: np.nan if x['sample_total_count']==0 else x['cummulative_count']/x['sample_total_count'],1)
+        cnts['fraction'] = cnts.apply(lambda x: np.nan if x['sample_total_count']==0 else x['cumulative_count']/x['sample_total_count'],1)
 
         cnts['percent'] = cnts['fraction'].multiply(100)
-        if subsets is not None:
-            cnts['fraction'] = np.nan
-            cnts['percent'] = np.nan
 
         cnts['measured_frame_count'] = cnts['measured_frame_count'].astype(int)
 
-        cnts.loc[cnts['cummulative_region_area_pixels']<self.minimum_region_size_pixels,['cummulative_density_mm2']] = np.nan
+        cnts.loc[cnts['cumulative_region_area_pixels']<self.minimum_region_size_pixels,['cumulative_density_mm2']] = np.nan
         cnts.loc[cnts['sample_total_count']<self.minimum_denominator_count,['percent','fraction']] = np.nan
+        cnts['cumulative_count'] = cnts['cumulative_count'].astype(int)
+        if subsets is not None:
+            # if we are doing subsets we've lost any relevent reference counts in the subsetting process
+            cnts['sample_total_count'] = np.nan
+            cnts['fraction'] = np.nan
+            cnts['percent'] = np.nan
         return cnts
 
     def project_counts(self,subsets=None):
@@ -170,14 +178,14 @@ class Counts(Measurement):
             groupby(mergeon+['phenotype_label']).\
             apply(lambda x: 
                 pd.Series(dict(zip(
-                    ['cummulative_count'],
-                    [x['cummulative_count'].sum()]
+                    ['cumulative_count'],
+                    [x['cumulative_count'].sum()]
                 )))
             ).reset_index()
-        totals = cnts.groupby(mergeon).sum()[['cummulative_count']].\
-            rename(columns={'cummulative_count':'project_total_count'})
+        totals = cnts.groupby(mergeon).sum()[['cumulative_count']].\
+            rename(columns={'cumulative_count':'project_total_count'})
         cnts = totals.merge(cnts,on=mergeon)
-        cnts['fraction'] = cnts.apply(lambda x: x['cummulative_count']/x['project_total_count'],1)
+        cnts['fraction'] = cnts.apply(lambda x: x['cumulative_count']/x['project_total_count'],1)
         cnts['percent'] = cnts['fraction'].multiply(100)
         if subsets is not None:
             cnts['fraction'] = np.nan
@@ -217,10 +225,10 @@ class Counts(Measurement):
         cnts = fp.groupby(self.cdf.sample_columns+['phenotype_label','region_label']).\
            apply(lambda x:
            pd.Series(dict({
-               'cummulative_numerator':x['numerator'].sum(),
-               'cummulative_denominator':x['denominator'].sum(),
-               'cummulative_fraction':np.nan if x['denominator'].sum()!=x['denominator'].sum() or x['denominator'].sum()<self.minimum_denominator_count else x['numerator'].sum()/x['denominator'].sum(),
-               'cummulative_percent':np.nan if x['denominator'].sum()!=x['denominator'].sum() or x['denominator'].sum()<self.minimum_denominator_count else 100*x['numerator'].sum()/x['denominator'].sum(),
+               'cumulative_numerator':x['numerator'].sum(),
+               'cumulative_denominator':x['denominator'].sum(),
+               'cumulative_fraction':np.nan if x['denominator'].sum()!=x['denominator'].sum() or x['denominator'].sum()<self.minimum_denominator_count else x['numerator'].sum()/x['denominator'].sum(),
+               'cumulative_percent':np.nan if x['denominator'].sum()!=x['denominator'].sum() or x['denominator'].sum()<self.minimum_denominator_count else 100*x['numerator'].sum()/x['denominator'].sum(),
                'mean_fraction':x['fraction'].mean(),
                'stdev_fraction':x['fraction'].std(),
                'stderr_fraction':np.nan if len([y for y in x['fraction'] if y==y])<=1 else x['fraction'].std()/np.sqrt(len([y for y in x['fraction'] if y==y])),
