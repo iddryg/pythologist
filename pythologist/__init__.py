@@ -126,6 +126,26 @@ class CellDataFrame(pd.DataFrame):
         f[key].attrs["microns_per_pixel"] = float(self.microns_per_pixel) if self.microns_per_pixel is not None else np.nan
         f.close()
 
+    def add_zeroed_phenotype(self,phenotype_label):
+        """
+        Add a phenotype to the mutually exclusive phenotypes, but it is set to zero. Raises an error if the phenotype already exists
+
+        Args:
+            phenotype_label (str): name of the phenotype to add
+
+        Returns:
+            CellDataFrame
+        """
+        def _add_item(x,phenotype_label):
+            d = x.copy()
+            d[phenotype_label] = 0
+            return d
+        if phenotype_label in self.phenotypes: raise ValueError("phenotype '"+str(phenotype_label)+"' already exists")
+        cdf = self.copy()
+        cdf['phenotype_calls'] = cdf['phenotype_calls'].apply(lambda x: _add_item(x,phenotype_label))
+        return cdf
+
+
     def phenotypes_to_scored(self,phenotypes=None,overwrite=False):
         """
         Add mutually exclusive phenotypes to the scored calls
