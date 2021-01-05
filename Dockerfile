@@ -35,7 +35,7 @@ RUN pip3 install cython \
     && pip3 install scikit-learn \
     && pip3 install h5py \
     && pip3 install openpyxl \
-    && pip3 install MulticoreTSNE
+    && pip3 install umap-learn
 
 ARG user=jupyter_user
 ARG user_id=999
