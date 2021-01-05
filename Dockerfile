@@ -71,6 +71,8 @@ RUN mkdir /source \
     && pip3 install -e . \
     && cd ../../libs/pythologist-test-images \
     && pip3 install -e . \ 
+    && cd ../../libs/pythologist-schemas \
+    && pip3 install -e . \ 
     && cd ../../../good-neighbors \
     && pip3 install -e .
 #RUN mkdir /home/$user/work
