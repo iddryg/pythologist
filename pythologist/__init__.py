@@ -125,7 +125,25 @@ class CellDataFrame(pd.DataFrame):
         f = h5py.File(path,'r+')
         f[key].attrs["microns_per_pixel"] = float(self.microns_per_pixel) if self.microns_per_pixel is not None else np.nan
         f.close()
+    def frame_region_generator(cdf):
+        """
+        Generator that produces individual regions of frames
 
+
+        Returns:
+            CellDataFrame
+        """
+        for project_id in cdf['project_id'].unique():
+            project = cdf.loc[cdf['project_id']==project_id]
+            for sample_id in project['sample_id'].unique():
+                sample = project.loc[project['sample_id']==sample_id,:]
+                for frame_id in sample['frame_id'].unique():
+                    #print(frame_id)
+                    frame = sample.loc[sample['frame_id']==frame_id,:]
+                    for region_label in frame['region_label'].unique():
+                        #print(region_label)
+                        region = frame.loc[frame['region_label']==region_label].copy()
+                        yield region
     def add_zeroed_phenotype(self,phenotype_label):
         """
         Add a phenotype to the mutually exclusive phenotypes, but it is set to zero. Raises an error if the phenotype already exists
@@ -348,12 +366,12 @@ class CellDataFrame(pd.DataFrame):
 
         Args:
             verbose (bool): output more details if true
-            measured_regions (pandas.DataFrame): explicitly list the measured images and regions
-            measured_phenotypes (list): explicitly list the phenotypes present
+            min_neighbors (int): number of neighbors of each phenotyhpe to find, default 1
 
         Returns:
             NearestNeighbors: returns a class that holds nearest neighbor information for whatever phenotypes were in the CellDataFrame before execution.  This class is suitable for nearest neighbor and proximity operations.
         """
+        if 'min_neighbors' not in kwargs: kwargs['min_neighbors'] = 1
         n = NearestNeighbors.read_cellframe(self,*args,**kwargs)
         if 'measured_regions' in kwargs: n.measured_regions = kwargs['measured_regions']
         else: n.measured_regions = self.get_measured_regions()
