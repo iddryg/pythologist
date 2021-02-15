@@ -43,8 +43,8 @@ def _clean_neighbors(left,right,k_neighbors):
 class NearestNeighbors(Measurement):
     @staticmethod
     def _preprocess_dataframe(cdf,*args,**kwargs):
-        if 'min_neighbors' not in kwargs: raise ValueError('max_neighbors must be defined')
-        k_neighbors = kwargs['min_neighbors']
+        if 'per_phenotype_neighbors' not in kwargs: raise ValueError('per_phenotype_neighbors must be defined')
+        k_neighbors = kwargs['per_phenotype_neighbors']
         nn = []
         for rdf in cdf.frame_region_generator():
             if kwargs['verbose'] and rdf.shape[0]>0:
@@ -68,6 +68,7 @@ class NearestNeighbors(Measurement):
                     _df['neighbor_phenotype_label'] = phenotype_label2
                     _df = _df.merge(dists,on='cell_index')
                     nn.append(_df)
+        if kwargs['verbose']: sys.stderr.write("concatonating nn blocks\n")
         nn = pd.concat(nn).reset_index(drop=True)
         # add on the total rank
         def _add_index(x):
@@ -89,7 +90,7 @@ class NearestNeighbors(Measurement):
                 _add_index(x)
                 ).drop(columns='neighbor_distance_px')
         nn = nn.merge(_rnks,on=['project_id','sample_id','frame_id','region_label','cell_index','neighbor_cell_index'])
-        nn['min_neighbors'] = k_neighbors
+        nn['per_phenotype_neighbors'] = k_neighbors
         return nn
 
     def _distance(self,mergeon,minimum_edges):
@@ -278,4 +279,56 @@ class NearestNeighbors(Measurement):
         sub['right']=[int(x.right) for x in sub['bins'].tolist()]
         sub.loc[sub['total']<minimum_total_count,'fraction']=np.nan
         return sub
+    def cell_proximity_cdfs(self,include_self=True,k_neighbors=50,min_neighbors=40,max_distance_px=None,max_distance_um=None):
+        """
+        Use the neighbors that were calculated to generate mini cell data frames based on the cells near by each cell
 
+        Args:
+            include_self (bool): Include the refernece cell in the neighborhood. default True
+            k_neighbors (int): The maximum number of nearest negibhors to use.  Must be less than or equal to max_neighbors. default: 50
+            max_distance_px (int): The maximum distance to constrain k_neighbors to.  default None
+            max_distance_um (float): The maximum distance to constrain k_neighbors to overrides pixel setting if both are set. default None
+            min_neighbors (int): Do not return cells if they do not have a local neighborhood of sufficient size
+
+        Returns:
+            Series, CellDataFrame: Returns a series from the CellDataFrame which is the cell this region is referenced from, and the CellDataFrame.
+        """
+        if k_neighbors > self.iloc[0]['per_phenotype_neighbors']: raise ValueError("k_neighbors must be less or equal to per_phenotype_neighbors defined earlier")
+        if max_distance_um is not None:
+            max_distance_px = max_distance_um/self.cdf.microns_per_pixel
+        mergeon = ['project_id','project_name','sample_id','sample_name','frame_id','frame_name','region_label']
+        for block in self.cdf.frame_region_generator():
+            block = block.prune_neighbors()
+            block_idx = block.set_index('cell_index')
+            df = block.merge(self,left_on=mergeon+['cell_index'],right_on=mergeon+['neighbor_cell_index'])
+            df = df.loc[df['overall_rank']<k_neighbors,:]
+            if max_distance_px is not None:
+                df = df.loc[df['neighbor_distance_px']<=max_distance_px,:]
+            df = df.drop(columns=['neighbor_cell_index','phenotype_label_y','per_phenotype_neighbors','neighbor_cell_coord','neighbor_phenotype_label']).\
+                rename(columns={'cell_index_x':'cell_index','cell_index_y':'cell_group','phenotype_label_x':'phenotype_label'})
+            if include_self: 
+                # We need to add on the cell itself to the cell group
+                df2 = block.copy()
+                df2['cell_group'] = df2['cell_index']
+                df2['neighbor_distance_px'] = 0
+                df2['neighbor_rank'] = -1
+                df2['overall_rank'] = -1
+                df = pd.concat([df,df2.loc[:,df.columns]])
+            df = df.sort_values(['cell_group','cell_index']).reset_index(drop=True).set_index('cell_group')
+            df.microns_per_pixel = self.cdf.microns_per_pixel
+            for cell_group in df.index.unique():
+                reference_cell = block_idx.loc[cell_group]
+                output_cdf = df.loc[cell_group].reset_index(drop=True)
+                if output_cdf.shape[0] < min_neighbors: continue
+                yield reference_cell, output_cdf
+    def explode_to_proximity_region_cdf(self,k_neighbors=50,max_distance_um=100,min_neighbors=40,verbose=False):
+        massive = []
+        for i, (ref, mdf) in enumerate(self.cell_proximity_cdfs(k_neighbors=k_neighbors,
+                                                              max_distance_um=max_distance_um,
+                                                              min_neighbors=min_neighbors)):
+            if verbose and i%100==0: sys.stderr.write("reading block "+str(i)+"\r")
+            mdf['channel_values'] = mdf['channel_values'].apply(lambda x: dict())
+            mdf = mdf.rename_region(mdf.regions,str(ref['frame_id'])+'|'+str(ref['region_label'])+'|'+str(ref.name))
+            massive.append(mdf)
+        if verbose: sys.stderr.write("\nconcatonating proximity blocks\n")
+        return self.cdf.concat(massive) #call the classmethod

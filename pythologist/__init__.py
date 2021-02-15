@@ -366,12 +366,12 @@ class CellDataFrame(pd.DataFrame):
 
         Args:
             verbose (bool): output more details if true
-            min_neighbors (int): number of neighbors of each phenotyhpe to find, default 1
+            per_phenotype_neighbors (int): number of neighbors of each phenotyhpe to find, default 50
 
         Returns:
             NearestNeighbors: returns a class that holds nearest neighbor information for whatever phenotypes were in the CellDataFrame before execution.  This class is suitable for nearest neighbor and proximity operations.
         """
-        if 'min_neighbors' not in kwargs: kwargs['min_neighbors'] = 1
+        if 'per_phenotype_neighbors' not in kwargs: kwargs['per_phenotype_neighbors'] = 50
         n = NearestNeighbors.read_cellframe(self,*args,**kwargs)
         if 'measured_regions' in kwargs: n.measured_regions = kwargs['measured_regions']
         else: n.measured_regions = self.get_measured_regions()
@@ -850,9 +850,9 @@ class CellDataFrame(pd.DataFrame):
         return output
     def permute_phenotype_labels(self,phenotype_labels=None,
                                       random_state=None,
-                                      group_strategy=['project_name','project_id','sample_name','sample_id','frame_name','frame_id']):
+                                      group_strategy=['project_name','project_id','sample_name','sample_id','frame_name','frame_id','region_label']):
         """
-        Shuffle phenotype labels.  Defaults to shuffleling all labels within a frame.  Adjust this by modifying group_strategy.
+        Shuffle phenotype labels.  Defaults to shuffleling all labels within a frames regions.  Adjust this by modifying group_strategy.
 
         Args:
             phenotype_labels (list): a list of phenotype_labels to shuffle amongst eachother if None shuffle all
