@@ -1,94 +1,79 @@
 from multiprocessing import Pool
-from tempfile import NamedTemporaryFile
-import json, h5py, sys
+import json, sys, math
 import pandas as pd
-def _func(b):
-    return b.contacts().frame_proportions()
+import numpy as np
+from pythologist.selection import SubsetLogic as SL
 
-class Permutation:
-    def __init__(self,h5_cache_path,mode='r+'):
-        self.h5_cache_path=h5_cache_path
-        self.mode = mode
-        if self.mode != 'w':
-            self.parameters = json.loads(str(h5py.File(self.h5_cache_path,'r')['parameters'].attrs['parameters']))
-            self.cdf = CellDataFrame.read_hdf(h5_cache_path,'cdf')
-        self._working_cdf = None
-    def _get_working_cdf(self,cdf):
-        if self.parameters['cell_proximity_cdfs']:
-            nn = cdf.nearestneighbors(verbose=self.parameters['verbose'],
-                                       per_phenotype_neighbors=self.parameters['k_neighbors'],
-                                       include_self=True,
-                                       min_neighbors=self.parameters['min_neighbors'],
-                                       max_distance_px=None if 'max_distance_px' not in self.parameters else self.parameters['max_distance_px'],
-                                       max_distance_um=None if 'max_distance_um' not in self.parameters else self.parameters['max_distance_um']
-                                       )
-            massive = []
-            for i, (ref, mdf) in enumerate(nn.cell_proximity_cdfs(**self.parameters['cell_proximity_cdfs_parameters'])):
-                if self.parameters['verbose'] and i%100==0:
-                    sys.stderr.write("exploding the cell proxmity regions "+str(i)+"\r")
-                mdf['channel_values'] = mdf['channel_values'].apply(lambda x: dict())
-                mdf = mdf.rename_region(mdf.regions,str(ref['frame_id'])+'-'+str(ref.name))
-                massive.append(mdf)
-            massive = self.cdf.concat(massive)
-            return massive 
-        else:
-            return cdf
 
-    
-    def set_parameters(self,**kwargs):
-        """
-        cdf
-        phenotypes
-        cell_proximity_cdfs
-        cell_proximity_cdfs_parameters
-        random_state
-        n_permutations
-        n_processes
-        k_neighbors
-        min_neighbors
-        max_distance_px
-        max_distance_um
-        verbose
-        """
-        if self.mode != 'w': raise ValueError("These can only be established on setup")
-        self.cdf = kwargs['cdf']
-        self.cdf.to_hdf(self.h5_cache_path,'cdf',mode='w')
-        _kwargs = kwargs.copy()
-        del _kwargs['cdf']
-        self.parameters = _kwargs
-        var = json.dumps(self.parameters)
-        with h5py.File(self.h5_cache_path,'r+') as h5:
-            grp = h5.create_dataset("parameters",(1000, 1000), chunks=True)
-            grp.attrs['parameters'] = var
-    def _get_specific(self,_cdf,mp=True):
-        if self.parameters['cell_proximity_cdfs'] and self.parameters['cell_proximity_cdfs_parameters'] is None:
-            raise ValueError("You must set_cell_proximity_cdfs_parameters before running")
-        if mp:
-            with Pool(processes=self.parameters['n_processes']) as pool:
-                fcnts = pd.concat([x for x in pool.imap_unordered(_func,_cdf.frame_region_generator())])
-                return fcnts
-        else:
-            return pd.concat([_func(x) for x in _cdf.frame_region_generator()])
-    def save_reference(self):
-        fcnts = self._get_specific(self._get_working_cdf(self.cdf.copy()),mp=True)
-        fcnts.to_hdf(self.h5_cache_path,'reference',mode='r+')
-    def save_permutations(self,overwrite_all=False):
-        if 'reference' not in [x for x in h5py.File(self.h5_cache_path,'r')]:
-            raise ValueError("save the reference first")
-        with Pool(processes=self.parameters['n_processes']) as pool:
-            for i, x in pool.imap_unordered(_get_perm,[(j,self) for j in range(0,self.parameters['n_permutations'])]):
-                x.to_hdf(self.h5_cache_path,'perm_'+str(i),mode='r+')
-        #for i in range(0,self.parameters['n_permutations']):
-def _get_perm(myvars):
-    i, self = myvars
-    if self.parameters['verbose']:
-        sys.stderr.write("Calculating permutation "+str(i)+"\n")
-    #if 'perm_'+str(i) in [x for x in h5py.File(self.h5_cache_path,'r')]:
-    #    return
-    return i, self._get_specific(
-                                    self._get_working_cdf(
-                                        self.cdf.permute_phenotype_labels(
-                                            self.parameters['phenotypes'],
-                                            random_state=None if self.parameters['random_state'] is None else self.parameters['random_state']+i
-                                        )
-                                    ),mp=False)
+def _get_frame_perm(myvars):
+    cdf, random_state, phenotypes, i = myvars
+    perm = cdf.permute_phenotype_labels(
+        phenotypes,
+        random_state = None if random_state is None else random_state+i
+    ).contacts().frame_proportions()
+    perm['perm'] = i
+    return perm
+def _get_sample_perm(myvars):
+    cdf, random_state, phenotypes, i = myvars
+    perm = cdf.permute_phenotype_labels(
+        phenotypes,
+        random_state = None if random_state is None else random_state+i
+    ).contacts().sample_proportions()
+    perm['perm'] = i
+    return perm
+def _analyze_perm(count,obs):
+    low_break = len([x for x in obs if x <= count])/len(obs)
+    high_break = len([x for x in obs if x >= count])/len(obs)
+    mean = np.mean(obs)
+    fold = math.log(count+1,2)-math.log(mean+1,)
+    return pd.Series(dict(zip(
+        ['count','n_perms','pvalue','fold'],
+        (count,len(obs),min(low_break,high_break),fold)
+    )))
+def permute_frame_contacts(self,n_permutations=500,phenotypes=None,random_state=None,verbose=True,n_processes=1):
+    if n_processes > 1 and random_state is None:
+        raise ValueError("must provide a random state when multiprocessing")
+    if phenotypes is None: phenotypes = self.phenotypes
+    base_cdf = self.subset(SL(phenotypes=phenotypes))
+    base = base_cdf.contacts().frame_proportions()
+    perms = None
+    if n_processes<=1:
+        perms = pd.concat([_get_frame_perm((base_cdf,random_state,phenotypes,j)) for j in range(0,n_permutations)])
+    else: 
+        with Pool(processes=n_processes) as pool:
+            perms = pd.concat([x for x in pool.imap_unordered(_get_frame_perm,[(base_cdf,random_state,phenotypes,j) for j in range(0,n_permutations)])])
+    mergeon = ['project_id','project_name','sample_id','sample_name','frame_id','frame_name','region_label']
+    _perms = perms.groupby(mergeon+['phenotype_label','neighbor_phenotype_label']).\
+        apply(lambda x: [y for y in x['count']]).reset_index().\
+            rename(columns={0:'obs'})
+    _df = base.merge(_perms,on=mergeon+['phenotype_label','neighbor_phenotype_label'])
+    _df = _df.set_index(mergeon+['phenotype_label','neighbor_phenotype_label','total','fraction']).\
+        apply(lambda x: _analyze_perm(x['count'],x['obs']),1).reset_index()
+    _df.loc[_df['total']==0,'n_perms'] = np.nan
+    _df.loc[_df['total']==0,'pvalue'] = np.nan
+    _df.loc[_df['total']==0,'fold'] = np.nan
+    return _df
+
+def permute_sample_contacts(self,n_permutations=500,phenotypes=None,random_state=None,verbose=True,n_processes=1):
+    if n_processes > 1 and random_state is None:
+        raise ValueError("must provide a random state when multiprocessing")
+    if phenotypes is None: phenotypes = self.phenotypes
+    base_cdf = self.subset(SL(phenotypes=phenotypes))
+    base = base_cdf.contacts().sample_proportions()
+    perms = None
+    if n_processes<=1:
+        perms = pd.concat([_get_sample_perm((base_cdf,random_state,phenotypes,j)) for j in range(0,n_permutations)])
+    else: 
+        with Pool(processes=n_processes) as pool:
+            perms = pd.concat([x for x in pool.imap_unordered(_get_frame_perm,[(base_cdf,random_state,phenotypes,j) for j in range(0,n_permutations)])])
+    mergeon = ['project_id','project_name','sample_id','sample_name','region_label']
+    _perms = perms.groupby(mergeon+['phenotype_label','neighbor_phenotype_label']).\
+        apply(lambda x: [y for y in x['count']]).reset_index().\
+            rename(columns={0:'obs'})
+    _df = base.merge(_perms,on=mergeon+['phenotype_label','neighbor_phenotype_label'])
+    _df = _df.set_index(mergeon+['phenotype_label','neighbor_phenotype_label','total','fraction']).\
+        apply(lambda x: _analyze_perm(x['count'],x['obs']),1).reset_index()
+    _df.loc[_df['total']==0,'n_perms'] = np.nan
+    _df.loc[_df['total']==0,'pvalue'] = np.nan
+    _df.loc[_df['total']==0,'fold'] = np.nan
+    return _df
