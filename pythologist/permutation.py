@@ -77,7 +77,7 @@ class Permutation:
             raise ValueError("save the reference first")
         with Pool(processes=self.parameters['n_processes']) as pool:
             for i, x in pool.imap_unordered(_get_perm,[(j,self) for j in range(0,self.parameters['n_permutations'])]):
-                x.to_hdf(self.h5_cach_path,'perm_'+str(i),mode='r+')
+                x.to_hdf(self.h5_cache_path,'perm_'+str(i),mode='r+')
         #for i in range(0,self.parameters['n_permutations']):
 def _get_perm(myvars):
     i, self = myvars
