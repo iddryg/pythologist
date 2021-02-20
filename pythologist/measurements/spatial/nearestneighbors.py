@@ -231,7 +231,7 @@ class NearestNeighbors(Measurement):
         cnt['fraction'] = cnt.apply(lambda x: x['count']/x['total'],1)
         return cnt
     def threshold(self,phenotype,proximal_label,k_neighbors=1,distance_um=None,distance_pixels=None):
-        if k_neighbors > self.iloc[0]['min_neighbors']:
+        if k_neighbors > self.iloc[0]['per_phenotype_neighbors']:
             raise ValueError("must select a k_neighbors smaller or equal to the min_neighbors used to generate the NearestNeighbors object")
         def _add_score(d,value,label):
             d[label] = 0 if value!=value else int(value)
