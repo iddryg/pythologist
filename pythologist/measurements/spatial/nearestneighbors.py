@@ -245,7 +245,6 @@ class NearestNeighbors(Measurement):
               ].copy()
         nn1['_threshold'] = np.nan
         nn1.loc[(nn1['neighbor_distance_px']<distance_pixels),'_threshold'] = 1
-        if nn1.shape
 
         output = self.cdf.copy()
         mergeon = output.frame_columns+['region_label','cell_index']
