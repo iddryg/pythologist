@@ -144,6 +144,22 @@ class CellDataFrame(pd.DataFrame):
                         #print(region_label)
                         region = frame.loc[frame['region_label']==region_label].copy()
                         yield region
+    def frame_generator(cdf):
+        """
+        Generator that produces individual frames
+
+
+        Returns:
+            CellDataFrame
+        """
+        for project_id in cdf['project_id'].unique():
+            project = cdf.loc[cdf['project_id']==project_id]
+            for sample_id in project['sample_id'].unique():
+                sample = project.loc[project['sample_id']==sample_id,:]
+                for frame_id in sample['frame_id'].unique():
+                    #print(frame_id)
+                    frame = sample.loc[sample['frame_id']==frame_id,:].copy()
+                    yield frame
     def add_zeroed_phenotype(self,phenotype_label):
         """
         Add a phenotype to the mutually exclusive phenotypes, but it is set to zero. Raises an error if the phenotype already exists
