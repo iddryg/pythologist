@@ -7,7 +7,7 @@ from pythologist.measurements.counts import Counts
 from pythologist.measurements.spatial.contacts import Contacts
 from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
 from pythologist.measurements.spatial.cartesian import Cartesian
-from pythologist.interface import SegmentationImages, phenotypes_to_regions as interface_phenotypes_to_regions
+from pythologist.interface import SegmentationImages, phenotypes_to_regions as interface_phenotypes_to_regions, build_segmetnation_image
 from pythologist.qc import QC
 
 class CellDataSeries(pd.Series):
@@ -799,6 +799,18 @@ class CellDataFrame(pd.DataFrame):
             CellDataFrame: The updated cell project
         """
         return interface_phenotypes_to_regions(self,*args,**kwargs)
+    def fetch_single_segmentation_image_bytes(self,*args,**kwargs):
+        """
+        For a CellDataFrame sliced down to a single frame, get the image
+
+        Args:
+            schema (obj): schema defining the coloring
+            background (tuple): integer tuple for background color
+
+        Returns:
+            bytes: A png image
+        """
+        return fetch_single_segmentation_image_bytes(self,*args,**kwargs)
 
     def regions_to_scored(self,regions=[]):
         """

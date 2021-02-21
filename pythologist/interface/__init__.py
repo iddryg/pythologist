@@ -382,3 +382,15 @@ def get_region_images(cdf,output_path,colors,background_color='#000000',overwrit
             frames = samples.loc[samples['sample_id']==sid]
             for fid in frames['frame_id'].unique():
                 write_regions(s.get_frame(fid),basedir,colors,background_color,format)
+
+def fetch_single_segmentation_image_bytes(self,schema,background=(0,0,0,255),tempdir=None):
+    if self['frame_name'].unique().shape[0]!=1: raise ValueError("must be only one frame name")
+    if self['frame_id'].unique().shape[0]!=1: raise ValueError("must be only one frame name")
+    sio = _frame.segmentation_images().build_segmentation_image(schema,background=(0,0,0,255))
+    with TemporaryDirectory(dir=tempdir) as td:
+        sio.write_to_path(td,overwrite=True,format='png')
+        for base, dirs, files in os.walk(td):
+            #print((base,dirs,files))
+            for fname in files:
+                print(fname[-3:])
+                return open(os.path.join(base,fname),'rb').read()
