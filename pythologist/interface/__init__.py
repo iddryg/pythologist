@@ -393,5 +393,5 @@ def fetch_single_segmentation_image_bytes(self,schema,background=(0,0,0,255),tem
         for base, dirs, files in os.walk(td):
             #print((base,dirs,files))
             for fname in files:
-                print(fname[-3:])
+                #print(fname[-3:])
                 return open(os.path.join(base,fname),'rb').read()
