@@ -7,7 +7,7 @@ from pythologist.measurements.counts import Counts
 from pythologist.measurements.spatial.contacts import Contacts
 from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
 from pythologist.measurements.spatial.cartesian import Cartesian
-from pythologist.interface import SegmentationImages, phenotypes_to_regions as interface_phenotypes_to_regions, build_segmetnation_image
+from pythologist.interface import SegmentationImages, phenotypes_to_regions as interface_phenotypes_to_regions, fetch_single_segmentation_image_bytes
 from pythologist.qc import QC
 
 class CellDataSeries(pd.Series):
