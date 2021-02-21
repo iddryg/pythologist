@@ -245,10 +245,11 @@ class NearestNeighbors(Measurement):
               ].copy()
         nn1['_threshold'] = np.nan
         nn1.loc[(nn1['neighbor_distance_px']<distance_pixels),'_threshold'] = 1
+        if nn1.shape
 
         output = self.cdf.copy()
         mergeon = output.frame_columns+['region_label','cell_index']
-        cdf = output.merge(nn1[mergeon+['_threshold']],on=mergeon)
+        cdf = output.merge(nn1[mergeon+['_threshold']],on=mergeon,how='left')
         cdf['scored_calls'] = cdf.apply(lambda x:
             _add_score(x['scored_calls'],x['_threshold'],proximal_label)
         ,1)
