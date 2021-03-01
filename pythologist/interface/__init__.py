@@ -1,13 +1,14 @@
 import pandas as pd
 import numpy as np
 from pythologist.measurements import Measurement
-from pythologist_image_utilities import watershed_image, map_image_ids
+from pythologist_image_utilities import watershed_image, map_image_ids, generate_new_region_image
 import sys, os, io
 import imageio
 from PIL import Image
 from pythologist import SubsetLogic as SL
 from scipy.ndimage import gaussian_filter
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, NamedTemporaryFile
+from skimage import img_as_ubyte
 
 class SegmentationImageOutput(pd.DataFrame):
     """
@@ -299,54 +300,69 @@ def _get_new_regions(cdf,sample,frame_id,unset_label='undefined',gaussian_sigma=
     regions[unset_label] = (remainder&proc).astype(np.uint8)
     return regions
 
-def phenotypes_to_regions(cdf,path,
+def _extract_regionization_features(cpi,cdf,sample_id,frame_id):
+    frame = cpi.get_sample(sample_id).get_frame(frame_id)
+    processed_image = frame.get_image(frame.processed_image_id)
+    segmentation_image = frame.get_image(frame.get_data('segmentation_images').\
+                                             set_index('segmentation_label').\
+                                             loc['cell_map','image_id'])
+    label_df = cdf.loc[cdf['frame_id']==frame_id].loc[:,['cell_index','phenotype_label']].\
+        set_index('cell_index')
+    label_dict = label_df.loc[~label_df['phenotype_label'].isna(),'phenotype_label'].to_dict()
+    return processed_image, segmentation_image,label_dict
+def phenotypes_to_regions(cdf,path=None,
                           gaussian_sigma=66,
                           gaussian_truncate=4,
+                          gaussian_mode='reflect',
                           verbose=False,
                           overwrite=False,
-                          unset_label='undefined',
-                          project_name='region-refactor'):
-    def _get_label(regions_dict,x,y):
-        for label in regions_dict:
-                if regions_dict[label][y][x] == 1: return label
-        return np.nan
-
-    if os.path.exists(path) and not overwrite: raise ValueError("cannot overwrite unless overwrite is True")
-    if cdf.db is None: raise ValueError("You need the storage object set for this function")
-    output = cdf.db.__class__(path,mode='w')
-    output.project_name = project_name
-    dfs = {}
-    ocdf = cdf.copy()
-    subs = []
+                          tempdir=None
+                        ):
+    if cdf.db is None: raise ValueError("cannot execute without the source CellProject db attribute set")
+    if path and os.path.exists(path) and not overwrite: raise ValueError("cannot overwrite unless overwrite is True")
+    if cdf['project_name'].unique().shape[0] > 1: raise ValueError("cannot do this with multiple project names")
+    if cdf['project_id'].unique().shape[0] > 1: raise ValueError("cannot do this with multiple project ids")
+    if path is None:
+        tnf = NamedTemporaryFile(delete=False,dir=tempdir)
+    output = cdf.db.__class__(path if path is not None else tnf.name,mode='w')
+    output.project_name = cdf.iloc[0]['project_name']
     for sample_id in cdf['sample_id'].unique():
-        sample = cdf.db.get_sample(sample_id)
-        if verbose: sys.stderr.write("==========\nSample: "+sample.sample_name+"\n")
-        for frame_id in cdf.loc[(cdf['sample_id']==sample_id),'frame_id'].unique():
-            #sub = ocdf.loc[(ocdf['sample_id']==sample_id)&(ocdf['frame_id']==frame_id)].copy()
-            regions = _get_new_regions(cdf,sample,frame_id,
-                          verbose=verbose,
-                          gaussian_sigma=gaussian_sigma,
-                          gaussian_truncate=gaussian_truncate,
-                          unset_label = unset_label
-                          )
-            dfs[frame_id] = regions
-            f = sample.get_frame(frame_id)
-            f.set_regions(regions,
+        sample = cdf.loc[cdf['sample_id']==sample_id,:]
+        if verbose: sys.stderr.write("Doing sample "+str((sample_id,sample.iloc[0]['sample_name']))+"\n")
+        sample_cpi = cdf.db.get_sample(sample_id)
+        for frame_id in sample.loc[sample['sample_id']==sample_id,'frame_id'].unique():
+            frame_cpi = sample_cpi.get_frame(frame_id)
+            processed_image, segmentation_image,label_dict = _extract_regionization_features(cdf.db,cdf,sample_id,frame_id)
+            new_region, region_key = generate_new_region_image(processed_image,
+                                                               segmentation_image,
+                                                               label_dict,
+                                                               sigma=gaussian_sigma,
+                                                               truncate=gaussian_truncate,
+                                                               mode=gaussian_mode
+                                                              )
+            regions = {}
+            for i, region in region_key.items():
+                layer = np.zeros(processed_image.shape)
+                layer[np.where(new_region==i)] = 1
+                regions[region] = layer.astype(np.int8)
+            frame_cpi.set_regions(regions,
                           use_processed_region=True,
-                          unset_label='undefined2',
+                          unset_label='undefined',
                           verbose=verbose)
-            if verbose: sys.stderr.write("    "+f.frame_name+"\n")
-        output.append_sample(sample)
-    # Now update the cell dataframe
-    if verbose: sys.stderr.write("update phenotype_labels\n")
-    ocdf['region_label'] = ocdf.apply(lambda x: _get_label(dfs[x['frame_id']],x['x'],x['y']),1)
-    ocdf = ocdf.loc[~ocdf['region_label'].isna()].copy()
-    region_sizes = {}
-    for fid in dfs: 
-        region_sizes[fid] = {}
-        for label in dfs[fid]: region_sizes[fid][label] = int(dfs[fid][label].astype(int).sum().sum())
-    ocdf['regions'] = ocdf.apply(lambda x: region_sizes[x['frame_id']],1)
-    return ocdf, output
+        output.append_sample(sample_cpi)
+    output.set_id(cdf.iloc[0]['project_id'])
+    _temp = output.cdf
+    _temp = _temp[['sample_id','frame_id','region_label','regions']].rename(columns={'region_label':'temp1','regions':'temp2'})
+    cdf2 = cdf.copy()
+    cdf2 = cdf2.merge(_temp,on=['sample_id','frame_id'])
+    cdf2['region_label'] = cdf2['temp1']
+    cdf2['regions'] = cdf2['temp2']
+    cdf2 = cdf2.drop(columns=['temp1','temp2'])
+    #if path is None:
+    #    os.remove(tnf.name)
+    cdf2.db = output
+    cdf2.microns_per_pixel = cdf.microns_per_pixel
+    return cdf2, output
 def get_region_images(cdf,output_path,colors,background_color='#000000',overwrite=False,format='png',verbose=False):
     def hex_to_rgb(h):
         h = h.lstrip('#')
@@ -362,7 +378,7 @@ def get_region_images(cdf,output_path,colors,background_color='#000000',overwrit
         for i,r in frame.get_data('regions').iterrows():
             col = colors[r['region_label']]
             img = frame.get_image(r['image_id'])
-            start[img==1]=hex_to_rgb(col)
+            start[img==1]= hex_to_rgb(col)
         imageio.imwrite(os.path.join(basedir,fname+'.'+format), start,format=format)
 
     if not cdf.db: raise ValueError("Need db set")
@@ -394,4 +410,13 @@ def fetch_single_segmentation_image_bytes(self,schema,background=(0,0,0,255),tem
             #print((base,dirs,files))
             for fname in files:
                 #print(fname[-3:])
+                return open(os.path.join(base,fname),'rb').read()
+
+def fetch_single_region_image_bytes(self,colors,background='#000000',tempdir=None,verbose=False):
+    if self['frame_name'].unique().shape[0]!=1: raise ValueError("must be only one frame name")
+    if self['frame_id'].unique().shape[0]!=1: raise ValueError("must be only one frame id")
+    with TemporaryDirectory(dir=tempdir) as td:
+        outfile = get_region_images(self,td,colors,background_color=background,overwrite=True,format='png',verbose=verbose)
+        for base, dirs, files in os.walk(td):
+            for fname in files:
                 return open(os.path.join(base,fname),'rb').read()
