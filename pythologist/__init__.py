@@ -908,32 +908,30 @@ class CellDataFrame(pd.DataFrame):
         ,1)
         return output
     def permute_phenotype_labels(self,phenotype_labels=None,
-                                      random_state=None,
-                                      group_strategy=['project_name','project_id','sample_name','sample_id','frame_name','frame_id','region_label']):
+                                      random_state=None):
         """
         Shuffle phenotype labels.  Defaults to shuffleling all labels within a frames regions.  Adjust this by modifying group_strategy.
 
         Args:
             phenotype_labels (list): a list of phenotype_labels to shuffle amongst eachother if None shuffle all
             random_state (int or numpy random state): pass to the pandas shuffle function
-            group_strategy (list): variables to group by
 
         Returns:
             CellDataFrame
         """
-        if random_state is not None and isinstance(random_state, int): random_state = np.random.RandomState(random_state)
-        # if phenotype_labels is None use all phenotype labels
-        remember_order = self.index
-        if phenotype_labels is None: phenotype_labels = self.phenotypes
-        keep = self.loc[~self['phenotype_label'].isin(phenotype_labels)].copy()
-        toshuffle = self.loc[self['phenotype_label'].isin(phenotype_labels)].copy()
-        shuffled = []
-        for name, group in toshuffle.groupby(group_strategy):
-            sub = group.copy()
-            sub['phenotype_label'] = list(sub['phenotype_label'].sample(sub.shape[0],random_state=random_state).reset_index(drop=True))
-            sub = sub.fill_phenotype_calls()
-            shuffled.append(sub)
-        return CellDataFrame.concat([keep]+shuffled).loc[remember_order]
+        mergeon = ['project_name','project_id','sample_name','sample_id','frame_name','frame_id','region_label']
+        phenotypes = self.phenotypes if phenotype_labels is None else phenotype_labels
+        def _proc_df(df):
+            to_shuffle = df.loc[df['phenotype_label'].isin(phenotypes),:]
+            to_keep = df.loc[~df['phenotype_label'].isin(phenotypes),:]
+            shuffled =  to_shuffle.sample(frac=1,random_state=random_state)
+            to_shuffle['phenotype_label'] = shuffled['phenotype_label'].tolist()
+            fresh = df.__class__.concat([to_keep,to_shuffle]).fill_phenotype_calls(df.phenotypes)
+            return fresh
+        data = self.groupby(mergeon).apply(lambda x: _proc_df(x)).reset_index(drop=True)
+        data.microns_per_pixel = self.microns_per_pixel
+        data.db = self.db
+        return data
 
     def threshold_on_mutually_exclusive_ordinal_labels(self,phenotype_label,ordinal_labels):
         """

@@ -11,7 +11,7 @@ def _find_one(d):
 class Contacts(Measurement):
     @staticmethod
     def _preprocess_dataframe(cdf,*args,**kwargs):
-        mergeon = ['project_id','sample_id','frame_id','cell_index']
+        mergeon = ['project_id','project_name','sample_id','sample_name','frame_id','frame_name','region_label','cell_index']
         subset = cdf.loc[~cdf['neighbors'].isna()].copy().reset_index(drop=True)
         present = subset[mergeon].drop_duplicates()
         def _get_items(x):
@@ -28,14 +28,14 @@ class Contacts(Measurement):
                    'cell_index','region_label',
                    ]].merge(data,left_index=True,right_on='db_id').\
                    drop(columns='db_id')
-        temp = cdf[['frame_id','cell_index','edge_length','phenotype_calls']].copy()
+        temp = cdf[mergeon +['edge_length','phenotype_calls']].copy()
         temp['phenotype_calls'] = temp['phenotype_calls'].apply(lambda x: _find_one(x))
         temp = temp.loc[~temp['phenotype_calls'].isna()].rename(columns={'phenotype_calls':'phenotype_label'})
-        merged = temp.merge(base,on=['frame_id','cell_index'])
+        merged = temp.merge(base,on=mergeon)
         temp2 = temp.copy().rename(columns={'phenotype_label':'neighbor_phenotype_label',
                                             'edge_length':'neighbor_edge_length',
                                             'cell_index':'neighbor_cell_index'})
-        merged = merged.merge(temp2,on=['frame_id','neighbor_cell_index'])
+        merged = merged.merge(temp2,on=[x for x in mergeon if x!='cell_index'] + ['neighbor_cell_index'])
         return merged
     def _proportions(self,mergeon):
         tot = self.groupby(mergeon+['phenotype_label']).\
@@ -79,6 +79,12 @@ class Contacts(Measurement):
         cnts['region_area_mm2'] = cnts.apply(lambda x: 
             (x['region_area_pixels']/1000000)*(self.microns_per_pixel*self.microns_per_pixel),1)
         cnts['density_mm2'] = cnts.apply(lambda x: x['count']/x['region_area_mm2'],1)
+        cnts['count'] = cnts['count'].astype(int)
+        _tot = cnts[mergeon+['phenotype_label','count']].groupby(self.cdf.frame_columns+['region_label','phenotype_label']).sum().\
+            rename(columns={'count':'total'})
+        cnts = cnts.merge(_tot,on=self.cdf.frame_columns+['region_label','phenotype_label'])
+        cnts['fraction'] = cnts.apply(lambda x: np.nan if x['total']==0 else x['count']/x['total'],1)
+        cnts['percent'] = cnts.apply(lambda x: np.nan if x['total']==0 else 100*x['count']/x['total'],1)
         return cnts
     def sample_counts(self):
         mergeon = self.cdf.sample_columns+['region_label','phenotype_label','neighbor_phenotype_label']
@@ -88,10 +94,10 @@ class Contacts(Measurement):
         cnts = self.frame_counts().groupby(mergeon).\
             apply(lambda x:
                 pd.Series(dict(zip(
-                    ['cummulative_count',
-                     'cummulative_region_area_pixels',
-                     'cummulative_region_area_mm2',
-                     'cummulative_density_mm2',
+                    ['cumulative_count',
+                     'cumulative_region_area_pixels',
+                     'cumulative_region_area_mm2',
+                     'cumulative_density_mm2',
                      'mean_density_mm2',
                      'stddev_density_mm2',
                      'stderr_density_mm2',
@@ -110,6 +116,14 @@ class Contacts(Measurement):
                 )))
             ).reset_index()
         cnts = cnts.merge(fc,on=self.cdf.sample_columns)
+        cnts['cumulative_count'] = cnts['cumulative_count'].astype(int)
+        cnts['measured_frame_count'] = cnts['measured_frame_count'].astype(int)
+        cnts['cumulative_region_area_pixels'] = cnts['cumulative_region_area_pixels'].astype(int)
+        _tot = cnts[mergeon+['cumulative_count']].groupby(self.cdf.sample_columns+['region_label','phenotype_label']).sum().\
+            rename(columns={'cumulative_count':'cumulative_total'}).reset_index()
+        cnts = cnts.merge(_tot,on=self.cdf.sample_columns+['region_label','phenotype_label'])
+        cnts['cumulative_fraction'] = cnts.apply(lambda x: np.nan if x['cumulative_total']==0 else x['cumulative_count']/x['cumulative_total'],1)
+        cnts['cumulative_percent'] = cnts.apply(lambda x: np.nan if x['cumulative_total']==0 else 100*x['cumulative_count']/x['cumulative_total'],1)
         return cnts
     def threshold(self,phenotype,contact_label=None):
         if contact_label is None: contact_label = phenotype+'/contact'
@@ -129,3 +143,20 @@ class Contacts(Measurement):
         cdf.microns_per_pixel = self.microns_per_pixel
         cdf.db = self.cdf.db
         return cdf.drop(columns='_threshold')
+    def permute(self,phenotype_labels=None,random_state=None):
+        mergeon = ['project_name','project_id','sample_name','sample_id','frame_name','frame_id','region_label']
+        phenotypes = self.cdf.phenotypes if phenotype_labels is None else phenotype_labels
+        cdf2 = self.cdf.permute_phenotype_labels(phenotype_labels = phenotype_labels, random_state=random_state)
+        data = pd.DataFrame(cdf2.loc[:,mergeon+['cell_index','phenotype_label']].rename(columns={'phenotype_label':'shuffled_phenotype_label'}))
+        nn2 = self.copy().merge(data,on=mergeon+['cell_index']).\
+            merge(data.rename(columns={'cell_index':'neighbor_cell_index'}),on=mergeon+['neighbor_cell_index'])
+        nn2['phenotype_label'] = nn2['shuffled_phenotype_label_x']
+        nn2['neighbor_phenotype_label'] = nn2['shuffled_phenotype_label_y']
+        nn2 = nn2.drop(columns=['shuffled_phenotype_label_x','shuffled_phenotype_label_y'])
+        nn2 = self.__class__(nn2)
+        nn2.microns_per_pixel = self.microns_per_pixel
+        nn2.cdf = cdf2
+        nn2.verbose = self.verbose
+        nn2.measured_phenotypes = self.measured_phenotypes
+        nn2.measured_regions = self.measured_regions
+        return nn2
