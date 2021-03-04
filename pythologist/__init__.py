@@ -9,7 +9,6 @@ from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
 from pythologist.measurements.spatial.cartesian import Cartesian
 from pythologist.interface import SegmentationImages, phenotypes_to_regions as interface_phenotypes_to_regions, fetch_single_segmentation_image_bytes, fetch_single_region_image_bytes
 from pythologist.qc import QC
-from pythologist.permutation import permute_sample_contacts, permute_frame_contacts
 
 class CellDataSeries(pd.Series):
     @property
@@ -854,10 +853,6 @@ class CellDataFrame(pd.DataFrame):
         """
         return fetch_single_region_image_bytes(self,*args,**kwargs)
 
-    def permute_frame_contacts(self,*args,**kwargs):
-        return permute_frame_contacts(self,*args,**kwargs)
-    def permute_sample_contacts(self,*args,**kwargs):
-        return permute_sample_contacts(self,*args,**kwargs)
 
     def regions_to_scored(self,regions=[]):
         """
