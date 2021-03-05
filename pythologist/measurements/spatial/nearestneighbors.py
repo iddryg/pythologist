@@ -280,9 +280,10 @@ class NearestNeighbors(Measurement):
         sub['right']=[int(x.right) for x in sub['bins'].tolist()]
         sub.loc[sub['total']<minimum_total_count,'fraction']=np.nan
         return sub
-    def cell_proximity_cdfs(self,include_self=True,k_neighbors=50,min_neighbors=40,max_distance_px=None,max_distance_um=None):
+    def generate_cell_proximity_cdfs(self,cell_indecies=None,include_self=True,k_neighbors=50,min_neighbors=40,max_distance_px=None,max_distance_um=None):
         """
         Use the neighbors that were calculated to generate mini cell data frames based on the cells near by each cell
+        Note that you probably will want to collapse regions before executing this function.
 
         Args:
             include_self (bool): Include the refernece cell in the neighborhood. default True
@@ -292,8 +293,15 @@ class NearestNeighbors(Measurement):
             min_neighbors (int): Do not return cells if they do not have a local neighborhood of sufficient size
 
         Returns:
-            Series, CellDataFrame: Returns a series from the CellDataFrame which is the cell this region is referenced from, and the CellDataFrame.
+            CellDataFrame: Returns a series from the CellDataFrame which is the cell this region is referenced from, and the CellDataFrame.
         """
+        def _set_ref(scored_calls,value):
+            scored_calls['reference_cell'] = value
+            return scored_calls
+        if cell_indecies is not None and self.loc[['project_id','project_name','sample_id','sample_name','frame_id','frame_name']].drop_duplicates().shape[0] != 1:
+            raise ValueError("can only specify cell_indecies if you are feeding one frame at a time")
+        if len(self.cdf.regions) > 1: 
+            sys.stderr.write("Warning: Multiple regions are present. Proximal neighborhoods will be restricted to the member region of of each cell.\n")
         if k_neighbors > self.iloc[0]['per_phenotype_neighbors']: raise ValueError("k_neighbors must be less or equal to per_phenotype_neighbors defined earlier")
         if max_distance_um is not None:
             max_distance_px = max_distance_um/self.cdf.microns_per_pixel
@@ -316,20 +324,35 @@ class NearestNeighbors(Measurement):
                 df2['overall_rank'] = -1
                 df = pd.concat([df,df2.loc[:,df.columns]])
             df = df.sort_values(['cell_group','cell_index']).reset_index(drop=True).set_index('cell_group')
+            if 'reference_cell' in df.scored_names:
+                raise ValueError("Looks like reference_cell has already been generated.")
             df.microns_per_pixel = self.cdf.microns_per_pixel
             for cell_group in df.index.unique():
+                if cell_indecies is not None and cell_group not in cell_indecies: continue
                 reference_cell = block_idx.loc[cell_group]
                 output_cdf = df.loc[cell_group].reset_index(drop=True)
                 if output_cdf.shape[0] < min_neighbors: continue
-                yield reference_cell, output_cdf
-    def explode_to_proximity_region_cdf(self,k_neighbors=50,max_distance_um=100,min_neighbors=40,verbose=False):
-        massive = []
-        for i, (ref, mdf) in enumerate(self.cell_proximity_cdfs(k_neighbors=k_neighbors,
-                                                              max_distance_um=max_distance_um,
-                                                              min_neighbors=min_neighbors)):
-            if verbose and i%100==0: sys.stderr.write("reading block "+str(i)+"\r")
-            mdf['channel_values'] = mdf['channel_values'].apply(lambda x: dict())
-            mdf = mdf.rename_region(mdf.regions,str(ref['frame_id'])+'|'+str(ref['region_label'])+'|'+str(ref.name))
-            massive.append(mdf)
-        if verbose: sys.stderr.write("\nconcatonating proximity blocks\n")
-        return self.cdf.concat(massive) #call the classmethod
+                # lets add the reference cell to the scored calls
+                #print(output_cdf.columns)
+                #print(cell_group)
+                #print(type(cell_group))
+                #print(reference_cell)
+                output_cdf['scored_calls'] = output_cdf.apply(lambda x: _set_ref(x['scored_calls'],1) if x['cell_index']==cell_group else _set_ref(x['scored_calls'],0),1)
+                # lets change the region name
+                region_name = 'cell_index-'+str(cell_group)
+                d = {region_name:output_cdf['cell_area'].sum()} 
+                output_cdf['region_label'] = region_name 
+                output_cdf['regions'] = output_cdf.apply(lambda x: d.copy(),1) 
+                output_cdf['reference_cell_index'] = cell_group
+                yield output_cdf
+    #def explode_to_proximity_region_cdf(self,k_neighbors=50,max_distance_um=100,min_neighbors=40,verbose=False):
+    #    massive = []
+    #    for i, (ref, mdf) in enumerate(self.cell_proximity_cdfs(k_neighbors=k_neighbors,
+    #                                                          max_distance_um=max_distance_um,
+    #                                                          min_neighbors=min_neighbors)):
+    #        if verbose and i%100==0: sys.stderr.write("reading block "+str(i)+"\r")
+    #        mdf['channel_values'] = mdf['channel_values'].apply(lambda x: dict())
+    #        mdf = mdf.rename_region(mdf.regions,str(ref['frame_id'])+'|'+str(ref['region_label'])+'|'+str(ref.name))
+    #        massive.append(mdf)
+    #    if verbose: sys.stderr.write("\nconcatonating proximity blocks\n")
+    #    return self.cdf.concat(massive) #call the classmethod

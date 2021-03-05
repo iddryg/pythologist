@@ -812,6 +812,39 @@ class CellDataFrame(pd.DataFrame):
         fixed = self.copy()
         fixed['phenotype_calls'] = fixed.apply(lambda x: _get_calls(x['phenotype_label'],phenotypes),1)
         return fixed
+    def approximate_phenotypes_to_regions(self,allow_na_phenotype_label=False,na_phenotype_label='Unspecified'):
+        """
+        Create a new CellDataFrame where the region sizes are based 
+        on the mutually exclusive phenotypes from the sum of cell areas.
+        This does NOT create new region masks, and areas do not include space between cells.
+        """
+        mergeon=['project_id','project_name','sample_id','sample_name','frame_id','frame_name']
+        region_names = self.phenotypes
+        if allow_na_phenotype_label is False and self.loc[self['phenotype_label'].isna()].shape[0] > 0:
+            raise ValueError("cannot set regions from phenotype labels unless allow_na_phenotype_label is True")
+        elif allow_na_phenotype_label:
+            region_names += [na_phenotype_label]
+        df = pd.DataFrame(self.loc[:,mergeon+['phenotype_label','cell_area']])
+        df.loc[df['phenotype_label'].isna(),'phenotype_label'] = na_phenotype_label
+        df = df.groupby(mergeon+['phenotype_label']).sum()[['cell_area']].\
+            rename(columns={'cell_area':'region_area_pixels'}).\
+            reset_index()
+        full = df.loc[:,mergeon].drop_duplicates()
+        full['_key'] = 1
+        regions = pd.DataFrame({'phenotype_label':region_names,'_key':[1 for x in range(0,len(region_names))]})
+        df = full.merge(regions, on='_key').drop(columns=['_key']).merge(df,on=mergeon+['phenotype_label']).fillna(0)
+        df = df.groupby(mergeon).apply(lambda x: dict(zip(x['phenotype_label'],x['region_area_pixels']))).\
+            reset_index().rename(columns={0:'regions_new'})
+        cdf2 = self.copy()
+        cdf2 = cdf2.merge(df,on=mergeon)
+        cdf2['region_label'] = cdf2['phenotype_label']
+        cdf2.loc[cdf2['region_label'].isna(),'region_label'] = na_phenotype_label
+        cdf2['regions'] = cdf2['regions_new']
+        cdf2 = cdf2.drop(columns=['regions_new'])
+        cdf2.microns_per_pixel = self.microns_per_pixel
+        cdf2.db = self.db
+        return cdf2
+
     def phenotypes_to_regions(self,*args,**kwargs):
         """
         Create a new Project where regions are replaced to be based on regions defined as phenotypes
