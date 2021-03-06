@@ -1,5 +1,5 @@
 import pandas as pd
-import sys
+import sys, json
 from pythologist.measurements import Measurement
 import numpy as np
 from sklearn.neighbors import KDTree
@@ -41,6 +41,28 @@ def _clean_neighbors(left,right,k_neighbors):
     return dists
 
 class NearestNeighbors(Measurement):
+    def to_hdf(self,path):
+        """
+        Save the CellDataFrame to an hdf5 file.
+
+        Args:
+            path (str): the path to save to
+        """
+        self.cdf.to_hdf(path,'cdf')
+        df = self.copy()
+        df['neighbor_cell_coord'] = df['neighbor_cell_coord'].apply(lambda x: json.dumps(x))
+        pd.DataFrame(df).to_hdf(path,'nn',mode='a',format='table',complib='zlib',complevel=9)
+
+    @classmethod
+    def read_hdf(cls,path):
+        from pythologist import CellDataFrame
+        nndf = cls(pd.read_hdf(path,'nn'))
+        nndf['neighbor_cell_coord'] = nndf['neighbor_cell_coord'].apply(lambda x: tuple(json.loads(x)))
+        nndf.cdf = CellDataFrame.read_hdf(path,'cdf')
+        nndf.microns_per_pixel = nndf.cdf.microns_per_pixel
+        return nndf
+
+
     @staticmethod
     def _preprocess_dataframe(cdf,*args,**kwargs):
         if 'per_phenotype_neighbors' not in kwargs: raise ValueError('per_phenotype_neighbors must be defined')
@@ -59,6 +81,7 @@ class NearestNeighbors(Measurement):
                             ))+"\n")
             for phenotype_label1 in rdf['phenotype_label'].unique():
                 for phenotype_label2 in rdf['phenotype_label'].unique():
+                    if kwargs['verbose']: sys.stderr.write("  "+str((phenotype_label1,phenotype_label2))+"\n")
                     left = rdf.loc[rdf['phenotype_label']==phenotype_label1,:]
                     right= rdf.loc[rdf['phenotype_label']==phenotype_label2,:]
                     if left.shape[0]==0 or right.shape[0]==0: continue
@@ -298,7 +321,7 @@ class NearestNeighbors(Measurement):
         def _set_ref(scored_calls,value):
             scored_calls['reference_cell'] = value
             return scored_calls
-        if cell_indecies is not None and self.loc[['project_id','project_name','sample_id','sample_name','frame_id','frame_name']].drop_duplicates().shape[0] != 1:
+        if cell_indecies is not None and self.loc[:,['project_id','project_name','sample_id','sample_name','frame_id','frame_name']].drop_duplicates().shape[0] != 1:
             raise ValueError("can only specify cell_indecies if you are feeding one frame at a time")
         if len(self.cdf.regions) > 1: 
             sys.stderr.write("Warning: Multiple regions are present. Proximal neighborhoods will be restricted to the member region of of each cell.\n")

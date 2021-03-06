@@ -143,6 +143,8 @@ class CellDataFrame(pd.DataFrame):
                     for region_label in frame['region_label'].unique():
                         #print(region_label)
                         region = frame.loc[frame['region_label']==region_label].copy()
+                        region.db = cdf.db
+                        region.microns_per_pixel = cdf.microns_per_pixel
                         yield region
     def frame_generator(cdf):
         """
@@ -159,6 +161,8 @@ class CellDataFrame(pd.DataFrame):
                 for frame_id in sample['frame_id'].unique():
                     #print(frame_id)
                     frame = sample.loc[sample['frame_id']==frame_id,:].copy()
+                    frame.db = cdf.db
+                    frame.microns_per_pixel = cdf.microns_per_pixel
                     yield frame
     def sample_generator(cdf):
         """
@@ -172,6 +176,8 @@ class CellDataFrame(pd.DataFrame):
             project = cdf.loc[cdf['project_id']==project_id]
             for sample_id in project['sample_id'].unique():
                 sample = project.loc[project['sample_id']==sample_id,:].copy()
+                sample.db = cdf.db
+                sample.microns_per_pixel = cdf.microns_per_pixel
                 yield sample
     def add_zeroed_phenotype(self,phenotype_label):
         """
@@ -857,8 +863,8 @@ class CellDataFrame(pd.DataFrame):
             project_name (str): the project name 
 
         Returns:
-            CellProject: The new cell project
             CellDataFrame: The updated cell project
+            CellProject: The new cell project
         """
         return interface_phenotypes_to_regions(self,*args,**kwargs)
     def fetch_single_segmentation_image_bytes(self,*args,**kwargs):
