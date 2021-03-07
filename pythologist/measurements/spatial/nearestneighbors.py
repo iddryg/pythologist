@@ -101,7 +101,8 @@ class NearestNeighbors(Measurement):
             if nn is not None: nn = pd.concat([nn,_df])
             else: nn = _df
         if kwargs['verbose']: sys.stderr.write("concatonating nn blocks\n")
-        nn = pd.concat(nn).reset_index(drop=True)
+        nn.reset_index(drop=True,inplace=True)
+        #nn = pd.concat(nn).reset_index(drop=True)
         # add on the total rank
         def _add_index(x):
             df = pd.DataFrame({
