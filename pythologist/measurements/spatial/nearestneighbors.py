@@ -65,7 +65,7 @@ class NearestNeighbors(Measurement):
     @classmethod
     def concat(cls,nns):
         from pythologist import CellDataFrame
-        output = cls.concat(nns)
+        output = cls(pd.concat(nns))
         output.cdf = CellDataFrame.concat([x.cdf for x in nns])
         output.microns_per_pixel = None if len(nns)==0 else nns[0].microns_per_pixel
         return ouptut
