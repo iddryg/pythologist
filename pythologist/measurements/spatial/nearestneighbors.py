@@ -375,7 +375,7 @@ class NearestNeighbors(Measurement):
                 sys.stderr.write("processing "+str(tot)+" points\n")
             for ix,cell_group in enumerate(df.index.unique()):
                 if verbose:
-                    sys.stderr.write(str(ix)+"/"+str(tot)+"\r")
+                    sys.stderr.write(str(ix+1)+"/"+str(tot)+"\r")
                 if cell_indecies is not None and cell_group not in cell_indecies: continue
                 reference_cell = block_idx.loc[cell_group]
                 output_cdf = df.loc[cell_group].reset_index(drop=True)
