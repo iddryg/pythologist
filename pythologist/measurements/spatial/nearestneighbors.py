@@ -134,8 +134,8 @@ class NearestNeighbors(Measurement):
                 ).drop(columns='neighbor_distance_px')
         nn = nn.merge(_rnks,on=['project_id','sample_id','frame_id','region_label','cell_index','neighbor_cell_index'])
         nn['per_phenotype_neighbors'] = k_neighbors
-        if max_neighbors is not None:
-            return nn.loc[nn['overall_rank']<max_neighbors,:].reset_index(drop=True)
+        if kwargs['max_neighbors'] is not None:
+            return nn.loc[nn['overall_rank']<kwargs['max_neighbors'],:].reset_index(drop=True)
         return nn
 
     def _distance(self,mergeon,minimum_edges):
