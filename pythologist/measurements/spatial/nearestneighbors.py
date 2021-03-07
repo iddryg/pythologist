@@ -88,7 +88,7 @@ class NearestNeighbors(Measurement):
                                                                     row['region_label']
                             ))+"\n")
             for phenotype_label1 in rdf['phenotype_label'].unique():
-                if kwargs['verbose']: sys.stderr.write("  "+phenotype_label1+" vs "+str(rdf['phenotype_label'].unique().shape[0])+"\n")
+                if kwargs['verbose']: sys.stderr.write("  "+str(phenotype_label1)+" vs "+str(rdf['phenotype_label'].unique().shape[0])+"\n")
                 for phenotype_label2 in rdf['phenotype_label'].unique():
                     left = rdf.loc[rdf['phenotype_label']==phenotype_label1,:]
                     right= rdf.loc[rdf['phenotype_label']==phenotype_label2,:]
@@ -316,7 +316,13 @@ class NearestNeighbors(Measurement):
         sub['right']=[int(x.right) for x in sub['bins'].tolist()]
         sub.loc[sub['total']<minimum_total_count,'fraction']=np.nan
         return sub
-    def generate_cell_proximity_cdfs(self,cell_indecies=None,include_self=True,k_neighbors=50,min_neighbors=40,max_distance_px=None,max_distance_um=None):
+    def generate_cell_proximity_cdfs(self,cell_indecies=None,
+                                          include_self=True,
+                                          k_neighbors=50,
+                                          min_neighbors=40,
+                                          max_distance_px=None,
+                                          max_distance_um=None,
+                                          verbose=False):
         """
         Use the neighbors that were calculated to generate mini cell data frames based on the cells near by each cell
         Note that you probably will want to collapse regions before executing this function.
@@ -343,6 +349,7 @@ class NearestNeighbors(Measurement):
             max_distance_px = max_distance_um/self.cdf.microns_per_pixel
         mergeon = ['project_id','project_name','sample_id','sample_name','frame_id','frame_name','region_label']
         for block in self.cdf.frame_region_generator():
+            if verbose and block.shape[0] > 0: sys.stderr.write("Processing block "+str((block.iloc[0]['sample_name'],block.iloc[0]['frame_name'],block.iloc[0]['region_label']))+"\n")
             block = block.prune_neighbors()
             block_idx = block.set_index('cell_index')
             df = block.merge(self,left_on=mergeon+['cell_index'],right_on=mergeon+['neighbor_cell_index'])
@@ -363,7 +370,12 @@ class NearestNeighbors(Measurement):
             if 'reference_cell' in df.scored_names:
                 raise ValueError("Looks like reference_cell has already been generated.")
             df.microns_per_pixel = self.cdf.microns_per_pixel
-            for cell_group in df.index.unique():
+            tot = len(df.index.unique())
+            if verbose:
+                sys.stderr.write("processing "+str(tot)+" points\n")
+            for ix,cell_group in enumerate(df.index.unique()):
+                if verbose:
+                    sys.stderr.write(str(ix)+"/"+str(tot)+"\r")
                 if cell_indecies is not None and cell_group not in cell_indecies: continue
                 reference_cell = block_idx.loc[cell_group]
                 output_cdf = df.loc[cell_group].reset_index(drop=True)
@@ -381,6 +393,8 @@ class NearestNeighbors(Measurement):
                 output_cdf['regions'] = output_cdf.apply(lambda x: d.copy(),1) 
                 output_cdf['reference_cell_index'] = cell_group
                 yield output_cdf
+            if verbose:
+                sys.stderr.write("\n")
     #def explode_to_proximity_region_cdf(self,k_neighbors=50,max_distance_um=100,min_neighbors=40,verbose=False):
     #    massive = []
     #    for i, (ref, mdf) in enumerate(self.cell_proximity_cdfs(k_neighbors=k_neighbors,
