@@ -68,7 +68,7 @@ class NearestNeighbors(Measurement):
         output = cls(pd.concat(nns))
         output.cdf = CellDataFrame.concat([x.cdf for x in nns])
         output.microns_per_pixel = None if len(nns)==0 else nns[0].microns_per_pixel
-        return ouptut
+        return output
 
 
     @staticmethod
