@@ -99,6 +99,7 @@ class NearestNeighbors(Measurement):
                     _df['neighbor_phenotype_label'] = phenotype_label2
                     _df = _df.merge(dists,on='cell_index')
             if nn is not None: nn = pd.concat([nn,_df])
+            if kwargs['verbose']: sys.stderr.write("nn size is: "+str(nn.shape)+"\n")
             else: nn = _df
         if kwargs['verbose']: sys.stderr.write("concatonating nn blocks\n")
         nn.reset_index(drop=True,inplace=True)
