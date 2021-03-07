@@ -94,18 +94,20 @@ class NearestNeighbors(Measurement):
                 for phenotype_label2 in plabs:
                     left = rdf.loc[rdf['phenotype_label']==phenotype_label1,:]
                     right= rdf.loc[rdf['phenotype_label']==phenotype_label2,:]
-                    if left.shape[0]==0 or right.shape[0]==0: continue
+                    if left.shape[0]==0 or right.shape[0]==0: 
+                        continue
                     dists = _clean_neighbors(left,right,k_neighbors)
-                    if dists is None: continue
+                    if dists is None: 
+                        continue
                     _df = pd.DataFrame(left[['project_id','project_name','sample_name','sample_id','frame_name','frame_id','region_label','phenotype_label','cell_index']])
                     _df['neighbor_phenotype_label'] = phenotype_label2
                     _df = _df.merge(dists,on='cell_index')
-                if nn is not None: 
-                    nn = pd.concat([nn,_df.copy()])
-                else: 
-                    nn = _df.copy()
-                if kwargs['verbose']:
-                    sys.stderr.write("  "+phenotype_label1+" vs "+phenotype_label2+" "+str(_df.shape[0])+"\n")
+                    if nn is not None: 
+                        nn = pd.concat([nn,_df.copy()])
+                    else: 
+                        nn = _df.copy()
+                    if kwargs['verbose']:
+                        sys.stderr.write("  "+phenotype_label1+" vs "+phenotype_label2+" "+str(_df.shape[0])+"\n")
             if kwargs['verbose']: sys.stderr.write("nn size is: "+str(nn.shape)+"\n")
         if kwargs['verbose']: sys.stderr.write("finished concatonating nn blocks\n")
         nn.reset_index(drop=True,inplace=True)
