@@ -74,6 +74,7 @@ class NearestNeighbors(Measurement):
     @staticmethod
     def _preprocess_dataframe(cdf,*args,**kwargs):
         if 'per_phenotype_neighbors' not in kwargs: raise ValueError('per_phenotype_neighbors must be defined')
+        if 'max_neighbors' not in kwargs: raise ValueError('max_neighbors must be defined')
         k_neighbors = kwargs['per_phenotype_neighbors']
         nn = None
         for rdf in cdf.frame_region_generator():
@@ -133,6 +134,8 @@ class NearestNeighbors(Measurement):
                 ).drop(columns='neighbor_distance_px')
         nn = nn.merge(_rnks,on=['project_id','sample_id','frame_id','region_label','cell_index','neighbor_cell_index'])
         nn['per_phenotype_neighbors'] = k_neighbors
+        if max_neighbors is not None:
+            return nn.loc[nn['overall_rank']<max_neighbors,:].reset_index(drop=True)
         return nn
 
     def _distance(self,mergeon,minimum_edges):

@@ -407,6 +407,7 @@ class CellDataFrame(pd.DataFrame):
             NearestNeighbors: returns a class that holds nearest neighbor information for whatever phenotypes were in the CellDataFrame before execution.  This class is suitable for nearest neighbor and proximity operations.
         """
         if 'per_phenotype_neighbors' not in kwargs: kwargs['per_phenotype_neighbors'] = 50
+        if 'max_neighbors' not in kwargs: kwargs['max_neighbors'] = None
         n = NearestNeighbors.read_cellframe(self,*args,**kwargs)
         if 'measured_regions' in kwargs: n.measured_regions = kwargs['measured_regions']
         else: n.measured_regions = self.get_measured_regions()
