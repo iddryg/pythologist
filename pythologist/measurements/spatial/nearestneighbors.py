@@ -98,10 +98,12 @@ class NearestNeighbors(Measurement):
                     _df = pd.DataFrame(left[['project_id','project_name','sample_name','sample_id','frame_name','frame_id','region_label','phenotype_label','cell_index']])
                     _df['neighbor_phenotype_label'] = phenotype_label2
                     _df = _df.merge(dists,on='cell_index')
-            if nn is not None: nn = pd.concat([nn,_df])
+            if nn is not None: 
+                nn = pd.concat([nn,_df])
+            else: 
+                nn = _df
             if kwargs['verbose']: sys.stderr.write("nn size is: "+str(nn.shape)+"\n")
-            else: nn = _df
-        if kwargs['verbose']: sys.stderr.write("concatonating nn blocks\n")
+        if kwargs['verbose']: sys.stderr.write("finished concatonating nn blocks\n")
         nn.reset_index(drop=True,inplace=True)
         #nn = pd.concat(nn).reset_index(drop=True)
         # add on the total rank
