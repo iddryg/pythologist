@@ -62,12 +62,20 @@ class NearestNeighbors(Measurement):
         nndf.microns_per_pixel = nndf.cdf.microns_per_pixel
         return nndf
 
+    @classmethod
+    def concat(cls,nns):
+        from pythologist import CellDataFrame
+        output = cls.concat(nns)
+        output.cdf = CellDataFrame.concat([x.cdf for x in nns])
+        output.microns_per_pixel = None if len(nns)==0 else nns[0].microns_per_pixel
+        return ouptut
+
 
     @staticmethod
     def _preprocess_dataframe(cdf,*args,**kwargs):
         if 'per_phenotype_neighbors' not in kwargs: raise ValueError('per_phenotype_neighbors must be defined')
         k_neighbors = kwargs['per_phenotype_neighbors']
-        nn = []
+        nn = None
         for rdf in cdf.frame_region_generator():
             if kwargs['verbose'] and rdf.shape[0]>0:
                 row = rdf.iloc[0]
@@ -90,7 +98,8 @@ class NearestNeighbors(Measurement):
                     _df = pd.DataFrame(left[['project_id','project_name','sample_name','sample_id','frame_name','frame_id','region_label','phenotype_label','cell_index']])
                     _df['neighbor_phenotype_label'] = phenotype_label2
                     _df = _df.merge(dists,on='cell_index')
-                    nn.append(_df)
+            if nn is not None: nn = pd.concat([nn,_df])
+            nn = _df
         if kwargs['verbose']: sys.stderr.write("concatonating nn blocks\n")
         nn = pd.concat(nn).reset_index(drop=True)
         # add on the total rank
