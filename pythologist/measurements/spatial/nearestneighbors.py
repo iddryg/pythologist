@@ -88,9 +88,10 @@ class NearestNeighbors(Measurement):
                                                                     row['region_label']
                             ))+"\n")
             rdf = rdf.loc[~rdf['phenotype_label'].isna(),:]
-            for phenotype_label1 in rdf['phenotype_label'].unique():
+            plabs = sorted(list(rdf['phenotype_label'].unique()))
+            for phenotype_label1 in plabs:
                 #if kwargs['verbose']: sys.stderr.write("  "+str(phenotype_label1)+" vs "+str(rdf['phenotype_label'].unique().shape[0])+"\n")
-                for phenotype_label2 in rdf['phenotype_label'].unique():
+                for phenotype_label2 in plabs:
                     left = rdf.loc[rdf['phenotype_label']==phenotype_label1,:]
                     right= rdf.loc[rdf['phenotype_label']==phenotype_label2,:]
                     if left.shape[0]==0 or right.shape[0]==0: continue
