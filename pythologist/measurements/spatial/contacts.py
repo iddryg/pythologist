@@ -19,7 +19,7 @@ class Contacts(Measurement):
         def _get_items(x):
             v = x['neighbors'].items()
             return ([x.name]*len(v),list(x['neighbors'].keys()),list(x['neighbors'].values()))
-        data = subset.dropna().apply(_get_items,1) 
+        data = subset.dropna(subset=['neighbors']).apply(_get_items,1) 
         myindex = list(chain(*[x[0] for x in data]))
         myneighbor = list(chain(*[x[1] for x in data]))
         myshared = list(chain(*[x[2] for x in data]))
