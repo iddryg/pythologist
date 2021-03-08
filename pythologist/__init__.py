@@ -9,6 +9,7 @@ from pythologist.measurements.spatial.nearestneighbors import NearestNeighbors
 from pythologist.measurements.spatial.cartesian import Cartesian
 from pythologist.interface import SegmentationImages, phenotypes_to_regions as interface_phenotypes_to_regions, fetch_single_segmentation_image_bytes, fetch_single_region_image_bytes
 from pythologist.qc import QC
+from itertools import chain
 
 class CellDataSeries(pd.Series):
     @property
@@ -1042,9 +1043,11 @@ class CellDataFrame(pd.DataFrame):
         return ndf
 
 def _extract_unique_keys_from_series(s):
-    uni = pd.Series(s.apply(lambda x: json.dumps(x)).unique()).\
-            apply(lambda x: json.loads(x)).apply(lambda x: set(sorted(x.keys())))
-    return sorted(list(set().union(*list(uni))))
+    v = [set(list(x.keys())) for x in s]
+    return sorted(list(set(chain.from_iterable(v))))
+    #uni = pd.Series(s.apply(lambda x: json.dumps(x)).unique()).\
+    #        apply(lambda x: json.loads(x)).apply(lambda x: set(sorted(x.keys())))
+    #return sorted(list(set().union(*list(uni))))
 def _dict_rename(old,change):
     new_keys = [x if x not in change else change[x] for x in old.keys()]
     return dict(zip(new_keys, old.values()))
