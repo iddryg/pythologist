@@ -943,31 +943,58 @@ class CellDataFrame(pd.DataFrame):
             dict([(y,1 if x['phenotype_label']==y else 0) for y in phenotypes])
         ,1)
         return output
-    def permute_phenotype_labels(self,phenotype_labels=None,
+    def permute_phenotype_labels(self,phenotypes=None,
+                                      channel_values=True,
+                                      scored_calls=True,
                                       random_state=None):
         """
         Shuffle phenotype labels.  Defaults to shuffleling all labels within a frames regions.  Adjust this by modifying group_strategy.
 
         Args:
-            phenotype_labels (list): a list of phenotype_labels to shuffle amongst eachother if None shuffle all
+            phenotypes (list): a list of phenotype_labels to shuffle amongst eachother if None shuffle all
+            channel_values (bool): include the channel_values in the shuffle
+            scored_calls (bool): include the scored_calls in the shuffle
             random_state (int or numpy random state): pass to the pandas shuffle function
 
         Returns:
             CellDataFrame
         """
-        mergeon = ['project_name','project_id','sample_name','sample_id','frame_name','frame_id','region_label']
-        phenotypes = self.phenotypes if phenotype_labels is None else phenotype_labels
-        def _proc_df(df):
-            to_shuffle = df.loc[df['phenotype_label'].isin(phenotypes),:]
-            to_keep = df.loc[~df['phenotype_label'].isin(phenotypes),:]
-            shuffled =  to_shuffle.sample(frac=1,random_state=random_state)
-            to_shuffle['phenotype_label'] = shuffled['phenotype_label'].tolist()
-            fresh = df.__class__.concat([to_keep,to_shuffle]).fill_phenotype_calls(df.phenotypes)
-            return fresh
-        data = self.groupby(mergeon).apply(lambda x: _proc_df(x)).reset_index(drop=True)
-        data.microns_per_pixel = self.microns_per_pixel
-        data.db = self.db
-        return data
+        phenotypes = phenotypes if phenotypes is not None else self.phenotypes 
+        keepers = set(self.phenotypes)-set(phenotypes)
+        if len(set(phenotypes)-set(self.phenotypes))>0:
+            raise ValueError("Phenotypes must be defined.")
+        keepers = self.loc[self['phenotype_label'].isin(keepers),:]
+        permute = self.loc[self['phenotype_label'].isin(phenotypes),:]
+        complete = []
+        for i,block in enumerate(permute.frame_region_generator()):
+            # we want to swap the labels of our phenotype_label
+            # we also want to swap the scored calls if set to true
+            # we also want to swap the channel_values if set to true
+            mergeon = block.loc[:,['phenotype_label','phenotype_calls','scored_calls','channel_values']].\
+                rename(columns={'phenotype_label':'plab',
+                        'phenotype_calls':'pcall',
+                        'scored_calls':'scall',
+                        'channel_values':'cvalue'}).\
+                sample(frac=1,random_state=None if random_state is None else random_state+i)
+            block['_key'] = range(0,block.shape[0],1)
+            mergeon['_key'] = range(0,block.shape[0],1)
+            block = block.merge(mergeon,on='_key')
+            block['phenotype_label'] = block['plab']
+            block['phenotype_calls'] = block['pcall']
+            if scored_calls:
+                block['scored_calls'] = block['scall']
+            if channel_values:
+                block['channel_values'] = block['cvalue']
+            block = block.drop(columns=['plab','pcall','scall','cvalue','_key'])
+            block.microns_per_pixel = self.microns_per_pixel
+            block.db = self.microns_per_pixel
+            complete.append(block)
+        complete = self.__class__.concat(complete+[keepers]).\
+            sort_values(['project_name','project_id','sample_name','sample_id','frame_name','frame_id','cell_index'])
+        complete.db = self.db
+        complete.microns_per_pixel = self.microns_per_pixel
+        return complete.reset_index(drop=True)
+
 
     def threshold_on_mutually_exclusive_ordinal_labels(self,phenotype_label,ordinal_labels):
         """
