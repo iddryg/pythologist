@@ -975,17 +975,18 @@ class CellDataFrame(pd.DataFrame):
                         'phenotype_calls':'pcall',
                         'scored_calls':'scall',
                         'channel_values':'cvalue'}).\
-                sample(frac=1,random_state=None if random_state is None else random_state+i)
-            block['_key'] = range(0,block.shape[0],1)
-            mergeon['_key'] = range(0,block.shape[0],1)
-            block = block.merge(mergeon,on='_key')
+                reset_index(drop=True).\
+                sample(frac=1,random_state=None if random_state is None else random_state+i).\
+                reset_index(drop=True)
+            block = block.reset_index(drop=True)
+            block = block.merge(mergeon,left_index=True,right_index=True)
             block['phenotype_label'] = block['plab']
             block['phenotype_calls'] = block['pcall']
             if scored_calls:
                 block['scored_calls'] = block['scall']
             if channel_values:
                 block['channel_values'] = block['cvalue']
-            block = block.drop(columns=['plab','pcall','scall','cvalue','_key'])
+            block = block.drop(columns=['plab','pcall','scall','cvalue'])
             block.microns_per_pixel = self.microns_per_pixel
             block.db = self.microns_per_pixel
             complete.append(block)
