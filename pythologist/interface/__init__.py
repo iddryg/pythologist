@@ -136,7 +136,7 @@ class SegmentationImages(Measurement):
                 blank = tuple(list(blank)[0:len(color)])
                 fresh[:][:] = blank
                 # get our coordinates
-                coords = np.array(list(zip(*map_image_ids(img)[['y','x']].apply(tuple).tolist())))
+                coords = np.array(list(zip(*map_image_ids(img)[['y','x']].apply(lambda x: tuple(x),1).tolist())))
                 fresh[tuple([*coords.T])] = color
                 #for i2,r2 in map_image_ids(img).iterrows():
                 #    fresh[r2['y']][r2['x']] = color
