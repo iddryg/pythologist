@@ -127,8 +127,10 @@ class SegmentationImages(Measurement):
             if watershed_steps > 0:
                 # get the zero and nonzero components
                 mid = map_image_ids(img,remove_zero=False)
-                midzero = list(zip(*mid.query('id==0').copy()[['x','y']].apply(tuple).tolist()))
-                mid = list(zip(*mid.query('id!=0').copy()[['x','y']].apply(tuple).tolist()))
+                #midzero = list(zip(*mid.query('id==0').copy()[['x','y']].apply(tuple).tolist()))
+                #mid = list(zip(*mid.query('id!=0').copy()[['x','y']].apply(tuple).tolist()))
+                midzero = mid.query('id==0').copy()[['x','y']].apply(lambda x: tuple(x),1).tolist()
+                mid = mid.query('id!=0').copy()[['x','y']].apply(lambda x: tuple(x),1).tolist()
                 img = watershed_image(np.array(img),mid,midzero,steps=watershed_steps)
             if color is not None:
                 # we need to make a new image thats colored in
