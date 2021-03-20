@@ -172,25 +172,29 @@ class Counts(Measurement):
         return cnts
 
     def project_counts(self,subsets=None):
-        raise VaueError("This function has not been tested in the current build.\n")
-        mergeon = self.cdf.project_columns+['region_label']
-        cnts = self.sample_counts(subsets=subsets).\
-            groupby(mergeon+['phenotype_label']).\
-            apply(lambda x: 
-                pd.Series(dict(zip(
-                    ['cumulative_count'],
-                    [x['cumulative_count'].sum()]
-                )))
-            ).reset_index()
-        totals = cnts.groupby(mergeon).sum()[['cumulative_count']].\
-            rename(columns={'cumulative_count':'project_total_count'})
-        cnts = totals.merge(cnts,on=mergeon)
-        cnts['fraction'] = cnts.apply(lambda x: x['cumulative_count']/x['project_total_count'],1)
-        cnts['percent'] = cnts['fraction'].multiply(100)
+        #raise VaueError("This function has not been tested in the current build.\n")
+        #mergeon = self.cdf.project_columns+['region_label']
+
+        pjt = self.sample_counts(subsets=subsets).groupby(['project_id',
+                              'project_name',
+                              'region_label',
+                              'phenotype_label'])[['cumulative_count',
+                                                   'cumulative_region_area_pixels',
+                                                   'cumulative_region_area_mm2',
+                                                  ]].sum()
+        pjt['cumulative_density_mm2'] = pjt.apply(lambda x: np.nan if x['cumulative_region_area_mm2']==0 else x['cumulative_count']/x['cumulative_region_area_mm2'],1)
+        pjt = pjt.reset_index()
+        tot = pjt.groupby(['project_id','project_name','region_label']).sum()[['cumulative_count']].\
+            rename(columns={'cumulative_count':'project_total_count'}).reset_index()
+        pjt = pjt.merge(tot,on=['project_id','project_name','region_label'])
+        pjt['fraction'] = pjt.apply(lambda x: x['cumulative_count']/x['project_total_count'],1)
+        pjt['percent'] = pjt['fraction'].multiply(100)
         if subsets is not None:
+            cnts['project_total_count'] = np.nan
             cnts['fraction'] = np.nan
             cnts['percent'] = np.nan
-        return cnts
+        return pjt
+
 
     def frame_percentages(self,percentage_logic_list):
         criteria = self.cdf.frame_columns+['region_label']
