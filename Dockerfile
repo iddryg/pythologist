@@ -1,6 +1,6 @@
 # An Image development environment
 #     docker build -t cio_image_lab:20181129 --build-arg user=USERNAME --build-arg group=GROUPNAME --build-arg user_id=USERID --build-arg group_id=GROUPID .
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 RUN apt-get update \
     && apt-get upgrade -y \
     && DEBIAN_FRONTEND='noninteractive' apt-get install -y \
@@ -24,7 +24,8 @@ RUN apt-get update \
  && apt-get clean
 
 
-RUN pip3 install --upgrade pip
+RUN pip3 install --upgrade pip \
+    &&  pip3 install --upgrade setuptools
 
 RUN pip3 install cython \
     && pip3 install cmake \

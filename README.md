@@ -62,20 +62,34 @@ There is probably a more elegant way to use setuptools to assist in this process
 
 # Quickstart
 
+The docker is the fastest way to get working with the latest version of pytholgoist.
+
 To start a jupyter lab notebook with the required software as your user in your current drectory you can use the following command 
 
-`docker run --rm -p 8888:8888 --user $(id -u):$(id -g) -v $(pwd):/work vacation/pythologist:latest`
+`docker run -v "$(pwd)":"/work"  --rm -p 8888:8888 --user $(id -u):$(id -g) vacation/pythologist:latest`
 
 This will start jupyter lab on port 8888 as your user and group. 
 
 Any of the test data examples should work fine in this environment.
 
-# Installation
+# Installation of the latest version
 
-## Install by pip
+## The pip install is not up-to-date with the current version of the package.  
+
+I recommend installing by cloning all the submodules and installing each as we do in the docker for a local installation.  We plan to simplify this in the future.
 
 ```
-$ pip install pythologist
+    git clone --recurse-submodules https://github.com/jason-weirather/pythologist.git \
+    && cd pythologist/libs/pythologist-image-utilities \
+    && pip3 install -e . \
+    && cd ../.. \
+    && pip3 install -e . \
+    && cd libs/pythologist-reader \
+    && pip3 install -e . \
+    && cd ../../libs/pythologist-test-images \
+    && pip3 install -e . \ 
+    && cd ../../libs/pythologist-schemas \
+    && pip3 install -e . 
 ```
 
 # Common tasks
