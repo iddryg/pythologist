@@ -34,32 +34,6 @@ Additional Analytics
 
 * `good-neighbors` This package facilitates the analysis of cellular data based on their proximal "cellular neighborhoods" [[Read the Docs](https://jason-weirather.github.io/good-neighbors/)] [[source](https://github.com/jason-weirather/good-neighbors)]
 
-### about Submodules
-
-This primary module `pythologist` is comprised of submodules.
-
-All of these can be cloned at once via https with the command:
-
-```
-$ git clone --recurse-submodules https://github.com/jason-weirather/pythologist.git
-```
-
-or via ssh
-
-```
-$ git clone --recurse-submodules git@github.com:jason-weirather/pythologist.git
-```
-
-Submodules will be in the `libs/` directory. For development purposes you should 
-
-1. checkout and pull the master branch of each of these submodules
-2. install each of these submodules as editable via `pip install -e .`
-3. install the main `pythologist` as editable the same way `pip install -e .`
-
-There is probably a more elegant way to use setuptools to assist in this process that I'm not doing here.
-
-
-
 # Quickstart
 
 The docker is the fastest way to get working with the latest version of pytholgoist.
@@ -76,20 +50,9 @@ Any of the test data examples should work fine in this environment.
 
 ## The pip install is not up-to-date with the current version of the package.  
 
-I recommend installing by cloning all the submodules and installing each as we do in the docker for a local installation.  We plan to simplify this in the future.
 
 ```
-    git clone --recurse-submodules https://github.com/jason-weirather/pythologist.git \
-    && cd pythologist/libs/pythologist-image-utilities \
-    && pip3 install -e . \
-    && cd ../.. \
-    && pip3 install -e . \
-    && cd libs/pythologist-reader \
-    && pip3 install -e . \
-    && cd ../../libs/pythologist-test-images \
-    && pip3 install -e . \ 
-    && cd ../../libs/pythologist-schemas \
-    && pip3 install -e . 
+    git clone https://github.com/dfci/pythologist.git 
 ```
 
 # Common tasks
@@ -508,3 +471,5 @@ cdf = cdf.nearestneighbors().threshold('T cell','T cell/within 75um',distance_um
 To ensure we are generating expected outs we can check against the outputs of IrisSpatialFeatures [[github](https://github.com/gusef/IrisSpatialFeatures)]. 
 
 * Jupyter Notebook: [Test against IrisSpatialFeatures outputs](https://github.com/jason-weirather/pythologist/blob/master/notebooks/Test%20against%20IrisSpatialFeatures%20outputs.ipynb)
+
+

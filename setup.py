@@ -10,7 +10,8 @@ setup(
   name='pythologist',
   version='1.2.2',
   test_suite='nose2.collector.collector',
-  description='inForm PerkinElmer Reader - Python interface to read outputs of the PerkinElmer inForm software',
+  description='inForm PerkinElmer Reader - Python interface to read outputs of the PerkinElmer inForm software;\
+    Pythologist-image-utilities: Functions to assist in working with image files',
   long_description=long_description,
   url='https://github.com/jason-weirather/pythologist',
   author='Jason L Weirather',
@@ -23,15 +24,20 @@ setup(
     'License :: OSI Approved :: Apache Software License'
   ],
   keywords='bioinformatics',
-  packages=['pythologist'],
-  install_requires=['pandas>=1.2.0',
+  packages=['pythologist',
+            'libs/pythologist-reader/pythologist_reader',
+            'libs/pythologist-image-utilities/pythologist_image_utilities'],
+  install_requires=['pandas>=1.2.2',
                     'numpy',
                     'scipy',
                     'h5py',
                     'imageio',
                     'tables',
                     'Pillow',
-                    'pythologist-image-utilities>=1.0.2'],
+                    'xmltodict', 
+                    'scikit-image>=0.18.0',
+                    'imagecodecs',
+                    'tifffile>=2019.7.26'], 
   extras_require = {
         'test':  ["pythologist-test-images"]
   },
