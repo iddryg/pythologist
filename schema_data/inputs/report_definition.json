@@ -1,0 +1,125 @@
+{
+    "$schema": "https://json-schema.org/schema#",
+    "type": "object",
+    "description":"Define cell populations to produce a report on for population and percentage based measures, across a set of defined regions.",
+    "properties":{
+        "parameters":{
+            "title":"Parameters",
+            "type":"object",
+            "properties":{
+                "report_name":{
+                    "title":"Report Name",
+                    "type":"string",
+                    "description":"Name to identify this report setup"
+                },
+                "report_version":{
+                    "title":"Report Version",
+                    "type":"string",
+                    "description":"Version of the report"
+                },
+                "minimum_denominator_count":{
+                    "title":"Minimum denominator count",
+                    "description":"Minimum cell count in a denominator to measure a percentage",
+                    "type":"integer",
+                    "default":1
+                },
+                "minimum_density_region_size_pixels":{
+                    "title":"Minimum region size pixels",
+                    "description":"Minimum region size in pixels to measure a density",
+                    "type":"integer",
+                    "default":0
+                }
+            },
+            "additionalProperties":false,
+            "required":["report_name","report_version","minimum_denominator_count","minimum_density_region_size_pixels"]
+        },
+        "region_selection":{
+            "title":"Region Selection",
+            "type":"array",
+            "description":"Choose the regions to output in the report.",
+            "items":{
+                "type":"object",
+                "properties":{
+                    "report_region_name":{
+                        "title":"Report Region Name",
+                        "type":"string",
+                        "description":"Label to give this region name in the report."
+                    },
+                    "regions_to_combine":{
+                        "title":"Regions to Combine",
+                        "type":"string",
+                        "description":"Comma separated list of region names"
+                    }
+                },
+                "additionalProperties":false,
+                "required":["report_region_name","regions_to_combine"]
+            }
+        },
+        "population_densities":{
+            "title":"Population Densities",
+            "type":"array",
+            "description":"The set of rules defining population densities to extract.",
+            "items":{
+                "type":"object",
+                "properties":{
+                    "population_name":{
+                        "title":"Population Name",
+                        "type":"string",
+                        "description":"Label to give this cell population in the report."
+                    },
+                    "mutually_exclusive_phenotypes":{
+                        "title":"Mutually Exclusive Phenotypes",
+                        "type":"string",
+                        "description":"Comma separated list of phenotype names"
+                    },
+                    "binary_phenotypes":{
+                        "title":"Binary Phenotypes",
+                        "type":["string","null"],
+                        "description":"Comma separated list of phenotype names with a trailing positive or negative sign to define the filter."
+                    }
+                },
+                "additionalProperties":false,
+                "required":["population_name","mutually_exclusive_phenotypes"]
+            }
+        },
+        "population_percentages":{
+            "title":"Population Percentages",
+            "type":"array",
+            "description":"The set of rules defining population percentages to extract.",
+            "items":{
+                "type":"object",
+                "properties":{
+                    "population_name":{
+                        "title":"Population Name",
+                        "type":"string",
+                        "description":"Label to give this cell population in the report."
+                    },
+                    "numerator_mutually_exclusive_phenotypes":{
+                        "title":"Numerator Mutually Exclusive Phenotypes",
+                        "type":"string",
+                        "description":"Comma separated list of mutually exclusive phenotypes in the numerator."
+                    },
+                    "numerator_binary_phenotypes":{
+                        "title":"Numerator Binary Phenotypes",
+                        "type":["string","null"],
+                        "description":"Comma separated list of phenotype names in the numerator with a trailing positive or negative sign to define the filter."
+                    },
+                    "denominator_mutually_exclusive_phenotypes":{
+                        "title":"Denominator Mutually Exclusive Phenotypes",
+                        "type":"string",
+                        "description":"Comma separated list of mutually exclusive phenotypes in the numerator."
+                    },
+                    "denominator_binary_phenotypes":{
+                        "title":"Denominator Binary Phenotypes",
+                        "type":["string","null"],
+                        "description":"Comma separated list of phenotype names in the numerator with a trailing positive or negative sign to define the filter."
+                    }
+                },
+                "additionalProperties":false,
+                "required":["population_name","numerator_mutually_exclusive_phenotypes"]
+            }
+        }
+    },      
+    "additionalProperties":false,
+    "required":["parameters"]
+}

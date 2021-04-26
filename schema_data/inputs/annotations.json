@@ -1,0 +1,64 @@
+{
+    "$schema": "https://json-schema.org/schema#",
+    "type": "object",
+    "description":"These are a first 'working' set of features that the analysis process will add to the images.",
+    "properties": {
+        "mutually_exclusive_phenotypes":{
+            "type":"array",
+            "description": "Names used to phenotype cells.",
+            "items":{"type":"string"}
+        },
+        "binary_phenotypes":{
+            "type":"array",
+            "description": "This is a set of features abstracted from the image that will be classified as positive or negative.",
+            "items":{
+                 "type":"object",
+                "properties":{
+                    "binary_phenotype_name":{
+                        "type":"string",
+                        "description":"A name for a binary phenotype."
+                    },
+                    "binary_phenotype_source":{
+                        "type":"string",
+                        "enum":["Stain intensity threshold","Learned phenotype","Other"]
+                    }
+                }
+            }
+        },
+        "mutually_exclusive_regions":{
+            "type":"array",
+            "description": "The labels of mutually exclusive regions.",
+            "items":{"type":"string"}
+        },
+        "meta": {
+            "type": "object",
+            "properties":{
+                "label":{
+                    "type":"string",
+                    "description":"The label for this set of annotations."
+                },
+                "description":{
+                    "type":"string",
+                    "description":"A description of the analyses being done."
+                },
+                "version":{
+                    "type":"string",
+                    "description":"A version to annotate this set of analyses."
+                },
+                "software":{
+                    "type":"array",
+                    "description":"A list of software used to produce the annotations for these images.",
+                    "items":{
+                        "type":"object",
+                        "properties":{
+                            "software_name":{"type":"string"},
+                            "software_version":{"type":"string"}   
+                        },
+                        "required":["software_name"]
+                    }
+                }
+            }
+        }
+    },
+    "additionalProperties":false
+}

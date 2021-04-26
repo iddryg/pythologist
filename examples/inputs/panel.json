@@ -1,0 +1,29 @@
+{
+    "markers":[
+        {
+            "marker_name":"CD8",
+            "full_name":"CD8 (Opal 540)",
+            "lineage_marker":true,
+            "thresholding":false
+        },
+        {
+            "marker_name":"CD68",
+            "full_name":"CD68 (Opal 570)",
+            "lineage_marker":true,
+            "thresholding":false
+        },
+        {
+            "marker_name":"PD-L1",
+            "full_name":"PD-L1 (Opal 620)",
+            "compartment":"Membrane",
+            "lineage_marker":false,
+            "thresholding":true
+        }
+    ],
+    "meta": {
+        "label":"Immune Panel 1",
+        "description":"A panel for looking at T cells and Macrophages",
+        "version":"1",
+        "platform":"mIF imaging"
+    }
+}

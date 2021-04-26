@@ -1,0 +1,20 @@
+{
+    "export_data":{
+        "component_data_tif_path":"/my/directory/structure/picture_1_component_data.tif",
+        "binary_segs_maps_tif_path":"/my/directory/structure/picture_1_binary_seg_maps.tif",
+        "cell_seg_data_txt_path":"/my/directory/structure/picture_1_cell_seg_data.txt",
+        "score_data_txt_path":"/my/directory/structure/picture_1_score_data.txt"
+    },
+    "panel":{
+        "markers":[],
+        "meta":{}
+    },
+    "annotations":{},
+    "image_attributes":{
+        "image_label":"picture_1",
+        "microns_per_pixel":0.496        
+    },
+    "meta":{
+        "description":"My best work yet."
+    }
+}

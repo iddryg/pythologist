@@ -11,7 +11,8 @@ setup(
   version='1.2.2',
   test_suite='nose2.collector.collector',
   description='inForm PerkinElmer Reader - Python interface to read outputs of the PerkinElmer inForm software;\
-    Pythologist-image-utilities: Functions to assist in working with image files',
+    Pythologist-image-utilities: Functions to assist in working with image files;\
+    Pythologist-schemas: Check the assumptions of inputs for pythologist ahead of reading',
   long_description=long_description,
   url='https://github.com/jason-weirather/pythologist',
   author='Jason L Weirather',
@@ -25,8 +26,12 @@ setup(
   ],
   keywords='bioinformatics',
   packages=['pythologist',
-            'libs/pythologist-reader/pythologist_reader',
-            'libs/pythologist-image-utilities/pythologist_image_utilities'],
+            'pythologist_reader',
+            'pythologist_image_utilities',
+           'pythologist_schemas',
+            'schema_data',
+            'schema_data.inputs',
+            'schema_data.inputs.platforms.InForm'],
   install_requires=['pandas>=1.2.2',
                     'numpy',
                     'scipy',
@@ -37,8 +42,20 @@ setup(
                     'xmltodict', 
                     'scikit-image>=0.18.0',
                     'imagecodecs',
-                    'tifffile>=2019.7.26'], 
+                    'tifffile>=2019.7.26',
+                    'sklearn',
+                    'jsonschema',
+                    'importlib_resources',
+                    'XlsxWriter'], 
   extras_require = {
         'test':  ["pythologist-test-images"]
+  },
+  include_package_data = True,
+  entry_points = {
+    'console_scripts':['pythologist-stage=pythologist_schemas.cli.stage_tool:cli',
+                       'pythologist-templates=pythologist_schemas.cli.template_tool:cli',
+                       'pythologist-run=pythologist_schemas.cli.run_tool:cli',
+                       'pythologist-report=pythologist_schemas.cli.report_tool:cli'
+                      ]
   },
 )

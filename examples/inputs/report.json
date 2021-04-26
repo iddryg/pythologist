@@ -1,0 +1,45 @@
+{
+    "regions":[
+        {
+            "label":"Whole Slide",
+            "rules":{
+                "mutually_exclusive_regions":["Tumor","Stroma"]
+            }
+        },
+        {
+            "label":"Tumor",
+            "rules":{
+                "mutually_exclusive_regions":["Tumor"]
+            }
+        }
+    ],
+    "populations":[
+        {
+            "label":"CD68",
+            "rules":{
+                "mutually_exclusive_phenotypes":["CD68"]
+            }
+        }
+    ],
+    "percentages":[
+        {
+            "label":"CD68+ % PD-L1+",
+            "numerator":{
+                "rules":{
+                    "mutually_exclusive_phenotypes":["CD68"],
+                    "threshold_strategies":[
+                        {
+                            "marker_name":"PD-L1",
+                            "threshold_strategy":"+"
+                        }
+                    ]
+                }
+            },
+            "denominator":{
+                "rules":{
+                    "mutually_exclusive_phenotypes":["CD68"]
+                }
+            }
+        }
+    ]
+}

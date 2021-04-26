@@ -1,0 +1,151 @@
+{
+    "$schema": "https://json-schema.org/schema#",
+    "type": "object",
+    "properties":{
+        "inform_exports":{
+            "title":"Exports",
+            "type":"array",
+            "minItems":1,
+            "description":"Describe expected components of an InForm project exports. This is a list of exports from the same project for the purpose of combining thresholding strategies.",
+            "items":{
+                "type":"object",
+                "properties":{
+                    "export_name":{
+                        "title":"Export Name",
+                        "description":"Name of the export",
+                        "type":"string"
+                    },
+                    "primary_phenotyping":{
+                        "title":"Primary Phenotyping",
+                        "description":"If TRUE, this is the InForm export that will be the basis for the mutually exclusive phenotypes. Only one of the exports can be a TRUE.",
+                        "type":["boolean","null"]
+                    }
+                },
+                "additionalProperties":false,
+                "required":["export_name"]
+            }
+        },
+        "mutually_exclusive_phenotypes":{
+            "title":"Mutually Exclusive Phenotypes",
+            "description":"Phenotypes that do not overlap.",
+            "type":"array",
+            "items":{
+                "type":"object",
+                "properties":{
+                    "export_name":{
+                        "title":"Export Name",
+                        "description":"This needs to be a mutually exclusive phenotype defined by the annotations.",
+                        "type":"string"
+                    },
+                    "phenotype_name":{
+                        "title":"Phenotype Name",
+                        "description":"This needs to be a mutually exclusive phenotype defined by the annotations.",
+                        "type":"string"
+                    },
+                    "convert_to_binary":{
+                        "title":"Convert to Binary Phenotype",
+                        "description":"If TRUE, this mutually exclusive phenotype will be converted to a binary phenotype.",
+                        "type":["boolean","null"]
+                    }
+                },
+                "additionalProperties":false,
+                "required":["export_name","phenotype_name"]
+            }
+        },
+        "binary_phenotypes":{
+            "title":"Binary Phenotypes",
+            "description":"This is a list of binary phenotypes to keep from this project.",
+            "type":"array",
+            "items":{
+                "type":"object",
+                "properties":{
+                    "export_name":{
+                        "title":"Export Name",
+                        "description":"This needs to be a mutually exclusive phenotype defined by the annotations.",
+                        "type":"string"
+                    },
+                    "target_name":{
+                        "title":"Target Name",
+                        "description":"This is a Target Name from the panel. These should not have a trailing positive or negative sign in them defined here, since that annotation will be used when applying filters.",
+                        "type":"string"
+                    }
+                },
+                "additionalProperties":false,
+                "required":["export_name","target_name"]
+            }
+        },
+        "regions":{
+            "title":"Regions",
+            "description":"Phenotypes that do not overlap.",
+            "type":"array",
+            "items":{
+                "type":"object",
+                "properties":{
+                    "region_name":{
+                            "title":"Region Name",
+                            "type":"string",
+                            "description":"The name defining a region."                    
+                    }
+                },
+                "additionalProperties":false,
+                "required":["region_name"]
+            }
+        },
+        "parameters":{
+            "title":"Parameters",
+            "type":"object",
+            "description":"Parameters describing the analysis",
+            "properties":{
+                "analysis_name":{
+                    "title":"Analysis Name",
+                    "description":"Name of the export",
+                    "type":"string"
+                },
+                "analysis_version":{
+                    "title":"Analysis Version",
+                    "description":"Name of the export",
+                    "type":"string"
+                },
+                "region_annotation_strategy":{
+                    "title":"Region Annotation Strategy",
+                    "description":"Type of regions being used",
+                    "type":"string",
+                    "enum":["NO_ANNOTATION","GIMP_TSI","GIMP_CUSTOM","INFORM_ANALYSIS"]
+                },
+                "draw_margin_width":{
+                    "title":"Draw Margin Width (pixels)",
+                    "description":"The width of tool used to draw the margin if a hand annotated file is included. Usually 10 pixels",
+                    "type":["integer","null"],
+                    "default":10
+                },
+                "expanded_margin_width_um":{
+                    "title":"Expanded Margin Width (um)",
+                    "description":"The width from the center of the margin to the edge of the margin after the watershed in microns.",
+                    "type":["number","null"],
+                    "default":40
+                },
+                "region_annotation_custom_label":{
+                    "title":"Region Annotation Custom Label",
+                    "type":["string","null"],
+                    "description":"If GIMP CUSTOM is the region annotation strategy, this is the name of the custom label <CUSTOM>.tif to find and label the region annotation mask"
+                },
+                "unannotated_region_label":{
+                    "title":"Unannotated Region Label",
+                    "type":["string","null"],
+                    "description":"If GIMP CUSTOM is the region annotation strategy, this is the name of the label for any region NOT covered by the <CUSTOM>.tif mask"
+                }
+            },
+            "additionalProperties":false,
+            "required":["analysis_name",
+                        "analysis_version",
+                        "region_annotation_strategy",
+                        "draw_margin_width",
+                        "expanded_margin_width_um",
+                        "region_annotation_custom_label",
+                        "unannotated_region_label"]
+        }
+    },
+    "additionalProperties":false,
+    "required":["inform_exports","mutually_exclusive_phenotypes","binary_phenotypes","regions","parameters"]
+
+}

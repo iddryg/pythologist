@@ -1,0 +1,68 @@
+{
+    "$schema": "https://json-schema.org/schema#",
+    "type": "object",
+    "properties": {
+        "markers":{
+            "title":"Panel",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "description": "Stain marker names are keys to these properites.",
+                "properties":{
+                    "marker_name":{
+                        "title":"Target Name",
+                        "type":"string",
+                        "description":"Short name unique to each entry. These should not have a trailing positive or negative sign since that annotation could be need for describing filters."
+                    },
+                    "full_name":{
+                        "title":"Full Platform Name",
+                        "type":"string",
+                        "description":"Descriptive name that is used in raw data to refer to the marker."
+                    },
+                    "compartment":{
+                        "title":"Compartment",
+                        "type":"string",
+                        "description":"Which cellular component this marker is expected to stain.",
+                        "enum":["Nuclear","Membrane","Whole Cell","Other"]
+                    },
+                    "lineage_marker":{
+                        "title":"Lineage Marker",
+                        "type":["boolean", "null"],
+                        "description":"This marker is expected to be used in determining mutually exclusive cell phenotypes."
+                    }
+                },
+                "additionalProperties":false,
+                "required":["marker_name","full_name"]
+            }
+        },
+        "parameters": {
+            "title":"Parameters",
+            "type": "object",
+            "properties":{
+                "panel_name":{
+                    "title":"Panel Name",
+                    "type":"string",
+                    "description":"The panel name."
+                },
+                "panel_description":{
+                    "title":"Panel Description",
+                    "type":"string",
+                    "description":"A description of the panel."
+                },
+                "panel_version":{
+                    "title":"Panel Version",
+                    "type":"string",
+                    "description":"A version of the panel."
+                },
+                "panel_platform":{
+                    "title":"Panel Platform",
+                    "type":"string",
+                    "description":"The platform this panel was built for."
+                }
+            },
+            "additionalProperties":false
+        }
+    },
+    "additionalProperties":false,
+    "required": ["markers","parameters"]
+}

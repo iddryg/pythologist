@@ -1,0 +1,18 @@
+{
+    "mutually_exclusive_phenotypes":["CD8","CD68","OTHER"],
+    "binary_phenotypes":[
+        {"binary_phenotype_name":"PD-L1"}
+    ],
+    "mutually_exclusive_regions":["Whole slide."],
+    "meta": {
+        "label":"CD68 and T cell segmentation and thresholding.",
+        "description":"My best job I'm doing.",
+        "version":"annot1.0",
+        "software":[
+            {
+                "software_name":"InForm",
+                "software_version":"1.4"
+            }
+        ]
+    }
+}

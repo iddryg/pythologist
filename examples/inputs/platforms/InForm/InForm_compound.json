@@ -1,0 +1,29 @@
+{
+    "InForm_exports":[
+        {
+            "export_data":{
+                "component_data_tif_path":"/my/directory/structure/picture_1_component_data.tif",
+                "binary_segs_maps_tif_path":"/my/directory/structure/picture_1_binary_seg_maps.tif",
+                "cell_seg_data_txt_path":"/my/directory/structure/picture_1_cell_seg_data.txt",
+                "score_data_txt_path":"/my/directory/structure/picture_1_score_data.txt"
+            },
+            "annotations":{},
+            "rules":{
+                "is_primary_mutually_exclusive_phenotyping":true,
+                "mutually_exclusive_phenotypes_to_keep_as_binary_phenotypes":[{"CD68":"Macrophage"}],
+                "binary_phenotypes_to_keep":["PD-L1"]
+            }
+        }
+    ],
+    "panel":{
+        "markers":[],
+        "meta":{}
+    },
+    "image_attributes":{
+        "image_label":"picutre_1",
+        "microns_per_pixel":0.496
+    },
+    "meta":{
+        "description":"My best work yet."
+    }
+}

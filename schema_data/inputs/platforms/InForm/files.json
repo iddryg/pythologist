@@ -1,0 +1,152 @@
+{
+    "$schema": "https://json-schema.org/schema#",
+    "type": "object",
+    "description":"Define a single sample in InForm.",
+    "definitions":{
+        "file":{
+            "type":"object",
+            "properties":{
+                "file_path":{
+                    "type":"string"
+                },
+                "sha256_hash":{
+                    "type":"string"
+                },
+                "last_modified_timestamp":{
+                    "type":"string"
+                }
+            }
+        },
+        "image_data":{
+            "type":"object",
+            "description":"These are the paths of the data elements created from InForm exports, although none are explicitly required here, what can be done downstream depends which of these are available.",
+            "properties":{
+                "component_data_tif":{
+                    "allOf":[
+                        {"$ref":"#/definitions/file"},
+                        {
+                            "type":"object",
+                            "description":"A tif image with layers representative of channels measuring each stain.",
+                            "properties":{
+                                "suffix":{
+                                    "type":"string",
+                                    "const":"component_data.tif"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "binary_segs_maps_tif":{
+                    "allOf":[
+                        {"$ref":"#/definitions/file"},
+                        {
+                            "type":"object",
+                            "description":"A tif image with layers such as an optional processed image area mask, a nuclear and membrane mask index integer coded, and region mask.",
+                            "properties":{
+                                "suffix":{
+                                    "type":"string",
+                                    "const":"binary_seg_maps.tif"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "cell_seg_data_txt":{
+                    "allOf":[
+                        {"$ref":"#/definitions/file"},
+                        {
+                            "type":"object",
+                            "description":"A file with the cell-phenotypes assigned per cell index, and mean intensity measures sufficient for infering any binary phenotypes.",
+                            "properties":{
+                                "suffix":{
+                                    "type":"string",
+                                    "const":"cell_seg_data.txt"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "score_data_txt":{
+                    "allOf":[
+                        {"$ref":"#/definitions/file"},
+                        {
+                            "type":"object",
+                            "description":"A file with one or two scores used in assigning binary phenotype thresholds.",
+                            "properties":{
+                                "suffix":{
+                                    "type":"string",
+                                    "const":"score_data.txt"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            "additionalProperties":false,
+            "required":["binary_segs_maps_tif","component_data_tif","cell_seg_data_txt"]
+        },
+        "image_annotations":{
+            "type":"array",
+            "items":{
+                "allOf":[
+                    {"$ref":"#/definitions/file"},
+                    {
+                        "type":"object",
+                        "title":"GIMP tif",
+                        "description":"Path to GIMP annotation files",
+                        "properties":{
+                            "suffix":{
+                                "type":"string",
+                                "const":".tif"
+                            },
+                            "mask_label":{
+                                "type":"string",
+                                "description":"A label for this mask"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "properties":{
+        "sample_name":{
+            "type":"string"
+        },
+        "sample_directory":{
+            "description":"The directory within the project SAMPLES directory corresponding to this sample.",
+            "type":"string"
+        },
+        "exports":{
+            "type":"array",
+            "items":{
+                "type":"object",
+                "description":"A single export",
+                "properties":{
+                    "export_name":{
+                        "type":"string"
+                    },
+                    "images":{
+                        "type":"array",
+                        "items":{
+                            "type":"object",
+                            "properties":{
+                                "image_name":{
+                                    "type":"string"
+                                },
+                                "image_data":{"$ref":"#/definitions/image_data"},
+                                "image_annotations":{"$ref":"#/definitions/image_annotations"}
+                            },
+                            "additionalProperties":false,
+                            "required":["image_name","image_data"]
+                        }
+                    }
+                },
+                "additionalProperties":false,
+                "required":["export_name","images"]
+            }
+        }
+    },
+    "additionalProperties":false,
+    "required":["sample_name","exports","sample_directory"]
+}

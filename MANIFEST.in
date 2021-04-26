@@ -1,3 +1,7 @@
 include README.md
 include LICENSE
 recursive-include example_data *.*
+
+include pythologist_validator/schema_data/*.json
+include pythologist_validator/schema_data/inputs/*.json
+include pythologist_validator/schema_data/inputs/platforms/*/*.json
