@@ -29,14 +29,14 @@ RUN pip3 install --upgrade pip \
 
 RUN pip3 install cython \
     && pip3 install cmake \
-    && pip3 install tables \
     && pip3 install pandas \
     && pip3 install numpy \
     && pip3 install scipy \
     && pip3 install scikit-learn \
     && pip3 install h5py \
     && pip3 install openpyxl \
-    && pip3 install umap-learn
+    && pip3 install umap-learn \
+    && pip3 install tables
 
 ARG user=jupyter_user
 ARG user_id=999
@@ -62,7 +62,7 @@ RUN mkdir /source \
     && git checkout 7aafa8c \
     && pip install -e . \
     && cd .. \
-    && git clone -b develop --single-branch https://github.com/jason-weirather/pythologist.git  \
+    && git clone -b develop --single-branch https://github.com/dfci/pythologist.git  \
     && cd pythologist \
     && pip3 install -e . \
     && cd .. \
