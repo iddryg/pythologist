@@ -37,7 +37,6 @@ setup(
                     'scipy',
                     'h5py',
                     'imageio',
-                    'tables',
                     'Pillow',
                     'xmltodict', 
                     'scikit-image>=0.18.0',
@@ -47,7 +46,12 @@ setup(
                     'jsonschema',
                     'importlib_resources',
                     'XlsxWriter',
-                    'openpyxl'], 
+                    'openpyxl',
+                    'plotnine',
+                    'IPython',
+                    'umap',
+                    'tables'
+                    ], 
   extras_require = {
         'test':  ["pythologist-test-images"]
   },
