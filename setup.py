@@ -46,7 +46,8 @@ setup(
                     'sklearn',
                     'jsonschema',
                     'importlib_resources',
-                    'XlsxWriter'], 
+                    'XlsxWriter',
+                    'openpyxl'], 
   extras_require = {
         'test':  ["pythologist-test-images"]
   },
