@@ -62,20 +62,14 @@ RUN mkdir /source \
     && git checkout 7aafa8c \
     && pip install -e . \
     && cd .. \
-    && git clone --recurse-submodules https://github.com/jason-weirather/pythologist.git \
+    && git clone -b develop --single-branch https://github.com/jason-weirather/pythologist.git  \
+    && cd pythologist \
+    && pip3 install -e . \
+    && cd .. \
     && git clone https://github.com/jason-weirather/good-neighbors.git \
-    && cd pythologist/libs/pythologist-image-utilities \
-    && pip3 install -e . \
-    && cd ../.. \
-    && pip3 install -e . \
-    && cd libs/pythologist-reader \
-    && pip3 install -e . \
-    && cd ../../libs/pythologist-test-images \
-    && pip3 install -e . \ 
-    && cd ../../libs/pythologist-schemas \
-    && pip3 install -e . \ 
-    && cd ../../../good-neighbors \
+    && cd good-neighbors \
     && pip3 install -e .
+
 #RUN mkdir /home/$user/work
 #WORKDIR /home/$user/work
 RUN mkdir .local \
