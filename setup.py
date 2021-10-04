@@ -39,7 +39,7 @@ setup(
                     'imageio',
                     'Pillow',
                     'xmltodict', 
-                    'scikit-image>=0.18.0',
+                    'scikit-image>=0.16.2',
                     'imagecodecs',
                     'tifffile>=2019.7.26',
                     'sklearn',
