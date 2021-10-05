@@ -217,8 +217,8 @@ class CellDataFrame(pd.DataFrame):
             phenotypes = [phenotypes]
         def _post(binary,phenotype_label,phenotypes,overwrite):
             d = binary.copy()
-            if len(set(phenotypes)&set(list(binary.keys()))) > 0 and overwrite==False:
-                raise ValueError("Error, phenotype already exists as a scored type")
+#             if len(set(phenotypes)&set(list(binary.keys()))) > 0 and overwrite==False:
+#                 raise ValueError("Error, phenotype already exists as a scored type")
             for label in phenotypes: d[label] = 0
             if phenotype_label == phenotype_label and phenotype_label in phenotypes:
                 d[phenotype_label] = 1
