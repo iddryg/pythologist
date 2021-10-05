@@ -88,8 +88,8 @@ class CellFrameInForm(CellFrameGeneric):
                    channel_abbreviations,require=require,require_score=require_score,skip_segmentation_processing=skip_segmentation_processing)
         return
 
-    def default_raw(self):
-        return self.get_raw(feature_label='Whole Cell',statistic_label='Mean')
+#     def default_raw(self):
+#         return self.get_raw(feature_label='Whole Cell',statistic_label='Mean')
 
     def binary_calls(self):
         # generate a table of gating calls with ncols = to the number of gates + phenotypes
