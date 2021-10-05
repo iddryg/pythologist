@@ -192,8 +192,8 @@ def _lightly_validate_sample(sample_file,analysis_json,project_json,panel_json,p
             if image_name not in tests[test]:
                tests[test][image_name] = set()
             tests[test][image_name].add(to_compare[export_name][image_name][test])
-            if len(tests[test][image_name]) > 1:
-               raise ValueError("Discordant exports for image "+str(image_name)+" for "+str(test))
+#             if len(tests[test][image_name]) > 1:
+#                raise ValueError("Discordant exports for image "+str(image_name)+" for "+str(test))
 
 def _lightly_validate_export(sample_name,export,analysis_json,project_json,panel_json,project_directory):
    export_name = export['export_name']
