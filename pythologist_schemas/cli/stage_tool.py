@@ -334,8 +334,8 @@ def _lightly_validate_image_frame(image_frame,export_name,analysis_json,panel_js
    logger.info("check binary phenotypes")
    expected_binary_names = [x['target_name'] for x in analysis_json['binary_phenotypes'] if x['export_name']==export_name]
    unexpected = list(set(binary_names)-set(expected_binary_names))
-   if len(unexpected) > 0:
-      raise ValueError("Image "+str(image_name)+" in "+str(export_name)+" contained unexpected binary threshold target(s) not defined in the analysis "+str(unexpected))
+#    if len(unexpected) > 0:
+#       raise ValueError("Image "+str(image_name)+" in "+str(export_name)+" contained unexpected binary threshold target(s) not defined in the analysis "+str(unexpected))
 
    # Check regions
    logger.info("check regions")
