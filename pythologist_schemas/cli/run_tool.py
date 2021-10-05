@@ -75,7 +75,7 @@ def main(args):
     #logger.info(str(output['sample_outputs']))
     if args.output_json:
         with open(args.output_json,'wt') as of:
-            of.write(json.dumps(output,allow_nan=False))
+            of.write(json.dumps(output,allow_nan=True))
     return 
 
 def execute_sample(files_json,inputs,run_id,verbose=False,cache_directory=None):
