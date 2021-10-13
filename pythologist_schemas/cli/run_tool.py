@@ -127,8 +127,8 @@ def execute_sample(files_json,inputs,run_id,verbose=False,cache_directory=None):
         _cdf = cdfs[export_name]
         _cdf['project_id'] = run_id
         cdf,f = cdf.merge_scores(_cdf,on=['project_name','sample_name','frame_name','x','y','cell_index'])
-#         if f.shape[0] > 0:
-#             raise ValueError("segmentation mismatch error "+str(f.shape[0]))
+        if f.shape[0] > 0:
+            raise ValueError("segmentation mismatch error "+str(f.shape[0]))
     logger.info("merging completed")
     # Now cdf contains a CellDataFrame sutiable for data extraction
 
