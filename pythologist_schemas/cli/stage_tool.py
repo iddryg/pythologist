@@ -229,12 +229,12 @@ def _lightly_validate_image_frame(image_frame,export_name,analysis_json,panel_js
       if 'microns' in firstline:
          raise ValueError('Detected microns instead of pixels in cell seg data')
 
-#    logger.info("checking for membrane segmentation")
-#    # Check for the presence of membrane segmentation
-#    with open(image_frame['image_data']['cell_seg_data_txt']['file_path'],'rt') as inf:
-#       firstline = inf.readline()
-#       if not 'Entire' in firstline:
-#          raise ValueError('Failed to detected membrane-based segmentation in cell seg data')
+   logger.info("checking for membrane segmentation")
+   # Check for the presence of membrane segmentation
+   with open(image_frame['image_data']['cell_seg_data_txt']['file_path'],'rt') as inf:
+      firstline = inf.readline()
+      if not 'Entire' in firstline:
+         raise ValueError('Failed to detected membrane-based segmentation in cell seg data')
 
    image_name = image_frame['image_name']
 
