@@ -57,7 +57,8 @@ class CellSampleInFormCustomMask(CellSampleInForm):
         frames = []
         for file in segs:
             m = re.match('(.*)cell_seg_data.txt$',file)
-            score = os.path.join(path,m.group(1)+'score_data.txt')
+            score = os.path.join(path,m.group(1)+'score_data.txt') if require_score=True \
+                else pass
             #summary = os.path.join(path,m.group(1)+'cell_seg_data_summary.txt')
             binary_seg_maps = os.path.join(path,m.group(1)+'binary_seg_maps.tif')
             component_image = os.path.join(path,m.group(1)+'component_data.tif')
@@ -68,8 +69,8 @@ class CellSampleInFormCustomMask(CellSampleInForm):
             tissue_seg_data = tfile if os.path.exists(tfile) else None
             frame = m.group(1).rstrip('_')
             data = os.path.join(path,file)
-#             if require_score and not os.path.exists(score):
-#                     raise ValueError('Missing score file '+score)
+            if require_score and not os.path.exists(score):
+                    raise ValueError('Missing score file '+score)
             if verbose: sys.stderr.write('Acquiring frame '+data+"\n")
             cid = self.create_cell_frame_class()
             cid.read_raw(frame_name = frame,
