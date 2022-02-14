@@ -106,7 +106,6 @@ class CellFrameInForm(CellFrameGeneric):
 
         # Read images first because the tissue region tables need to be filled in so we can attribute a tissue region to data
         self._read_images(binary_seg_image_file,
-                   component_image_file,
                    verbose=verbose,
                    require_component=require_component,
                    skip_segmentation_processing=skip_segmentation_processing)
@@ -120,6 +119,12 @@ class CellFrameInForm(CellFrameGeneric):
                    require_component=require_component,
                    require_score=require_score,
                    skip_segmentation_processing=skip_segmentation_processing)
+
+        # Now we've read in whatever we've got fromt he binary seg image
+        if verbose: sys.stderr.write("Reading component images.\n")
+        if require_component or (not require_component and component_image_file and os.path.isfile(component_image_file)): 
+            self._read_component_image(component_image_file)
+        if verbose: sys.stderr.write("Finished reading component images.\n")
         return
 
     def default_raw(self):
@@ -191,9 +196,12 @@ class CellFrameInForm(CellFrameGeneric):
         if len(pheno_columns)==0:
             pheno_columns = ['Phenotype']
 
+        ###
+        # Define features #1 - get all mutually exclusive features we are keeping
         logged_phenotypes = set()
         me_features = []
         me_feature_definition = []
+        me_feature_basics = []
         for pc in pheno_columns:
             pstr = re.match('Phenotype-(.*)$',pc).group(1)
             _ptuple = tuple(sorted(pstr.split(', ')))
@@ -206,6 +214,7 @@ class CellFrameInForm(CellFrameGeneric):
             for _assigned, _label in mutually_exclusive_analysis[_ptuple].items():
                 me_feature_definition.append([_label,'+',1])
                 me_feature_definition.append([_label,'-',0])
+                me_feature_basics.append([_label,'InForm mutually exclusive analysis'])
                 _s1 = _sub.copy()
                 _s1['feature_value'] = _s1.apply(lambda x: 1 if x['Phenotype'] == _assigned else 0,1)
                 _s1['feature_label'] = _label
@@ -241,7 +250,8 @@ class CellFrameInForm(CellFrameGeneric):
         if score_data_file is None and len(threshold_analysis.keys())>0:
             raise ValueError("Expecting threshold data but no score data file provided")
 
-        extracted_threshold = []
+        ###
+        # Define features #2 - get all threshold features we are keeping
         if score_data_file is not None: 
             _thresholds = preliminary_threshold_read(score_data_file, 
                                                  self.get_data('measurement_statistics'), 
@@ -271,19 +281,31 @@ class CellFrameInForm(CellFrameGeneric):
             t_features = _t.copy()
 
         t_feature_definition = []
+        t_feature_basics = []
         for _k,_v in threshold_analysis.items():
             t_feature_definition.append([_v,'+',1])
             t_feature_definition.append([_v,'-',0])
-        feature_definition = pd.DataFrame(me_feature_definition+t_feature_definition,
-                                          columns=['feature_label','feature_value_label','feature_value']).\
-                                          reset_index(drop=True)
-        feature_definition.index.name = 'feature_index'
-        features = pd.concat([me_features,t_features]).reset_index(drop=True).\
-            merge(feature_definition.reset_index(),on=['feature_label','feature_value'])[['cell_index','feature_index']]
-        features.index.name = 'db_id'
+            t_feature_basics.append([_v,'InForm threshold analysis'])
 
-        self.set_data('cell_features',features)
-        self.set_data('features',feature_definition)
+        features = pd.DataFrame(me_feature_basics+t_feature_basics,columns=['feature_label','feature_description'])
+        features.index.name = 'feature_index'
+        #print(features)
+        feature_definitions = pd.DataFrame(me_feature_definition+t_feature_definition,
+                                          columns=['feature_label','feature_value_label','feature_value']).\
+                                          reset_index(drop=True).\
+                                          merge(features.reset_index(),on='feature_label')
+        feature_definitions.index.name = 'feature_definition_index'
+
+
+        cell_features = pd.concat([me_features,t_features]).reset_index(drop=True).\
+            merge(feature_definitions.reset_index(),on=['feature_label','feature_value'])[['cell_index','feature_definition_index']]
+        cell_features.index.name = 'db_id'
+
+
+
+        self.set_data('features',features)
+        self.set_data('cell_features',cell_features)
+        self.set_data('feature_definitions',feature_definitions.drop(columns=['feature_label','feature_description']))
 
         return
 
@@ -358,26 +380,14 @@ class CellFrameInForm(CellFrameGeneric):
         self.set_data('cell_measurements',_cell_measurements)
 
 
-    def _parse_score_file(self,score_data_file):
-        # Sets the 'thresholds' table by parsing the score file
-
-        
-        return _thresholds
-
     ### Lets work with image files now
     def _read_images(self,binary_seg_image_file,
-                          component_image_file=None,
                           verbose=False,
                           require_component=True,
                           skip_segmentation_processing=False):
         # Start with the binary seg image file because if it has a processed image area,
         # that will be applied to all other masks and we can get that segmentation right away
 
-        # Now we've read in whatever we've got fromt he binary seg image
-        if verbose: sys.stderr.write("Reading component images.\n")
-        if require_component or (not require_component and component_image_file and os.path.isfile(component_image_file)): 
-            self._read_component_image(component_image_file)
-        if verbose: sys.stderr.write("Finished reading component images.\n")
 
         if binary_seg_image_file is not None:
             if verbose: sys.stderr.write("Binary seg file present.\n")

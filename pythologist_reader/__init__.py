@@ -40,10 +40,14 @@ class CellFrameGeneric(object):
         'cell_interactions':{'index':'db_id', 
                              'columns':['cell_index','neighbor_cell_index','pixel_count','touch_distance']},
         'cell_features':{'index':'db_id',
-                         'columns':['cell_index','feature_index']
+                         'columns':['cell_index','feature_definition_index']
                         },
-        'features':{'index':'feature_index',
-                    'columns':['feature_label','feature_value_label','feature_value']},
+        'feature_definitions':{'index':'feature_definition_index',
+                                'columns':['feature_index','feature_value_label','feature_value']},
+        'features':{
+            'index':'feature_index',
+            'columns':['feature_label','feature_description']
+        },
         'tags':{'index':'tag_index',
                 'columns':['tag_label']}
                            }
