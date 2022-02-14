@@ -43,7 +43,7 @@ class CellFrameGeneric(object):
                          'columns':['cell_index','feature_index']
                         },
         'features':{'index':'feature_index',
-                    'columns':['feature_label','value_label','value']},
+                    'columns':['feature_label','feature_value_label','feature_value']},
         'tags':{'index':'tag_index',
                 'columns':['tag_label']}
                            }

@@ -5,32 +5,28 @@
     "properties": {
         "mutually_exclusive_phenotype_strategies":{
             "type":"array",
-            "description": "A set of mutually exclusive phenotypes.",
+            "description": "A sets of mutually exclusive phenotypes.",
             "items":{
-                "type":"object",
-                "properties":{
-                    "mutually_exclusive_strategy":{
-                        "type":"array",
-                        "description":"A single mutually exclusive strategy.",
-                        "items":{
-                            "type": "object",
-                            "properties": {
-                                "assigned_label":{
-                                    "type": "string",
-                                    "description":"The name given to the phenotype in InForm"
-                                },
-                                "label":{
-                                    "type": "string",
-                                    "description":"The label to carry forward"
-                                },
-                                "keep":{
-                                    "type": "boolean",
-                                    "default": true
-                                }
-                            },
-                            "additionalProperties": false
+                "type":"array",
+                "description":"The contents of a single mutually exclusive strategy.",
+                "items":{
+                    "type": "object",
+                    "properties": {
+                        "assigned_label":{
+                            "type": "string",
+                            "description":"The name given to the phenotype in InForm"
+                        },
+                        "label":{
+                            "type": "string",
+                            "description":"The label to carry forward, by default just used the assigned label if this is unset"
+                        },
+                        "keep":{
+                            "type": "boolean",
+                            "default": true
                         }
-                    }
+                    },
+                    "additionalProperties": false,
+                    "required": ["assigned_label"]
                 }
             }
         },
@@ -53,9 +49,11 @@
                         "default": true
                     }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "required": ["inform_channel_label","label"]
             }
         }
     },
-    "additionalProperties": false
+    "additionalProperties": false,
+    "required": ["mutually_exclusive_phenotype_strategies","threshold_features"]
 }

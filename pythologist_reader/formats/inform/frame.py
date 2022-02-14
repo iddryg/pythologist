@@ -31,10 +31,10 @@ class CellFrameInForm(CellFrameGeneric):
         # so in the end we should set this to NaN.  I would remove it but it would break some backwards compatibility.
         # we never have gotten a project where they have threhsolded differently on different regions, and this isn't something we
         # should probably support unless we have a really good reason too
-        #self.data_tables['thresholds'] = {'index':'gate_index',
-        #         'columns':['threshold_value','statistic_index',
-        #                    'feature_index','channel_index',
-        #                    'gate_label','region_index']}
+        self.data_tables['thresholds'] = {'index':'gate_index',
+                 'columns':['threshold_value','statistic_index',
+                            'feature_index','channel_index',
+                            'feature_label','region_index']}
         self.data_tables['mask_images'] = {'index':'db_id',
                  'columns':['mask_label','image_id']}
         for x in self.data_tables.keys():
@@ -67,12 +67,43 @@ class CellFrameInForm(CellFrameGeneric):
                  binary_seg_image_file=None,
                  component_image_file=None,
                  verbose=False,
-                 channel_abbreviations=None,
+                 inform_analysis_dict=None,
                  require_component=True,
                  require_score=True,
                  skip_segmentation_processing=False):
         self.frame_name = frame_name
         if verbose: sys.stderr.write("Reading image data.\n")
+
+
+        def _parse_threshold(inform_analysis_dict):
+            # return a simpler mapping of inform labels to new labels for anything we keep
+            _output = {}
+            for _d in inform_analysis_dict['threshold_features']:
+                if 'keep' not in _d: 
+                    _d['keep'] = True
+                if _d['keep'] is False: continue
+                _output[_d['inform_channel_label']] = _d['label']
+            return _output
+        def _parse_mutually_exclusive(inform_analysis_dict):
+            # return a tuple keyed dictionary
+            _output = {}
+            for _strategy in inform_analysis_dict['mutually_exclusive_phenotype_strategies']:
+                # iterating over each strategy
+                _strategy_tuple = tuple(sorted([x['assigned_label'] for x in _strategy]))
+                _output[_strategy_tuple] = {}
+                for _pheno in _strategy:
+                    if 'keep' not in _pheno:
+                        _pheno['keep'] = True
+                    if _pheno['keep'] is False: continue
+                    _output[_strategy_tuple][_pheno['assigned_label']] = \
+                        _pheno['assigned_label'] if 'label' not in _pheno else _pheno['label']
+            return _output
+       
+
+        threshold_analysis = _parse_threshold(inform_analysis_dict)
+        mutually_exclusive_analysis = _parse_mutually_exclusive(inform_analysis_dict)
+
+
         # Read images first because the tissue region tables need to be filled in so we can attribute a tissue region to data
         self._read_images(binary_seg_image_file,
                    component_image_file,
@@ -83,8 +114,9 @@ class CellFrameInForm(CellFrameGeneric):
         if verbose: sys.stderr.write("Reading text data.\n")
         self._read_data(cell_seg_data_file,
                    score_data_file,
+                   threshold_analysis,
+                   mutually_exclusive_analysis,
                    verbose,
-                   channel_abbreviations,
                    require_component=require_component,
                    require_score=require_score,
                    skip_segmentation_processing=skip_segmentation_processing)
@@ -127,11 +159,11 @@ class CellFrameInForm(CellFrameGeneric):
     
 
     def _read_data(self,
-                        cell_seg_data_file=None,
-                        score_data_file=None,
-                        tissue_seg_data_file=None,
+                        cell_seg_data_file,
+                        score_data_file,
+                        threshold_analysis,
+                        mutually_exclusive_analysis,
                         verbose=False,
-                        analysis_dict=None,
                         require_component=True,
                         require_score=True,
                         skip_segmentation_processing=False):
@@ -141,7 +173,9 @@ class CellFrameInForm(CellFrameGeneric):
         :type string:
 
         """
-        _seg = pd.read_csv(cell_seg_data_file,"\t")
+
+
+        _seg = pd.read_csv(cell_seg_data_file,sep="\t")
         if 'Tissue Category' not in _seg: _seg['Tissue Category'] = 'Any'
 
         ##########
@@ -152,49 +186,35 @@ class CellFrameInForm(CellFrameGeneric):
                                               'Cell Y Position':'y'})
         _cells = _cells.applymap(int).set_index('cell_index')
 
+        
+        pheno_columns = [x for x in _seg.columns if 'Phenotype-' in x]
+        if len(pheno_columns)==0:
+            pheno_columns = ['Phenotype']
 
-
-        ###########
-        # Set the cell phenotypes
-        #    Try to read phenotypes from the summary file if its there because some may be zero counts and won't show up in the cell_seg file
-        if 'Phenotype' in _seg:
-            # Sometimes inform files won't have a Phenotype columns
-            _phenotypes = _seg.loc[:,['Cell ID','Phenotype']]
-        else:
-            _phenotypes = _seg.loc[:,['Cell ID']]
-            _phenotypes['Phenotype'] = np.nan
-        _phenotypes = _phenotypes.rename(columns={'Cell ID':'cell_index','Phenotype':'phenotype_label'})
-        _phenotypes_present = pd.Series(_phenotypes['phenotype_label'].unique()).tolist()
-        if np.nan not in _phenotypes_present: _phenotypes_present = _phenotypes_present + [np.nan] 
-        _phenotype_list = pd.DataFrame({'phenotype_label':_phenotypes_present})
-        _phenotype_list.index.name = 'phenotype_index'
-        _phenotype_list = _phenotype_list.reset_index()
-
-        #if cell_seg_data_summary_file is not None:
-        #     ############
-        #     # Update the phenotypes table if a cell_seg_data_summary file is present
-        #    if verbose: sys.stderr.write("Cell seg summary file is present so acquire phenotype list from it.\n")
-        #    _segsum = pd.read_csv(cell_seg_data_summary_file,"\t")
-        #    if 'Phenotype' not in _segsum.columns: 
-        #        if verbose: sys.stderr.write("Missing phenotype column so set to NaN.\n")
-        #        _segsum['Phenotype'] = np.nan
-
-        #    _phenotypes_present = [x for x in sorted(_segsum['Phenotype'].unique().tolist()) if x != 'All']
-        #    if np.nan not in _phenotypes_present: _phenotypes_present = _phenotypes_present + [np.nan] 
-        #    _phenotype_list = pd.DataFrame({'phenotype_label':_phenotypes_present})
-        #    _phenotype_list.index.name = 'phenotype_index'
-        #    _phenotype_list = _phenotype_list.reset_index()
-
-        _phenotypes = _phenotypes.merge(_phenotype_list,on='phenotype_label')
-        _phenotype_list = _phenotype_list.set_index('phenotype_index')
-        #Assign 'phenotypes' in a way that ensure we retain the pre-defined column structure
-        self.set_data('phenotypes',_phenotype_list)
-        if verbose: sys.stderr.write("Finished assigning phenotype list.\n")
-
-        _phenotypes = _phenotypes.drop(columns=['phenotype_label']).applymap(int).set_index('cell_index')
-
-        # Now we can add to cells our phenotype indecies
-        _cells = _cells.merge(_phenotypes,left_index=True,right_index=True,how='left')
+        logged_phenotypes = set()
+        me_features = []
+        me_feature_definition = []
+        for pc in pheno_columns:
+            pstr = re.match('Phenotype-(.*)$',pc).group(1)
+            _ptuple = tuple(sorted(pstr.split(', ')))
+            _sub = _seg.loc[:,['Cell ID',pc]].copy().\
+                rename(columns={'Cell ID':'cell_index',pc:'Phenotype'}).\
+                dropna(subset=['Phenotype'])
+            # we are only keeping a subset within these
+            if _ptuple not in mutually_exclusive_analysis:
+                raise ValueError("Missing expected Phenotype analysis column "+str(_ptup))
+            for _assigned, _label in mutually_exclusive_analysis[_ptuple].items():
+                me_feature_definition.append([_label,'+',1])
+                me_feature_definition.append([_label,'-',0])
+                _s1 = _sub.copy()
+                _s1['feature_value'] = _s1.apply(lambda x: 1 if x['Phenotype'] == _assigned else 0,1)
+                _s1['feature_label'] = _label
+                _s1 = _s1.drop(columns=['Phenotype'])
+                if _label in logged_phenotypes:
+                    raise ValueError("Error, of a repeated phenotype label "+str(_label))
+                logged_phenotypes.add(_label)
+                me_features.append(_s1)
+        me_features = pd.concat(me_features).reset_index(drop=True)
 
 
         ###########
@@ -214,17 +234,60 @@ class CellFrameInForm(CellFrameGeneric):
 
         ###########
         # Get the intensity measurements - sets 'measurement_channels', 'measurement_statistics', 'measurement_features', and 'cell_measurements'
-        self._parse_measurements(_seg,channel_abbreviations)  
+        self._parse_measurements(_seg,threshold_analysis)  
         if verbose: sys.stderr.write("Finished setting the measurements.\n")
         ###########
         # Get the thresholds
+        if score_data_file is None and len(threshold_analysis.keys())>0:
+            raise ValueError("Expecting threshold data but no score data file provided")
+
+        extracted_threshold = []
         if score_data_file is not None: 
-            self._parse_score_file(score_data_file)
+            _thresholds = preliminary_threshold_read(score_data_file, 
+                                                 self.get_data('measurement_statistics'), 
+                                                 self.get_data('measurement_features'), 
+                                                 self.get_data('measurement_channels'), 
+                                                 self.get_data('regions'))
             if verbose: sys.stderr.write("Finished reading score.\n")
-        #self.set_data('binary_calls',self.binary_df())
+            self.set_data('thresholds',_thresholds)
+
+            ms = self.get_data('measurement_statistics')
+            mf = self.get_data('measurement_features')
+            mc = self.get_data('measurement_channels')
+            cm = self.get_data('cell_measurements')
+            cells = self.get_data('cells')
+            regions = self.get_data('regions')
+
+            _t = cells.merge(regions,left_on='region_index',right_index=True).\
+                       drop(columns=['x','y','region_size','image_id']).\
+                       merge(cm,left_index=True,right_on=['cell_index']).\
+                       merge(_thresholds,on=['statistic_index','feature_index','channel_index','region_index'])
+            _t['feature_value'] = _t.apply(lambda x: 1 if x['value']>=x['threshold_value'] else 0,1)
+            _t = _t.loc[:,['cell_index','feature_label','feature_value']]
+            _t = _t.loc[_t['feature_label'].isin([x for x in threshold_analysis.values()]),:]
+            _flabs = _t['feature_label'].unique()
+            for _k,_v in threshold_analysis.items():
+                if _v not in _flabs: raise ValueError("Missing threshold feature "+str(_v))
+            t_features = _t.copy()
+
+        t_feature_definition = []
+        for _k,_v in threshold_analysis.items():
+            t_feature_definition.append([_v,'+',1])
+            t_feature_definition.append([_v,'-',0])
+        feature_definition = pd.DataFrame(me_feature_definition+t_feature_definition,
+                                          columns=['feature_label','feature_value_label','feature_value']).\
+                                          reset_index(drop=True)
+        feature_definition.index.name = 'feature_index'
+        features = pd.concat([me_features,t_features]).reset_index(drop=True).\
+            merge(feature_definition.reset_index(),on=['feature_label','feature_value'])[['cell_index','feature_index']]
+        features.index.name = 'db_id'
+
+        self.set_data('cell_features',features)
+        self.set_data('features',feature_definition)
+
         return
 
-    def _parse_measurements(self,_seg,channel_abbreviations):   
+    def _parse_measurements(self,_seg,threshold_analysis):   
         # Parse the cell seg pandas we've already read in to get the cell-level measurements, as well as what features we are measuring
         # Sets the 'measurement_channels', 'measurement_statistics', 'measurement_features', and 'cell_measurements'
         keepers = ['Cell ID']
@@ -272,9 +335,9 @@ class CellFrameInForm(CellFrameGeneric):
         _measurement_channels = pd.DataFrame({'channel_label':_intensity['channel_label'].unique()})
         _measurement_channels.index.name = 'channel_index'
         _measurement_channels['channel_abbreviation'] = _measurement_channels['channel_label']
-        if channel_abbreviations:
+        if threshold_analysis:
             _measurement_channels['channel_abbreviation'] = \
-                _measurement_channels.apply(lambda x: x['channel_label'] if x['channel_label'] not in channel_abbreviations else channel_abbreviations[x['channel_label']],1)
+                _measurement_channels.apply(lambda x: x['channel_label'] if x['channel_label'] not in threshold_analysis else threshold_analysis[x['channel_label']],1)
         _measurement_channels['image_id'] = np.nan
         self.set_data('measurement_channels',_measurement_channels)
 
@@ -297,13 +360,9 @@ class CellFrameInForm(CellFrameGeneric):
 
     def _parse_score_file(self,score_data_file):
         # Sets the 'thresholds' table by parsing the score file
-        _thresholds = preliminary_threshold_read(score_data_file, 
-                                                 self.get_data('measurement_statistics'), 
-                                                 self.get_data('measurement_features'), 
-                                                 self.get_data('measurement_channels'), 
-                                                 self.get_data('regions'))
-        self.set_data('thresholds',_thresholds)
-        return
+
+        
+        return _thresholds
 
     ### Lets work with image files now
     def _read_images(self,binary_seg_image_file,
@@ -328,7 +387,6 @@ class CellFrameInForm(CellFrameGeneric):
             ### Set a procssed image area based on available layers in the binary seg image file
             if 'ProcessRegionImage' in m.index:
                 # we have a ProcessedImage
-                #print('have a processedimage')
                 self.set_processed_image_id(m.loc['ProcessRegionImage']['image_id'])
                 self._images[self.processed_image_id] = self._images[self.processed_image_id].astype(np.int8)
             elif 'TissueClassMap' in m.index:
@@ -391,8 +449,6 @@ class CellFrameInForm(CellFrameGeneric):
             temp = self.get_data('regions').drop(columns=['image_id','region_size']).merge(df,left_index=True,right_index=True,how='right')
             temp['region_label'] = 'Any'
             temp['region_size'] = temp['region_size'].astype(float)
-            #print("do the temp")
-            #print(temp)
             self.set_data('regions',temp)
 
     def _read_component_image(self,filename):
@@ -419,7 +475,6 @@ class CellFrameInForm(CellFrameGeneric):
 
     def _parse_image_description(self,metatext):
         #root = ET.fromstring(metatext.decode('utf-8'))
-        #print("better image description?")
         d = xmltodict.parse(metatext)
         if len(list(d.keys())) > 1: raise ValueError("Unexpected XML format with multiple root tags")
         root_tag = list(d.keys())[0]
@@ -462,14 +517,9 @@ class CellFrameInForm(CellFrameGeneric):
 
         regions = pd.DataFrame(img.astype(int)).stack().unique()
         regions = [x for x in regions if x != 255]
-        #print('from tissue class map the regions are')
-        #print(regions)
         region_key = []
-        #print('step through regions')
-        # print(image_description)
 
         for region in regions:
-            # print("region: " + str(region))
             image_id = uuid4().hex
 
             # if value of key 'Entry' is list, pass
@@ -621,7 +671,7 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
     # for alternate exports without reading in everything.
 
     # Sets the 'thresholds' table by parsing the score file
-    _score_data = pd.read_csv(score_data_file,"\t")
+    _score_data = pd.read_csv(score_data_file,sep="\t")
     # Now we know there are two possible scoring schemes... a "Positivity Threshold" for binary type,
     # or a series of Thresholds for ordinal types
     # lets see which of our types we have
@@ -679,7 +729,7 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
                                   merge(regions[['region_label']].reset_index(),on='region_label').\
                                   drop(columns=['feature_label','channel_label','region_label'])
         # By default for inform name the gate after the channel abbreviation
-        _thresholds['gate_label'] = _thresholds['channel_abbreviation']
+        _thresholds['feature_label'] = _thresholds['channel_abbreviation']
         _thresholds = _thresholds.drop(columns=['channel_abbreviation'])
         _thresholds = _thresholds.set_index('gate_index')
 
@@ -716,13 +766,14 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
         return _thresholds
 
     if is_ordinal:
+        raise ValueError("Ordinal processing is not yet tested.")
         _thresholds = _parse_ordinal(_score_data,measurement_statistics,measurement_features,measurement_channels,regions)
     else:
         _thresholds = _parse_binary(_score_data,measurement_statistics,measurement_features,measurement_channels,regions)
 
         
-    # At this moment we don't support a different threhsold for each region so we will set a nonsense value for the region index... since this threhsold NOT be applied by region
-    _thresholds.loc[:,'region_index'] = np.nan
+    ## At this moment we don't support a different threhsold for each region so we will set a nonsense value for the region index... since this threhsold NOT be applied by region
+    ##_thresholds.loc[:,'region_index'] = np.nan
 
     # adding in the drop duplicates to hopefully fix an issue for with multiple tissues
     return _thresholds.drop_duplicates()
