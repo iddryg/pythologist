@@ -31,10 +31,10 @@ class CellFrameInForm(CellFrameGeneric):
         # so in the end we should set this to NaN.  I would remove it but it would break some backwards compatibility.
         # we never have gotten a project where they have threhsolded differently on different regions, and this isn't something we
         # should probably support unless we have a really good reason too
-        self.data_tables['thresholds'] = {'index':'gate_index',
-                 'columns':['threshold_value','statistic_index',
-                            'feature_index','channel_index',
-                            'gate_label','region_index']}
+        #self.data_tables['thresholds'] = {'index':'gate_index',
+        #         'columns':['threshold_value','statistic_index',
+        #                    'feature_index','channel_index',
+        #                    'gate_label','region_index']}
         self.data_tables['mask_images'] = {'index':'db_id',
                  'columns':['mask_label','image_id']}
         for x in self.data_tables.keys():
@@ -47,29 +47,28 @@ class CellFrameInForm(CellFrameGeneric):
     def excluded_channels(self):
         return ['Autofluorescence','Post-processing','DAPI']    
 
-    @property
-    def thresholds(self):
-        # Print the threhsolds
-        return self.get_data('thresholds').merge(self.get_data('measurement_statistics'),
-                                                 left_on='statistic_index',
-                                                 right_index=True).\
-               merge(self.get_data('measurement_features'),
-                     left_on='feature_index',
-                     right_index=True).\
-               merge(self.get_data('measurement_channels'),
-                     left_on='channel_index',
-                     right_index=True)
+    #@property
+    #def thresholds(self):
+    #    # Print the threhsolds
+    #    return self.get_data('thresholds').merge(self.get_data('measurement_statistics'),
+    #                                             left_on='statistic_index',
+    #                                             right_index=True).\
+    #           merge(self.get_data('measurement_features'),
+    #                 left_on='feature_index',
+    #                 right_index=True).\
+    #           merge(self.get_data('measurement_channels'),
+    #                 left_on='channel_index',
+    #                 right_index=True)
 
     def read_raw(self,
                  frame_name = None,
                  cell_seg_data_file=None,
                  score_data_file=None,
-                 tissue_seg_data_file=None,
                  binary_seg_image_file=None,
                  component_image_file=None,
                  verbose=False,
                  channel_abbreviations=None,
-                 require=True,
+                 require_component=True,
                  require_score=True,
                  skip_segmentation_processing=False):
         self.frame_name = frame_name
@@ -78,14 +77,17 @@ class CellFrameInForm(CellFrameGeneric):
         self._read_images(binary_seg_image_file,
                    component_image_file,
                    verbose=verbose,
-                   require=require,skip_segmentation_processing=skip_segmentation_processing)
+                   require_component=require_component,
+                   skip_segmentation_processing=skip_segmentation_processing)
         ### Read in the data for our object
         if verbose: sys.stderr.write("Reading text data.\n")
         self._read_data(cell_seg_data_file,
                    score_data_file,
-                   tissue_seg_data_file,
                    verbose,
-                   channel_abbreviations,require=require,require_score=require_score,skip_segmentation_processing=skip_segmentation_processing)
+                   channel_abbreviations,
+                   require_component=require_component,
+                   require_score=require_score,
+                   skip_segmentation_processing=skip_segmentation_processing)
         return
 
     def default_raw(self):
@@ -129,8 +131,10 @@ class CellFrameInForm(CellFrameGeneric):
                         score_data_file=None,
                         tissue_seg_data_file=None,
                         verbose=False,
-                        channel_abbreviations=None,
-                        require=True,require_score=True,skip_segmentation_processing=False):
+                        analysis_dict=None,
+                        require_component=True,
+                        require_score=True,
+                        skip_segmentation_processing=False):
         """ Read in the image data from a inForm
 
         :param cell_seg_data_file:
@@ -147,6 +151,8 @@ class CellFrameInForm(CellFrameGeneric):
                                               'Cell X Position':'x',
                                               'Cell Y Position':'y'})
         _cells = _cells.applymap(int).set_index('cell_index')
+
+
 
         ###########
         # Set the cell phenotypes
@@ -195,30 +201,6 @@ class CellFrameInForm(CellFrameGeneric):
         # Set the cell_regions
         _cell_regions = _seg[['Cell ID','Tissue Category']].copy().rename(columns={'Cell ID':'cell_index','Tissue Category':'region_label'})
 
-        ### Don't read the tissue seg data file.  You can get everything from the TissueClassMap.
-        #if tissue_seg_data_file:
-        #    if verbose: sys.stderr.write("Tissue seg file is present.\n")
-        #    _regions = pd.read_csv(tissue_seg_data_file,sep="\t")
-        #    _regions = _regions[['Region ID','Tissue Category','Region Area (pixels)']].\
-        #        rename(columns={'Region ID':'region_index','Tissue Category':'region_label','Region Area (pixels)':'region_size'}).set_index('region_index')
-        #    # Set the image_id and region size to null for now
-        #    _regions['image_id'] = np.nan # We don't have the image read in yet
-        #    print('this is where regions is')
-        #    print(_regions)
-        #    self.set_data('regions',_regions)
-        #    #raise ValueError("Region summary not implemented")
-        #else:
-        #    if verbose: sys.stderr.write("Tissue seg file is not present.\n")
-
-
-        ## Set some empty region data
-        #print("our regions")
-        #print(self.get_data('regions'))
-        #_regions = pd.DataFrame({'region_label':_cell_regions['region_label'].unique()})
-        #_regions.index.name = 'region_index'
-        #_regions['region_size'] = np.nan # We don't have size available yet
-        #_regions['image_id'] = np.nan
-        #self.set_data('regions',_regions)
 
         _cell_regions = _cell_regions.merge(self.get_data('regions')[['region_label']].reset_index(),on='region_label')
         _cell_regions = _cell_regions.drop(columns=['region_label']).set_index('cell_index')
@@ -284,14 +266,7 @@ class CellFrameInForm(CellFrameGeneric):
         _intensities = [_intensity2,
                         #_intensity3,
                         _intensity1.loc[:,_intensity2.columns]]
-        #if 'Entire Cell Area (pixels)' in _seg:
-        #    _intensity4 = _seg[['Cell ID','Entire Cell Area (pixels)']].rename(columns={'Cell ID':'cell_index',
-        #                                                                         'Entire Cell Area (pixels)':'value',
-        #                                                                        })
-        #    _intensity4['channel_label'] = 'Post-processing'
-        #    _intensity4['feature_label'] = 'Whole Cell'
-        #    _intensity4['statistic_label'] = 'Area (pixels)'
-        #    _intensities += [_intensity4.loc[:,_intensity2.columns]]
+
         _intensity = pd.concat(_intensities)
 
         _measurement_channels = pd.DataFrame({'channel_label':_intensity['channel_label'].unique()})
@@ -331,13 +306,17 @@ class CellFrameInForm(CellFrameGeneric):
         return
 
     ### Lets work with image files now
-    def _read_images(self,binary_seg_image_file=None,component_image_file=None,verbose=False,require=True,skip_segmentation_processing=False):
+    def _read_images(self,binary_seg_image_file,
+                          component_image_file=None,
+                          verbose=False,
+                          require_component=True,
+                          skip_segmentation_processing=False):
         # Start with the binary seg image file because if it has a processed image area,
         # that will be applied to all other masks and we can get that segmentation right away
 
         # Now we've read in whatever we've got fromt he binary seg image
         if verbose: sys.stderr.write("Reading component images.\n")
-        if require or (not require and component_image_file and os.path.isfile(component_image_file)): 
+        if require_component or (not require_component and component_image_file and os.path.isfile(component_image_file)): 
             self._read_component_image(component_image_file)
         if verbose: sys.stderr.write("Finished reading component images.\n")
 
@@ -401,29 +380,6 @@ class CellFrameInForm(CellFrameGeneric):
 
             raise ValueError("Nothing to set determine size of images")
 
-        # Now we can set the regions if we have them set intrinsically
-        #m = self.get_data('mask_images').set_index('mask_label')
-        #if 'TissueClassMap' in m.index:
-        #    img = self._images[m.loc['TissueClassMap']['image_id']]
-        #    regions = pd.DataFrame(img.astype(int)).stack().unique()
-        #    regions = [x for x in regions if x != 255]
-        #    print('from tissue class map the regions are')
-        #    print(regions)
-        #    region_key = []
-        #    print('step through regions')
-        #    for region in regions:
-        #        print("region: "+str(region))
-        #        image_id = uuid4().hex
-        #        region_key.append([region,image_id])
-        #        self._images[image_id] = np.array(pd.DataFrame(img.astype(int)).applymap(lambda x: 1 if x==region else 0)).astype(np.int8)
-        #    df = pd.DataFrame(region_key,columns=['region_index','image_id']).set_index('region_index')
-        #    df['region_size'] = df.apply(lambda x:
-        #            self._images[x['image_id']].sum()
-        #        ,1)
-        #    temp = self.get_data('regions').drop(columns=['image_id','region_size']).merge(df,left_index=True,right_index=True,how='right')
-        #    temp['region_size'] = temp['region_size'].astype(float)
-        #    self.set_data('regions',temp)
-
         # If we don't have any regions set and all we have is 'Any' then we can just use the processed image
         _region = self.get_data('regions') #.query('region_label!="Any"').query('region_label!="any"')
         if _region.shape[0] ==0:
@@ -478,10 +434,7 @@ class CellFrameInForm(CellFrameGeneric):
         for raw in stack:
             meta = raw['raw_meta']
             image_type, image_description = self._parse_image_description(meta['ImageDescription'])
-            #print("parsing image description")
-            #print("meta: "+str(meta))
-            #print("image_type: "+str(image_type))
-            #print("image_description: "+str(image_description))
+
             image_id = uuid4().hex
             if image_type == 'SegmentationImage':
                 ### Handle if its a segmentation
@@ -506,9 +459,7 @@ class CellFrameInForm(CellFrameGeneric):
 
     def _process_tissue_class_map(self,image_description,img):
         # Now we can set the regions if we have them set intrinsically
-        #m = self.get_data('mask_images').set_index('mask_label')
-        #if 'TissueClassMap' in m.index:
-        #img = self._images[m.loc['TissueClassMap']['image_id']]
+
         regions = pd.DataFrame(img.astype(int)).stack().unique()
         regions = [x for x in regions if x != 255]
         #print('from tissue class map the regions are')
@@ -536,19 +487,9 @@ class CellFrameInForm(CellFrameGeneric):
         df['region_size'] = df.apply(lambda x:
             self._images[x['image_id']].sum()
         ,1)
-        #print(df)
-        #print("enumerate")
-        #df['region_label'] = np.nan
-        #for i,entry in enumerate(image_description['Entry']):
-        #    #print(i+1)
-        #    df.loc[i+1,'region_label'] = entry['Name']
 
-        #temp = self.get_data('regions').drop(columns=['image_id','region_size']).merge(df,left_index=True,right_index=True,how='right')
-        #temp['region_size'] = temp['region_size'].astype(float)
-        #print("setting regions from the masks")
-        #print(temp)
         self.set_data('regions',df[['region_label','image_id','region_size']])
-        #print(self.get_data('regions'))
+
 
 
 

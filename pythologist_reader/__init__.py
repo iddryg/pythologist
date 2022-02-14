@@ -21,7 +21,7 @@ class CellFrameGeneric(object):
         self.frame_name = None
         self.data_tables = {
         'cells':{'index':'cell_index',            
-                  'columns':['x','y','phenotype_index',
+                  'columns':['x','y',
                              'region_index']},
         'cell_tags':{'index':'db_id',            
                      'columns':['tag_index','cell_index']},
@@ -33,14 +33,17 @@ class CellFrameGeneric(object):
                                 'columns':['channel_label','channel_abbreviation','image_id']},
         'measurement_statistics':{'index':'statistic_index',
                                   'columns':['statistic_label']},
-        'phenotypes':{'index':'phenotype_index',
-                      'columns':['phenotype_label']},
         'segmentation_images':{'index':'db_id',
                  'columns':['segmentation_label','image_id']},                     
         'regions':{'index':'region_index',
                    'columns':['region_label','region_size','image_id']},
         'cell_interactions':{'index':'db_id', 
                              'columns':['cell_index','neighbor_cell_index','pixel_count','touch_distance']},
+        'cell_features':{'index':'db_id',
+                         'columns':['cell_index','feature_index']
+                        },
+        'features':{'index':'feature_index',
+                    'columns':['feature_label','value_label','value']},
         'tags':{'index':'tag_index',
                 'columns':['tag_label']}
                            }
