@@ -30,7 +30,7 @@
                 }
             }
         },
-        "threshold_features":{
+        "channels":{
             "type":"array",
             "description": "The labels of mutually exclusive regions.",
             "items":{
@@ -44,9 +44,9 @@
                         "type": "string",
                         "description": "The label to carry forward"
                     },
-                    "keep": {
+                    "analyze_threshold": {
                         "type": "boolean",
-                        "default": true
+                        "default": false
                     }
                 },
                 "additionalProperties": false,
@@ -55,5 +55,5 @@
         }
     },
     "additionalProperties": false,
-    "required": ["mutually_exclusive_phenotype_strategies","threshold_features"]
+    "required": ["mutually_exclusive_phenotype_strategies","channels"]
 }

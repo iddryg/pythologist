@@ -24,19 +24,13 @@ class CellFrameInForm(CellFrameGeneric):
         super().__init__()
 
         self._storage_type = None
-
+        self._tissue_class_map = {'image_id':None,'image_description':None,'raw_image':None}
         ### Define extra InForm-specific data tables
 
-        # This one is not quite right ... the 'region_index' is not currently implemented, and is not used for applying threhsolds,
+        # This one is not quite right ... the 'region_index' is not currently implemented, and is not used for applying thresholds,
         # so in the end we should set this to NaN.  I would remove it but it would break some backwards compatibility.
-        # we never have gotten a project where they have threhsolded differently on different regions, and this isn't something we
+        # we never have gotten a project where they have thresholded differently on different regions, and this isn't something we
         # should probably support unless we have a really good reason too
-        self.data_tables['thresholds'] = {'index':'gate_index',
-                 'columns':['threshold_value','statistic_index',
-                            'feature_index','channel_index',
-                            'feature_label','region_index']}
-        self.data_tables['mask_images'] = {'index':'db_id',
-                 'columns':['mask_label','image_id']}
         for x in self.data_tables.keys():
             if x in self._data: continue
             self._data[x] = pd.DataFrame(columns=self.data_tables[x]['columns'])
@@ -47,9 +41,14 @@ class CellFrameInForm(CellFrameGeneric):
     def excluded_channels(self):
         return ['Autofluorescence','Post-processing','DAPI']    
 
+    @property
+    def tissue_class_map_image_id(self):
+        return self._tissue_class_map['image_id']
+    
+
     #@property
     #def thresholds(self):
-    #    # Print the threhsolds
+    #    # Print the thresholds
     #    return self.get_data('thresholds').merge(self.get_data('measurement_statistics'),
     #                                             left_on='statistic_index',
     #                                             right_index=True).\
@@ -61,6 +60,7 @@ class CellFrameInForm(CellFrameGeneric):
     #                 right_index=True)
 
     def read_raw(self,
+                 greedy_use_first_threshold = False,
                  frame_name = None,
                  cell_seg_data_file=None,
                  score_data_file=None,
@@ -71,17 +71,18 @@ class CellFrameInForm(CellFrameGeneric):
                  require_component=True,
                  require_score=True,
                  skip_segmentation_processing=False):
+        self.verbose = verbose
         self.frame_name = frame_name
-        if verbose: sys.stderr.write("Reading image data.\n")
 
 
         def _parse_threshold(inform_analysis_dict):
             # return a simpler mapping of inform labels to new labels for anything we keep
             _output = {}
-            for _d in inform_analysis_dict['threshold_features']:
-                if 'keep' not in _d: 
-                    _d['keep'] = True
-                if _d['keep'] is False: continue
+            for _d in inform_analysis_dict['channels']:
+                if 'analyze_threshold' not in _d: 
+                    continue
+                if _d['analyze_threshold'] is False:
+                    continue
                 _output[_d['inform_channel_label']] = _d['label']
             return _output
         def _parse_mutually_exclusive(inform_analysis_dict):
@@ -100,43 +101,76 @@ class CellFrameInForm(CellFrameGeneric):
             return _output
        
 
+        if self.verbose: sys.stderr.write("Reading analysis parameters.\n")
         threshold_analysis = _parse_threshold(inform_analysis_dict)
         mutually_exclusive_analysis = _parse_mutually_exclusive(inform_analysis_dict)
+        channel_abbreviations = dict([(x['inform_channel_label'],x['label']) for x in inform_analysis_dict['channels']])
 
 
         # Read images first because the tissue region tables need to be filled in so we can attribute a tissue region to data
+        if self.verbose: sys.stderr.write("Reading image data.\n")
         self._read_images(binary_seg_image_file,
-                   verbose=verbose,
                    require_component=require_component,
                    skip_segmentation_processing=skip_segmentation_processing)
+        if self.verbose: sys.stderr.write("Finished reading image data.\n")
+
         ### Read in the data for our object
-        if verbose: sys.stderr.write("Reading text data.\n")
+        if self.verbose: sys.stderr.write("Reading text data.\n")
+        #self._read_data(cell_seg_data_file,
+        #                score_data_file,
+        #                threshold_analysis,
+        #                mutually_exclusive_analysis,
+        #                channel_abbreviations,
+        #                require_component=require_component,
+        #                require_score=require_score,
+        #                skip_segmentation_processing=skip_segmentation_processing)
+        #if self.verbose: sys.stderr.write("Finished reading text data.\n")
+
+
+        # If we have a tissue_class_map we can make a new merged Map
+        if self.tissue_class_map_image_id is not None:
+            if self.verbose: sys.stderr.write("Setting a new region group for ProcessedRegionImage.\n")
+            _any_region_index = self._add_processed_image_region()
+        #    # fix the thresholds
+        #    _pre = self.get_data('thresholds').shape[0]
+        #    _thresholds = self.get_data('thresholds').groupby(['channel_index']).first().reset_index()
+        #    _thresholds['region_index'] = _any_region_index
+        #    _post = _thresholds.shape[0]
+        #    if _pre != _post:
+        #        sys.stderr.write("WARNING: Dropped extra thresholding.\n")
+        #    _thresholds.index.name = 'gate_index'
+        #    print("=====THRESHOLDS====")
+        #    print(_thresholds)
+        #    self.set_data('thresholds',_thresholds)
+
+
         self._read_data(cell_seg_data_file,
-                   score_data_file,
-                   threshold_analysis,
-                   mutually_exclusive_analysis,
-                   verbose,
-                   require_component=require_component,
-                   require_score=require_score,
-                   skip_segmentation_processing=skip_segmentation_processing)
+                        score_data_file,
+                        threshold_analysis,
+                        mutually_exclusive_analysis,
+                        channel_abbreviations,
+                        require_component=require_component,
+                        require_score=require_score,
+                        skip_segmentation_processing=skip_segmentation_processing)
 
         # Now we've read in whatever we've got fromt he binary seg image
-        if verbose: sys.stderr.write("Reading component images.\n")
+        if self.verbose: sys.stderr.write("Reading component images.\n")
         if require_component or (not require_component and component_image_file and os.path.isfile(component_image_file)): 
             self._read_component_image(component_image_file)
-        if verbose: sys.stderr.write("Finished reading component images.\n")
+        if self.verbose: sys.stderr.write("Finished reading component images.\n")
+
         return
 
     def default_raw(self):
-        return self.get_raw(feature_label='Whole Cell',statistic_label='Mean')
+        return self.get_raw(measurement_feature_label='Whole Cell',statistic_label='Mean')
 
-    def binary_calls(self):
-        # generate a table of gating calls with ncols = to the number of gates + phenotypes
-
-        temp = self.phenotype_calls()
-        if self.get_data('thresholds').shape[0] == 0:
-            return temp.astype(np.int8)
-        return temp.merge(self.scored_calls(),left_index=True,right_index=True).astype(np.int8)
+    #def binary_calls(self):
+    #    # generate a table of gating calls with ncols = to the number of gates + phenotypes
+    #
+    #    temp = self.phenotype_calls()
+    #    if self.get_data('thresholds').shape[0] == 0:
+    #        return temp.astype(np.int8)
+    #    return temp.merge(self.scored_calls(),left_index=True,right_index=True).astype(np.int8)
 
 
     def binary_df(self):
@@ -154,13 +188,13 @@ class CellFrameInForm(CellFrameGeneric):
         output.index.name = 'db_id'
         return output
 
-    def scored_calls(self):
-        if self.get_data('thresholds').shape[0] == 0: return None
-        d = self.get_data('thresholds').reset_index().\
-            merge(self.get_data('cell_measurements').reset_index(),on=['statistic_index','feature_index','channel_index'])
-        d['gate'] = d.apply(lambda x: x['value']>=x['threshold_value'],1)
-        d = d.pivot(values='gate',index='cell_index',columns='gate_label').applymap(lambda x: 1 if x else 0)
-        return d.astype(np.int8)
+    #def scored_calls(self):
+    #    if self.get_data('thresholds').shape[0] == 0: return None
+    #    d = self.get_data('thresholds').reset_index().\
+    #        merge(self.get_data('cell_measurements').reset_index(),on=['statistic_index','feature_index','channel_index'])
+    #    d['gate'] = d.apply(lambda x: x['value']>=x['threshold_value'],1)
+    #    d = d.pivot(values='gate',index='cell_index',columns='gate_label').applymap(lambda x: 1 if x else 0)
+    #    return d.astype(np.int8)
     
 
     def _read_data(self,
@@ -168,7 +202,7 @@ class CellFrameInForm(CellFrameGeneric):
                         score_data_file,
                         threshold_analysis,
                         mutually_exclusive_analysis,
-                        verbose=False,
+                        channel_abbreviations,
                         require_component=True,
                         require_score=True,
                         skip_segmentation_processing=False):
@@ -178,7 +212,6 @@ class CellFrameInForm(CellFrameGeneric):
         :type string:
 
         """
-
 
         _seg = pd.read_csv(cell_seg_data_file,sep="\t")
         if 'Tissue Category' not in _seg: _seg['Tissue Category'] = 'Any'
@@ -203,14 +236,19 @@ class CellFrameInForm(CellFrameGeneric):
         me_feature_definition = []
         me_feature_basics = []
         for pc in pheno_columns:
-            pstr = re.match('Phenotype-(.*)$',pc).group(1)
+            m = re.match('Phenotype-(.*)$',pc)
+            pstr = None
+            if m:
+                pstr = m.group(1)
+            else:
+                pstr = ", ".join(sorted(_seg['Phenotype'].dropna().unique().tolist())) 
             _ptuple = tuple(sorted(pstr.split(', ')))
             _sub = _seg.loc[:,['Cell ID',pc]].copy().\
                 rename(columns={'Cell ID':'cell_index',pc:'Phenotype'}).\
                 dropna(subset=['Phenotype'])
             # we are only keeping a subset within these
             if _ptuple not in mutually_exclusive_analysis:
-                raise ValueError("Missing expected Phenotype analysis column "+str(_ptup))
+                raise ValueError("Missing expected Phenotype analysis column "+str(_ptuple))
             for _assigned, _label in mutually_exclusive_analysis[_ptuple].items():
                 me_feature_definition.append([_label,'+',1])
                 me_feature_definition.append([_label,'-',0])
@@ -228,23 +266,29 @@ class CellFrameInForm(CellFrameGeneric):
 
         ###########
         # Set the cell_regions
+
+        #print(self._tissue_class_map['image_description'])
         _cell_regions = _seg[['Cell ID','Tissue Category']].copy().rename(columns={'Cell ID':'cell_index','Tissue Category':'region_label'})
 
 
         _cell_regions = _cell_regions.merge(self.get_data('regions')[['region_label']].reset_index(),on='region_label')
-        _cell_regions = _cell_regions.drop(columns=['region_label']).set_index('cell_index')
+        _cell_regions = _cell_regions.drop(columns=['region_label'])#.set_index('cell_index').reset_index()
+        _cell_regions.index.name = 'db_id'
+        #print(_cell_regions.columns)
+        #print(_cell_regions.head())
+        self.set_data('cell_regions',_cell_regions)
 
-        # Now we can add to cells our region indecies
-        _cells = _cells.merge(_cell_regions,left_index=True,right_index=True,how='left')
+        ## Now we can add to cells our region indecies
+        #_cells = _cells.merge(_cell_regions,left_index=True,right_index=True,how='left')
 
         # Assign 'cells' in a way that ensures we retain our pre-defined column structure. Should throw a warning if anything is wrong
         self.set_data('cells',_cells)
-        if verbose: sys.stderr.write("Finished setting the cell list regions are set.\n")
+        if self.verbose: sys.stderr.write("Finished setting the cell list regions are set.\n")
 
         ###########
         # Get the intensity measurements - sets 'measurement_channels', 'measurement_statistics', 'measurement_features', and 'cell_measurements'
-        self._parse_measurements(_seg,threshold_analysis)  
-        if verbose: sys.stderr.write("Finished setting the measurements.\n")
+        self._parse_measurements(_seg,threshold_analysis,channel_abbreviations)  
+        if self.verbose: sys.stderr.write("Finished setting the measurements.\n")
         ###########
         # Get the thresholds
         if score_data_file is None and len(threshold_analysis.keys())>0:
@@ -258,20 +302,46 @@ class CellFrameInForm(CellFrameGeneric):
                                                  self.get_data('measurement_features'), 
                                                  self.get_data('measurement_channels'), 
                                                  self.get_data('regions'))
-            if verbose: sys.stderr.write("Finished reading score.\n")
+            if self.verbose: sys.stderr.write("Finished reading score.\n")
             self.set_data('thresholds',_thresholds)
 
+            ### Take a greedy thresholds
+            _thresholds = self.get_data('thresholds').groupby(['channel_index']).first().\
+                reset_index()
+            _thresholds.index.name = 'gate_index'
+            _any_region_index = self.get_data('regions').reset_index().set_index('region_label').loc['Any']['region_index']
+            _thresholds['region_index'] = _any_region_index
+            #print(_thresholds)
+            self.set_data('thresholds',_thresholds)
+
+            # set the cell regions
+            _cr = self.get_data('cell_regions').copy()
+            #print('==== cell regions ====')
+            #print(_cr.shape)
+            _cr['region_index'] = _any_region_index
+            _cr = pd.concat([self.get_data('cell_regions'),_cr]).reset_index(drop=True)
+            _cr.index.name = 'db_id'
+            #print(_cr.shape)
+            self.set_data('cell_regions',_cr)
+
+
+            #_thresholds = self.get_data('thresholds')
             ms = self.get_data('measurement_statistics')
             mf = self.get_data('measurement_features')
             mc = self.get_data('measurement_channels')
             cm = self.get_data('cell_measurements')
-            cells = self.get_data('cells')
-            regions = self.get_data('regions')
+            _cr = self.get_data('cell_regions')
+            _regions = self.get_data('regions')
+            print(_regions)
 
-            _t = cells.merge(regions,left_on='region_index',right_index=True).\
-                       drop(columns=['x','y','region_size','image_id']).\
-                       merge(cm,left_index=True,right_on=['cell_index']).\
-                       merge(_thresholds,on=['statistic_index','feature_index','channel_index','region_index'])
+
+            _t = _cr.merge(_regions,left_on='region_index',right_index=True).\
+                       drop(columns=['region_size','image_id']).\
+                       merge(cm,on=['cell_index']).\
+                       merge(_thresholds,on=['statistic_index','measurement_feature_index','channel_index','region_index']).\
+                       merge(mc,left_on='channel_index',right_index=True).drop(columns=['channel_label','image_id']).\
+                       rename(columns={'channel_abbreviation':'feature_label'})
+
             _t['feature_value'] = _t.apply(lambda x: 1 if x['value']>=x['threshold_value'] else 0,1)
             _t = _t.loc[:,['cell_index','feature_label','feature_value']]
             _t = _t.loc[_t['feature_label'].isin([x for x in threshold_analysis.values()]),:]
@@ -306,10 +376,42 @@ class CellFrameInForm(CellFrameGeneric):
         self.set_data('features',features)
         self.set_data('cell_features',cell_features)
         self.set_data('feature_definitions',feature_definitions.drop(columns=['feature_label','feature_description']))
-
         return
 
-    def _parse_measurements(self,_seg,threshold_analysis):   
+    def _add_processed_image_region(self):
+            # Need to have finished reading in images and cell text data
+            imgany = ((self.get_image(self.tissue_class_map_image_id)!=255)&\
+                      (self.get_image(self.tissue_class_map_image_id)!=0)&\
+                      (self.get_image(self.processed_image_id)==1)).astype(np.int8)
+            imgany_id = uuid4().hex
+            self._images[imgany_id] = imgany
+            # Create a new region group for "Any"
+            _region_group_index = max(self.get_data('region_groups').index)+1
+            _rgt = self.get_data('region_groups').\
+                      append(pd.Series({'region_group':'ProcessRegionImage',
+                                        'region_group_description':'The complete processed image from InForm.'},
+                                        name=_region_group_index
+                                        ),
+                            )
+            self.set_data('region_groups',_rgt)
+
+            # set the regions
+            _region_index = max(self.get_data('regions').index)+1
+            print(('region_index',_region_index))
+            _rt = self.get_data('regions').\
+                append(pd.Series(
+                    {
+                        'region_group_index':_region_group_index,
+                        'region_label':'Any',
+                        'region_size':imgany.sum(),
+                        'image_id':imgany_id
+                    },name=_region_index
+                ))
+            _rt.index.name = 'region_index'
+            self.set_data('regions',_rt)
+            return _region_index
+
+    def _parse_measurements(self,_seg,threshold_analysis,channel_abbreviations):   
         # Parse the cell seg pandas we've already read in to get the cell-level measurements, as well as what features we are measuring
         # Sets the 'measurement_channels', 'measurement_statistics', 'measurement_features', and 'cell_measurements'
         keepers = ['Cell ID']
@@ -329,7 +431,7 @@ class CellFrameInForm(CellFrameGeneric):
             for row in v.itertuples(index=False):
                 _intensity1.append([row[0],stain,m.group(2),round(row[1],_float_decimals)])
         _intensity1 = pd.DataFrame(_intensity1,columns=['cell_index','channel_label','statistic_label','value'])
-        _intensity1['feature_label'] = 'Whole Cell'
+        _intensity1['measurement_feature_label'] = 'Whole Cell'
 
         _intensity2 = []
         #_intensity3 = []
@@ -345,7 +447,7 @@ class CellFrameInForm(CellFrameGeneric):
                 _intensity2.append([row[0],stain,compartment,m.group(3),round(row[1],_float_decimals)])
                 #_intensity3.append([row[0],'Post-processing',compartment,'Area (pixels)',round(row[2],_float_decimals)])
 
-        _intensity2 = pd.DataFrame(_intensity2,columns=['cell_index','channel_label','feature_label','statistic_label','value'])
+        _intensity2 = pd.DataFrame(_intensity2,columns=['cell_index','channel_label','measurement_feature_label','statistic_label','value'])
         #_intensity3 = pd.DataFrame(_intensity3,columns=['cell_index','channel_label','feature_label','statistic_label','value'])
 
         _intensities = [_intensity2,
@@ -357,9 +459,9 @@ class CellFrameInForm(CellFrameGeneric):
         _measurement_channels = pd.DataFrame({'channel_label':_intensity['channel_label'].unique()})
         _measurement_channels.index.name = 'channel_index'
         _measurement_channels['channel_abbreviation'] = _measurement_channels['channel_label']
-        if threshold_analysis:
-            _measurement_channels['channel_abbreviation'] = \
-                _measurement_channels.apply(lambda x: x['channel_label'] if x['channel_label'] not in threshold_analysis else threshold_analysis[x['channel_label']],1)
+        #if threshold_analysis:
+        _measurement_channels['channel_abbreviation'] = \
+                _measurement_channels.apply(lambda x: x['channel_label'] if x['channel_label'] not in channel_abbreviations else channel_abbreviations[x['channel_label']],1)
         _measurement_channels['image_id'] = np.nan
         self.set_data('measurement_channels',_measurement_channels)
 
@@ -367,14 +469,14 @@ class CellFrameInForm(CellFrameGeneric):
         _measurement_statistics.index.name = 'statistic_index'
         self.set_data('measurement_statistics',_measurement_statistics)
 
-        _measurement_features = pd.DataFrame({'feature_label':_intensity['feature_label'].unique()})
-        _measurement_features.index.name = 'feature_index'
+        _measurement_features = pd.DataFrame({'measurement_feature_label':_intensity['measurement_feature_label'].unique()})
+        _measurement_features.index.name = 'measurement_feature_index'
         self.set_data('measurement_features',_measurement_features)
 
         _cell_measurements = _intensity.merge(self.get_data('measurement_channels')[['channel_label','channel_abbreviation']].reset_index(),on='channel_label',how='left').\
                           merge(self.get_data('measurement_statistics').reset_index(),on='statistic_label',how='left').\
-                          merge(self.get_data('measurement_features').reset_index(),on='feature_label',how='left').\
-                          drop(columns=['channel_label','feature_label','statistic_label','channel_abbreviation'])
+                          merge(self.get_data('measurement_features').reset_index(),on='measurement_feature_label',how='left').\
+                          drop(columns=['channel_label','measurement_feature_label','statistic_label','channel_abbreviation'])
         _cell_measurements.index.name = 'measurement_index'
         _cell_measurements['cell_index'] = _cell_measurements['cell_index'].astype(np.uint32)
         self.set_data('cell_measurements',_cell_measurements)
@@ -382,7 +484,6 @@ class CellFrameInForm(CellFrameGeneric):
 
     ### Lets work with image files now
     def _read_images(self,binary_seg_image_file,
-                          verbose=False,
                           require_component=True,
                           skip_segmentation_processing=False):
         # Start with the binary seg image file because if it has a processed image area,
@@ -390,7 +491,7 @@ class CellFrameInForm(CellFrameGeneric):
 
 
         if binary_seg_image_file is not None:
-            if verbose: sys.stderr.write("Binary seg file present.\n")
+            if self.verbose: sys.stderr.write("Binary seg file present.\n")
             self._read_binary_seg_image(binary_seg_image_file)
             # if we have a ProcessedImage we can use that for an 'Any' region
             m = self.get_data('mask_images').set_index('mask_label')
@@ -411,23 +512,23 @@ class CellFrameInForm(CellFrameGeneric):
             segmentation_images = self.get_data('segmentation_images').set_index('segmentation_label')
             if 'Nucleus' in segmentation_images.index and \
                'Membrane' in segmentation_images.index and not skip_segmentation_processing:
-                if verbose: sys.stderr.write("Making cell-map filled-in.\n")
+                if self.verbose: sys.stderr.write("Making cell-map filled-in.\n")
                 ## See if we are a legacy membrane map
                 mem = self._images[self.get_data('segmentation_images').\
                           set_index('segmentation_label').loc['Membrane','image_id']]
                 color_count = len(pd.DataFrame(mem).unstack().reset_index()[0].unique())
                 if color_count < 10:
-                    if verbose: sys.stderr.write("Only found "+str(color_count)+" colors on the membrane looks like legacy\n")
+                    if self.verbose: sys.stderr.write("Only found "+str(color_count)+" colors on the membrane looks like legacy\n")
                     self._make_cell_map_legacy()
                 else:
                     self._make_cell_map()
-                if verbose: sys.stderr.write("Finished cell-map.\n")
-                if verbose: sys.stderr.write("Making edge-map.\n")
-                self._make_edge_map(verbose=verbose)
-                if verbose: sys.stderr.write("Finished edge-map.\n")
-                if verbose: sys.stderr.write("Set interaction map if appropriate\n")
+                if self.verbose: sys.stderr.write("Finished cell-map.\n")
+                if self.verbose: sys.stderr.write("Making edge-map.\n")
+                self._make_edge_map()
+                if self.verbose: sys.stderr.write("Finished edge-map.\n")
+                if self.verbose: sys.stderr.write("Set interaction map if appropriate\n")
                 self.set_interaction_map(touch_distance=1)
-            if verbose: sys.stderr.write("Finished reading seg file present.\n")
+            if self.verbose: sys.stderr.write("Finished reading seg file present.\n")
 
         _channel_key = self.get_data('measurement_channels')
         _channel_key_with_images = _channel_key[~_channel_key['image_id'].isna()]
@@ -439,27 +540,41 @@ class CellFrameInForm(CellFrameGeneric):
         _use_image_ids = _channel_image_ids+_seg_image_ids
         if self._processed_image_id is None and len(_use_image_ids)>0:
             # We have nothing so we assume the entire image is processed until we have some reason to update this
-            if verbose: sys.stderr.write("No mask present so setting entire image area to be processed area.\n")
+            if self.verbose: sys.stderr.write("No mask present so setting entire image area to be processed area.\n")
             dim = self._images[_use_image_ids[0]].shape                
             self._processed_image_id = uuid4().hex
             self._images[self._processed_image_id] = np.ones(dim,dtype=np.int8)
 
         if self._processed_image_id is None:
-
             raise ValueError("Nothing to set determine size of images")
 
-        # If we don't have any regions set and all we have is 'Any' then we can just use the processed image
-        _region = self.get_data('regions') #.query('region_label!="Any"').query('region_label!="any"')
-        if _region.shape[0] ==0:
-            #if self.get_data('regions').shape[0] == 0: raise ValueError("Expected an 'Any' region")
-            img = self._images[self._processed_image_id].copy()
-            region_id = uuid4().hex
-            self._images[region_id] = img
-            df = pd.DataFrame(pd.Series({'region_index':0,'image_id':region_id,'region_size':img.sum()})).T.set_index('region_index')
-            temp = self.get_data('regions').drop(columns=['image_id','region_size']).merge(df,left_index=True,right_index=True,how='right')
+        # Every image from inform will started with a region_group ProcessedRegionImage
+
+        if self.get_data('regions').shape[0] == 0:
+            print("NO REGIONS... make dummy regions")
+            _processed_image = self._images[self._processed_image_id].copy()
+            _region_id = uuid4().hex
+            self._images[_region_id] = _processed_image
+            df = pd.DataFrame(pd.Series({'region_index':0,'image_id':_region_id,'region_size':_processed_image.sum()})).T.\
+                                        set_index('region_index')
+            temp = self.get_data('regions').drop(columns=['image_id','region_size']).\
+                merge(df,left_index=True,right_index=True,how='right')
             temp['region_label'] = 'Any'
-            temp['region_size'] = temp['region_size'].astype(float)
+            temp['region_size'] = temp['region_size']
+            temp['region_group_index'] = 0
+
             self.set_data('regions',temp)
+        
+            _gdf = pd.DataFrame(pd.Series({'region_group':'ProcessedRegionImage',
+                                           'region_group_description':'The complete processed image from InForm.',
+                                           'region_group_index':0})).T.\
+                                           set_index('region_group_index')
+            self.set_data('region_groups',_gdf)
+
+
+
+
+
 
     def _read_component_image(self,filename):
         stack = read_tiff_stack(filename)
@@ -512,14 +627,16 @@ class CellFrameInForm(CellFrameGeneric):
                 ### If we have a Tissue Class Map we should process it into regions
                 if image_type == 'TissueClassMap':
                     # Process the Tissue Class Map
+                    self._tissue_class_map = {'image_id':image_id,'image_description':image_description,'raw_image':raw['raw_image'].astype(int)}
                     self._process_tissue_class_map(image_description,raw['raw_image'].astype(int))
-
 
         _mask_key = pd.DataFrame(mask_names,columns=['mask_label','image_id'])
         _mask_key.index.name = 'db_id'
         self.set_data('mask_images',_mask_key)
         _segmentation_key = pd.DataFrame(segmentation_names,columns=['segmentation_label','image_id'])
         _segmentation_key.index.name = 'db_id'
+
+
         self.set_data('segmentation_images',_segmentation_key)
 
     def _process_tissue_class_map(self,image_description,img):
@@ -547,8 +664,14 @@ class CellFrameInForm(CellFrameGeneric):
         df['region_size'] = df.apply(lambda x:
             self._images[x['image_id']].sum()
         ,1)
+        df['region_group_index'] = 0
+        self.set_data('regions',df[['region_group_index','region_label','image_id','region_size']])
 
-        self.set_data('regions',df[['region_label','image_id','region_size']])
+        _gdf = pd.DataFrame(pd.Series({'region_group_index':0,
+                             'region_group':'TissueClassMap',
+                             'region_group_description':'InForm defined tissue class map.'})).T.\
+            set_index('region_group_index')
+        self.set_data('region_groups',_gdf)
 
 
 
@@ -556,15 +679,14 @@ class CellFrameInForm(CellFrameGeneric):
 
 
 
-
-    def _make_edge_map(self,verbose=False):
+    def _make_edge_map(self):
         #### Get the edges
         segmentation_images = self.get_data('segmentation_images').set_index('segmentation_label')
         cellid = segmentation_images.loc['cell_map','image_id']
         cm = self.get_image(cellid)
         memid = segmentation_images.loc['Membrane','image_id']
         mem = self.get_image(memid)
-        em = image_edges(cm,verbose=verbose)
+        em = image_edges(cm,verbose=self.verbose)
         em_id  = uuid4().hex
         self._images[em_id] = em.copy()
         increment  = self.get_data('segmentation_images').index.max()+1
@@ -702,7 +824,7 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
             # We have the single stain case
             _score_data = _score_data[['Tissue Category','Cell Compartment','Stain Component','Positivity Threshold']].\
                 rename(columns={'Tissue Category':'region_label',
-                                      'Cell Compartment':'feature_label',
+                                      'Cell Compartment':'measurement_feature_label',
                                       'Stain Component':'channel_label',
                                       'Positivity Threshold':'threshold_value'})
         elif 'First Stain Component' in _score_data.columns and 'Second Stain Component' in _score_data.columns:
@@ -712,14 +834,14 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
             table1 = _score_data[['Tissue Category','First Cell Compartment','First Stain Component',first_name+' Threshold']].\
                 rename(columns ={
                     'Tissue Category':'region_label',
-                    'First Cell Compartment':'feature_label',
+                    'First Cell Compartment':'measurement_feature_label',
                     'First Stain Component':'channel_label',
                     first_name+' Threshold':'threshold_value'
                     })
             table2 = _score_data[['Tissue Category','Second Cell Compartment','Second Stain Component',second_name+' Threshold']].\
                 rename(columns ={
                     'Tissue Category':'region_label',
-                    'Second Cell Compartment':'feature_label',
+                    'Second Cell Compartment':'measurement_feature_label',
                     'Second Stain Component':'channel_label',
                     second_name+' Threshold':'threshold_value'
                     })
@@ -734,12 +856,12 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
 
         _mystats = measurement_statistics
         _score_data['statistic_index'] = _mystats[_mystats['statistic_label']=='Mean'].iloc[0].name 
-        _thresholds = _score_data.merge(measurement_features.reset_index(),on='feature_label').\
+        _thresholds = _score_data.merge(measurement_features.reset_index(),on='measurement_feature_label').\
                                   merge(measurement_channels[['channel_label','channel_abbreviation']].reset_index(),on='channel_label').\
                                   merge(regions[['region_label']].reset_index(),on='region_label').\
-                                  drop(columns=['feature_label','channel_label','region_label'])
+                                  drop(columns=['measurement_feature_label','channel_label','region_label'])
         # By default for inform name the gate after the channel abbreviation
-        _thresholds['feature_label'] = _thresholds['channel_abbreviation']
+        # _thresholds['feature_label'] = _thresholds['channel_abbreviation']
         _thresholds = _thresholds.drop(columns=['channel_abbreviation'])
         _thresholds = _thresholds.set_index('gate_index')
 
@@ -764,7 +886,7 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
         _score_data.index.name = 'gate_index'
         _mystats = measurement_statistics
         _score_data['statistic_index'] = _mystats[_mystats['statistic_label']=='Mean'].iloc[0].name
-        _thresholds = _score_data.merge(measurement_features.reset_index(),on='feature_label').\
+        _thresholds = _score_data.merge(measurement_features.reset_index(),on='measurement_feature_label').\
                                   merge(measurement_channels[['channel_label','channel_abbreviation']].reset_index(),on='channel_label').\
                                   merge(regions[['region_label']].reset_index(),on='region_label').\
                                   drop(columns=['feature_label','channel_label','region_label'])
@@ -782,7 +904,7 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
         _thresholds = _parse_binary(_score_data,measurement_statistics,measurement_features,measurement_channels,regions)
 
         
-    ## At this moment we don't support a different threhsold for each region so we will set a nonsense value for the region index... since this threhsold NOT be applied by region
+    ## At this moment we don't support a different threshold for each region so we will set a nonsense value for the region index... since this threshold NOT be applied by region
     ##_thresholds.loc[:,'region_index'] = np.nan
 
     # adding in the drop duplicates to hopefully fix an issue for with multiple tissues
