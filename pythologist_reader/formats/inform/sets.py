@@ -59,12 +59,12 @@ class CellProjectInForm(CellProjectGeneric):
     def read_path(self,path,
                        project_name=None,
                        sample_name_index=None,
-                       channel_abbreviations=None,
                        verbose=False,
-                       require=True,
+                       require_component=True,
                        require_score=True,
                        skip_segmentation_processing=False,
                        microns_per_pixel=None,
+                       inform_analysis_dict=None,
                        **kwargs):
         """
         Read in the project folder
@@ -81,6 +81,8 @@ class CellProjectInForm(CellProjectGeneric):
             microns_per_pixel (float): conversion factor
         """
         if project_name is not None: self.project_name = project_name
+        else:
+            self.project_name = self.id
         if microns_per_pixel is not None: self.microns_per_pixel = microns_per_pixel
         if verbose: sys.stderr.write("microns_per_pixel "+str(self.microns_per_pixel)+"\n")
         if self.mode == 'r': raise ValueError("Error: cannot write to a path in read-only mode.")
@@ -98,23 +100,30 @@ class CellProjectInForm(CellProjectGeneric):
             if sample_name_index is None: sname = s
             else: sname  = s.split(os.sep)[sample_name_index]
             sid = self.add_sample_path(s,sample_name=sname,
-                                         channel_abbreviations=channel_abbreviations,
-                                         verbose=verbose,require=require,
+                                         inform_analysis_dict=inform_analysis_dict,
+                                         verbose=verbose,require_component=require_component,
                                          require_score=require_score,
                                          skip_segmentation_processing=skip_segmentation_processing,
                                          **kwargs)
             if verbose: sys.stderr.write("Added sample "+sid+"\n")
 
 
-    def add_sample_path(self,path,sample_name=None,channel_abbreviations=None,
-                                  verbose=False,require=True,require_score=True,skip_segmentation_processing=False,**kwargs):
+    def add_sample_path(self,path,
+                             sample_name=None,
+                             inform_analysis_dict=None,
+                             verbose=False,
+                             require_component=True,
+                             require_score=True,
+                             skip_segmentation_processing=False,
+                             **kwargs):
         if self.mode == 'r': raise ValueError("Error: cannot write to a path in read-only mode.")
         if verbose: sys.stderr.write("Reading sample "+path+" for sample "+sample_name+"\n")
         cellsample = self.create_cell_sample_class()
         #print(type(cellsample))
         cellsample.read_path(path,sample_name=sample_name,
-                                  channel_abbreviations=channel_abbreviations,
-                                  verbose=verbose,require=require,
+                                  inform_analysis_dict=inform_analysis_dict,
+                                  verbose=verbose,
+                                  require_component=require_component,
                                   require_score=require_score,
                                   skip_segmentation_processing=skip_segmentation_processing,
                                   **kwargs)
@@ -180,8 +189,14 @@ class CellSampleInForm(CellSampleGeneric):
     def create_cell_frame_class(self):
         return CellFrameInForm()
 
-    def read_path(self,path,sample_name=None,
-        channel_abbreviations=None,verbose=False,require=True,require_score=True,skip_segmentation_processing=False,**kwargs):
+    def read_path(self,path,
+                       sample_name=None,
+                       verbose=False,
+                       require_component=True,
+                       require_score=True,
+                       skip_segmentation_processing=False,
+                       inform_analysis_dict=None,
+                       **kwargs):
         """
         Read in the project folder
 
@@ -212,8 +227,8 @@ class CellSampleInForm(CellSampleGeneric):
             #summary = os.path.join(path,m.group(1)+'cell_seg_data_summary.txt')
             binary_seg_maps = os.path.join(path,m.group(1)+'binary_seg_maps.tif')
             component_image = os.path.join(path,m.group(1)+'component_data.tif')
-            tfile = os.path.join(path,m.group(1)+'tissue_seg_data.txt')
-            tissue_seg_data = tfile if os.path.exists(tfile) else None
+            #tfile = os.path.join(path,m.group(1)+'tissue_seg_data.txt')
+            #tissue_seg_data = tfile if os.path.exists(tfile) else None
             frame = m.group(1).rstrip('_')
             data = os.path.join(path,file)
 
@@ -226,12 +241,12 @@ class CellSampleInForm(CellSampleGeneric):
             cid.read_raw(frame_name = frame,
                          cell_seg_data_file=data,
                          score_data_file=score,
-                         tissue_seg_data_file=tissue_seg_data,
+                         #tissue_seg_data_file=tissue_seg_data,
                          binary_seg_image_file=binary_seg_maps,
                          component_image_file=component_image,
-                         channel_abbreviations=channel_abbreviations,
+                         inform_analysis_dict=inform_analysis_dict,
                          verbose=verbose,
-                         require=require,
+                         require_component=require_component,
                          require_score=require_score,
                          skip_segmentation_processing=skip_segmentation_processing)
             frame_id = cid.id

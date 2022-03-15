@@ -60,7 +60,6 @@ class CellFrameInForm(CellFrameGeneric):
     #                 right_index=True)
 
     def read_raw(self,
-                 greedy_use_first_threshold = False,
                  frame_name = None,
                  cell_seg_data_file=None,
                  score_data_file=None,
@@ -139,8 +138,6 @@ class CellFrameInForm(CellFrameGeneric):
         #    if _pre != _post:
         #        sys.stderr.write("WARNING: Dropped extra thresholding.\n")
         #    _thresholds.index.name = 'gate_index'
-        #    print("=====THRESHOLDS====")
-        #    print(_thresholds)
         #    self.set_data('thresholds',_thresholds)
 
 
@@ -248,7 +245,7 @@ class CellFrameInForm(CellFrameGeneric):
                 dropna(subset=['Phenotype'])
             # we are only keeping a subset within these
             if _ptuple not in mutually_exclusive_analysis:
-                raise ValueError("Missing expected Phenotype analysis column "+str(_ptuple))
+                raise ValueError("Missing expected Phenotype analysis column "+str(_ptuple)+" from among "+str(mutually_exclusive_analysis))
             for _assigned, _label in mutually_exclusive_analysis[_ptuple].items():
                 me_feature_definition.append([_label,'+',1])
                 me_feature_definition.append([_label,'-',0])
@@ -267,15 +264,12 @@ class CellFrameInForm(CellFrameGeneric):
         ###########
         # Set the cell_regions
 
-        #print(self._tissue_class_map['image_description'])
         _cell_regions = _seg[['Cell ID','Tissue Category']].copy().rename(columns={'Cell ID':'cell_index','Tissue Category':'region_label'})
 
 
         _cell_regions = _cell_regions.merge(self.get_data('regions')[['region_label']].reset_index(),on='region_label')
         _cell_regions = _cell_regions.drop(columns=['region_label'])#.set_index('cell_index').reset_index()
         _cell_regions.index.name = 'db_id'
-        #print(_cell_regions.columns)
-        #print(_cell_regions.head())
         self.set_data('cell_regions',_cell_regions)
 
         ## Now we can add to cells our region indecies
@@ -311,17 +305,13 @@ class CellFrameInForm(CellFrameGeneric):
             _thresholds.index.name = 'gate_index'
             _any_region_index = self.get_data('regions').reset_index().set_index('region_label').loc['Any']['region_index']
             _thresholds['region_index'] = _any_region_index
-            #print(_thresholds)
             self.set_data('thresholds',_thresholds)
 
             # set the cell regions
             _cr = self.get_data('cell_regions').copy()
-            #print('==== cell regions ====')
-            #print(_cr.shape)
             _cr['region_index'] = _any_region_index
-            _cr = pd.concat([self.get_data('cell_regions'),_cr]).reset_index(drop=True)
+            _cr = pd.concat([self.get_data('cell_regions').loc[self.get_data('cell_regions')['region_index']!=_any_region_index,:],_cr]).reset_index(drop=True)
             _cr.index.name = 'db_id'
-            #print(_cr.shape)
             self.set_data('cell_regions',_cr)
 
 
@@ -332,15 +322,16 @@ class CellFrameInForm(CellFrameGeneric):
             cm = self.get_data('cell_measurements')
             _cr = self.get_data('cell_regions')
             _regions = self.get_data('regions')
-            print(_regions)
 
 
-            _t = _cr.merge(_regions,left_on='region_index',right_index=True).\
+            _t = _cr.merge(_regions.loc[_regions['region_label']=='Any'],left_on='region_index',right_index=True).\
                        drop(columns=['region_size','image_id']).\
                        merge(cm,on=['cell_index']).\
                        merge(_thresholds,on=['statistic_index','measurement_feature_index','channel_index','region_index']).\
                        merge(mc,left_on='channel_index',right_index=True).drop(columns=['channel_label','image_id']).\
                        rename(columns={'channel_abbreviation':'feature_label'})
+            #print("composed")
+            #print(_t)
 
             _t['feature_value'] = _t.apply(lambda x: 1 if x['value']>=x['threshold_value'] else 0,1)
             _t = _t.loc[:,['cell_index','feature_label','feature_value']]
@@ -348,7 +339,7 @@ class CellFrameInForm(CellFrameGeneric):
             _flabs = _t['feature_label'].unique()
             for _k,_v in threshold_analysis.items():
                 if _v not in _flabs: raise ValueError("Missing threshold feature "+str(_v))
-            t_features = _t.copy()
+            t_features = _t.copy()#.drop_duplicates()
 
         t_feature_definition = []
         t_feature_basics = []
@@ -359,7 +350,6 @@ class CellFrameInForm(CellFrameGeneric):
 
         features = pd.DataFrame(me_feature_basics+t_feature_basics,columns=['feature_label','feature_description'])
         features.index.name = 'feature_index'
-        #print(features)
         feature_definitions = pd.DataFrame(me_feature_definition+t_feature_definition,
                                           columns=['feature_label','feature_value_label','feature_value']).\
                                           reset_index(drop=True).\
@@ -397,7 +387,6 @@ class CellFrameInForm(CellFrameGeneric):
 
             # set the regions
             _region_index = max(self.get_data('regions').index)+1
-            print(('region_index',_region_index))
             _rt = self.get_data('regions').\
                 append(pd.Series(
                     {
@@ -408,6 +397,9 @@ class CellFrameInForm(CellFrameGeneric):
                     },name=_region_index
                 ))
             _rt.index.name = 'region_index'
+            _rt['region_label'] = _rt['region_label'].astype(str)
+            _rt['region_size'] = _rt['region_size'].astype(int)
+            _rt['image_id'] = _rt['image_id'].astype(str)
             self.set_data('regions',_rt)
             return _region_index
 
@@ -551,7 +543,6 @@ class CellFrameInForm(CellFrameGeneric):
         # Every image from inform will started with a region_group ProcessedRegionImage
 
         if self.get_data('regions').shape[0] == 0:
-            print("NO REGIONS... make dummy regions")
             _processed_image = self._images[self._processed_image_id].copy()
             _region_id = uuid4().hex
             self._images[_region_id] = _processed_image
@@ -563,9 +554,15 @@ class CellFrameInForm(CellFrameGeneric):
             temp['region_size'] = temp['region_size']
             temp['region_group_index'] = 0
 
+
+            temp['region_label'] = temp['region_label'].astype(str)
+            temp['region_size'] = temp['region_size'].astype(int)
+            temp['image_id'] = temp['image_id'].astype(str)
+
+
             self.set_data('regions',temp)
         
-            _gdf = pd.DataFrame(pd.Series({'region_group':'ProcessedRegionImage',
+            _gdf = pd.DataFrame(pd.Series({'region_group':'ProcessRegionImage',
                                            'region_group_description':'The complete processed image from InForm.',
                                            'region_group_index':0})).T.\
                                            set_index('region_group_index')
@@ -665,6 +662,11 @@ class CellFrameInForm(CellFrameGeneric):
             self._images[x['image_id']].sum()
         ,1)
         df['region_group_index'] = 0
+
+        df['region_label'] = df['region_label'].astype(str)
+        df['region_size'] = df['region_size'].astype(int)
+        df['image_id'] = df['image_id'].astype(str)
+
         self.set_data('regions',df[['region_group_index','region_label','image_id','region_size']])
 
         _gdf = pd.DataFrame(pd.Series({'region_group_index':0,
@@ -788,7 +790,6 @@ class CellFrameInForm(CellFrameGeneric):
         if overlap.shape[0] > 0: raise ValueError("need to handle overlap")
 
         
-        #print("DONE FILLING IN")
         cell_map_id  = uuid4().hex
         self._images[cell_map_id] = im2.copy()
         increment  = self.get_data('segmentation_images').index.max()+1
@@ -874,7 +875,6 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
         mre = re.compile('Threshold (\d+)\+?/(\d+)\+?')
         threshold_columns = [(x,mre.match(x).group(1)+'/'+mre.match(x).group(2)) for x in list(_score_data.columns) if mre.match(x)]
         threshold_dict = dict(threshold_columns)
-        #print(threshold_columns)
         static_columns = ['Tissue Category','Cell Compartment','Stain Component']
         _score_data = _score_data[static_columns+[x[0] for x in threshold_columns]].\
                 set_index(static_columns).stack().reset_index().\

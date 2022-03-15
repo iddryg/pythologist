@@ -558,7 +558,7 @@ class CellFrameGeneric(object):
 
         temp1['frame_name'] = self.frame_name
         temp1['frame_id'] = self.id
-        temp1  = temp1.reset_index()
+        #temp1  = temp1.reset_index()
         temp1 = temp1.sort_values('cell_index').reset_index(drop=True)
         temp1['sample_name'] = 'undefined'
         temp1['project_name'] = 'undefined'
@@ -649,14 +649,13 @@ class CellSampleGeneric(object):
         """
         return self._frames[frame_id]
 
-    @property
-    def cdf(self):
+    def cdf(self,region_group=None):
         """
         Return the pythologist.CellDataFrame of the sample
         """
         output = []
         for frame_id in self.frame_ids:
-            temp = self.get_frame(frame_id).cdf
+            temp = self.get_frame(frame_id).cdf(region_group=region_group)
             temp['sample_name'] = self.sample_name
             temp['sample_id'] = self.id
             output.append(temp)
@@ -928,14 +927,13 @@ class CellProjectGeneric(object):
         f['meta'].attrs['id'] = name
         f.close()
 
-    @property
-    def cdf(self):
+    def cdf(self,region_group=None):
         """
         Return the pythologist.CellDataFrame of the project
         """
         output = []
         for sample_id in self.sample_ids:
-            temp = self.get_sample(sample_id).cdf
+            temp = self.get_sample(sample_id).cdf(region_group=region_group)
             temp['project_name'] = self.project_name
             temp['project_id'] = self.id
             output.append(temp)
