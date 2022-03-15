@@ -39,7 +39,7 @@ class CellSampleInFormCustomMask(CellSampleInForm):
         return CellFrameInFormCustomMask()
     def read_path(self,path,sample_name=None,
                             channel_abbreviations=None,
-                            verbose=False,require=True,
+                            verbose=False,require_component=True,
                             require_score=True,
                             skip_segmentation_processing=False,
                             custom_mask_name='Tumor',
@@ -80,7 +80,7 @@ class CellSampleInFormCustomMask(CellSampleInForm):
                          component_image_file=component_image,
                          channel_abbreviations=channel_abbreviations,
                          verbose=verbose,
-                         require=require,
+                         require_component=require_component,
                          skip_segmentation_processing=skip_segmentation_processing,
                          require_score=require_score
 
@@ -124,7 +124,7 @@ class CellFrameInFormCustomMask(CellFrameInForm):
         stroma_binary = (~(tumor_binary&processed_image))&processed_image
         d = {custom_mask_name:tumor_binary,
              other_mask_name:stroma_binary}
-        self.set_regions(d)
+        self.set_regions('InFormCustomMask',d,description="Set from a single custom mask.")
         return d
 
 class CellProjectInFormLineArea(CellProjectInForm):
@@ -143,7 +143,7 @@ class CellProjectInFormLineArea(CellProjectInForm):
             path (str): location of the project directory
             project_name (str): name of the project
             sample_name_index (int): where in the directory chain is the foldername that is the sample name if not set use full path.  -1 is last directory
-            channel_abbreviations (dict): dictionary of shortcuts to translate to simpler channel names
+            inform_analysis_dict (dict): dictionary of shortcuts to translate to simpler channel names
             verbose (bool): if true print extra details
             require (bool): if true (default), require that channel componenet image be present
             require_score (bool): if true (default), require that score be present
@@ -158,8 +158,8 @@ class CellSampleInFormLineArea(CellSampleInForm):
     def create_cell_frame_class(self):
         return CellFrameInFormLineArea()
     def read_path(self,path,sample_name=None,
-                            channel_abbreviations=None,
-                            verbose=False,require=True,require_score=True,skip_segmentation_processing=False,steps=76,alternate_annotation_path=None):
+                            inform_analysis_dict=None,
+                            verbose=False,require_component=True,require_score=True,skip_segmentation_processing=False,steps=76,alternate_annotation_path=None):
         if sample_name is None: sample_name = path
         if not os.path.isdir(path):
             raise ValueError('Path input must be a directory')
@@ -191,12 +191,11 @@ class CellSampleInFormLineArea(CellSampleInForm):
             cid.read_raw(frame_name = frame,
                          cell_seg_data_file=data,
                          score_data_file=score,
-                         tissue_seg_data_file=tissue_seg_data,
                          binary_seg_image_file=binary_seg_maps,
                          component_image_file=component_image,
-                         channel_abbreviations=channel_abbreviations,
+                         inform_analysis_dict=inform_analysis_dict,
                          verbose=verbose,
-                         require=require,
+                         require_component=require_component,
                          require_score=require_score,
                          skip_segmentation_processing=skip_segmentation_processing)
             if verbose: sys.stderr.write("setting tumor and stroma and margin\n")
@@ -247,6 +246,6 @@ class CellFrameInFormLineArea(CellFrameInForm):
         d = {'Margin':margin_binary,
                           'Tumor':tumor_binary,
                           'Stroma':stroma_binary}
-        self.set_regions(d)
+        self.set_regions('InFormLineArea',d,description="Tumor stroma interface set from a mask and optional drawn line.")
         return d
 

@@ -154,7 +154,7 @@ class CellFrameGeneric(object):
         if table.index.name != self.data_tables[table_name]['index']: raise ValueError("Error index name doesn't match defined format")
         self._data[table_name] = table.loc[:,self.data_tables[table_name]['columns']].copy() # Auto-sort, and assign a copy so we aren't ever assigning by reference
 
-    def set_regions(self,regions,use_processed_region=True,unset_label='undefined',verbose=False):
+    def set_regions(self,region_group_name,regions,description="",use_processed_region=True,unset_label='undefined',verbose=False):
         """
         Alter the regions in the frame
 
@@ -166,12 +166,12 @@ class CellFrameGeneric(object):
             unset_label (str): name of unset regions default (undefined)
         """
         
-        # delete our current regions
-        raise ValueError("Function not brought to compatibility")
-        regions = regions.copy()
-        image_ids = list(self.get_data('mask_images')['image_id'])
-        image_ids = [x for x in image_ids if x != self.processed_image_id]
-        for image_id in image_ids: del self._images[image_id]
+        ### delete our current regions
+        ##raise ValueError("Function not brought to compatibility")
+        ##regions = regions.copy()
+        ##image_ids = list(self.get_data('mask_images')['image_id'])
+        ##image_ids = [x for x in image_ids if x != self.processed_image_id]
+        ##for image_id in image_ids: del self._images[image_id]
 
         labels = list(regions.keys())
         ids = [uuid4().hex for x in labels]
@@ -194,18 +194,30 @@ class CellFrameGeneric(object):
             self._images[ids[-1]] = remainder
             regions[unset_label] = remainder
 
-        regions2 = pd.DataFrame({'region_label':labels,
+        # add a new region group
+        _rgdf = self.get_data('region_groups')
+        _region_group_index = _rgdf.index.max()+1
+        _rgnew = pd.Series({'region_group':region_group_name,'region_group_description':description},name=_region_group_index)
+        _rgdf = _rgdf.append(_rgnew)
+        self.set_data('region_groups',_rgdf)
+
+        _region_index_start = self.get_data('regions').index.max()+1
+        regions2 = pd.DataFrame({'region_group_index':[_region_group_index for x in labels],
+                                 'region_label':labels,
                                  'region_size':sizes,
                                  'image_id':ids
-                                })
+                                },index=[x for x in range(_region_index_start,_region_index_start+len(labels))])
         regions2.index.name = 'region_index'
-        self.set_data('regions',regions2)
+        #print(regions2)
+        _regcomb = self.get_data('regions').append(regions2)
+        self.set_data('regions',_regcomb)
         def get_label(x,y,regions_dict):
             for label in regions_dict:
                 if regions_dict[label][y][x] == 1: return label
             return np.nan
             raise ValueError("Coordinate is out of bounds for all regions.")
         recode = self.get_data('cells').copy()
+        recode['region_index'] = 0
         recode['new_region_label'] = recode.apply(lambda x: get_label(x['x'],x['y'],regions),1)
         ## see how many we need to drop because the centroid fall in an unprocessed region
         if verbose: sys.stderr.write(str(recode.loc[recode['new_region_label'].isna()].shape[0])+" cells with centroids beyond the processed region are being dropped\n")
@@ -213,8 +225,12 @@ class CellFrameGeneric(object):
         recode = recode.drop(columns='region_index').reset_index().\
             merge(regions2[['region_label']].reset_index(),
                   left_on='new_region_label',right_on='region_label').\
-            drop(columns=['region_label','new_region_label']).set_index('cell_index')
-        self.set_data('cells',recode)
+            drop(columns=['region_label','new_region_label']).set_index('cell_index').\
+            reset_index().drop(columns=['x','y'])
+        recode.index.name = 'db_id'
+        # now add the recoded to the current cell_regions
+        recode_comb = self.get_data('cell_regions').append(recode)
+        self.set_data('cell_regions',recode_comb)
         return
 
 
