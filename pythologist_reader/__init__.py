@@ -10,37 +10,87 @@ from pythologist import CellDataFrame
 These are classes to help deal with cell-level image data
 """
 
+class FrameMaskLabel(object):
+    """
+    A genetic class for holding a generic labled image mask
+    """
+    def __init__(self,mask_image,region_group,labels):
+        self._mask_image = mask_image
+        self._mask_image_region_group = region_group
+        self._mask_iamge_label_dictionary = labels
+        if region_group is not isinstance(region_group,str):
+            raise ValueError("Must provide a string label for region_group")
+
+    @property
+    def region_group(self):
+        return self._mask_image_region_group
+    @property
+    def labels(self):
+        return self._mask_image_label_dictionary
+
 class CellFrameGeneric(object):
     """
     A generic CellFrameData object
     """
     def __init__(self):
+        self.verbose = False
         self._processed_image_id = None
         self._images = {}                      # Database of Images
         self._id = uuid4().hex
         self.frame_name = None
         self.data_tables = {
         'cells':{'index':'cell_index',            
-                  'columns':['x','y','phenotype_index',
-                             'region_index']},
-        'cell_tags':{'index':'db_id',            
-                     'columns':['tag_index','cell_index']},
+                  'columns':['x','y']},
+        # Tables for setting measurements
         'cell_measurements':{'index':'measurement_index', 
-                             'columns':['cell_index','statistic_index','feature_index','channel_index','value']},
-        'measurement_features':{'index':'feature_index',
-                                'columns':['feature_label']},
+                             'columns':['cell_index','statistic_index','measurement_feature_index','channel_index','value']},
+        'measurement_features':{'index':'measurement_feature_index',
+                                'columns':['measurement_feature_label']},
         'measurement_channels':{'index':'channel_index',
                                 'columns':['channel_label','channel_abbreviation','image_id']},
         'measurement_statistics':{'index':'statistic_index',
                                   'columns':['statistic_label']},
-        'phenotypes':{'index':'phenotype_index',
-                      'columns':['phenotype_label']},
         'segmentation_images':{'index':'db_id',
-                 'columns':['segmentation_label','image_id']},                     
-        'regions':{'index':'region_index',
-                   'columns':['region_label','region_size','image_id']},
+                 'columns':['segmentation_label','image_id']},
         'cell_interactions':{'index':'db_id', 
-                             'columns':['cell_index','neighbor_cell_index','pixel_count','touch_distance']},
+                             'columns':['cell_index','neighbor_cell_index','pixel_count','touch_distance']
+        },
+        # Tables for setting regions
+        'cell_regions':{
+            'index':'db_id',
+            'columns':['cell_index','region_index']
+        },
+        'regions':{
+            'index':'region_index',
+            'columns':['region_group_index','region_label','region_size','image_id']
+        },
+        'region_groups':{
+            'index':'region_group_index',
+            'columns':['region_group','region_group_description']
+        },
+        # Tables for setting features
+        'cell_features':{'index':'db_id',
+                         'columns':['cell_index','feature_definition_index']
+                        },
+        'feature_definitions':{'index':'feature_definition_index',
+                                'columns':['feature_index','feature_value_label','feature_value']},
+        'features':{
+            'index':'feature_index',
+            'columns':['feature_label','feature_description']
+        },
+        # Supplemental
+        'mask_images':{
+            'index':'db_id',
+            'columns':['mask_label','image_id']
+        },
+        'thresholds':{
+            'index':'gate_index',
+            'columns':['threshold_value','statistic_index',
+                       'measurement_feature_index','channel_index',
+                       'region_index']
+        },
+        'cell_tags':{'index':'db_id',            
+                     'columns':['tag_index','cell_index']},
         'tags':{'index':'tag_index',
                 'columns':['tag_label']}
                            }
@@ -104,7 +154,7 @@ class CellFrameGeneric(object):
         if table.index.name != self.data_tables[table_name]['index']: raise ValueError("Error index name doesn't match defined format")
         self._data[table_name] = table.loc[:,self.data_tables[table_name]['columns']].copy() # Auto-sort, and assign a copy so we aren't ever assigning by reference
 
-    def set_regions(self,regions,use_processed_region=True,unset_label='undefined',verbose=False):
+    def set_regions(self,region_group_name,regions,description="",use_processed_region=True,unset_label='undefined',verbose=False):
         """
         Alter the regions in the frame
 
@@ -116,12 +166,12 @@ class CellFrameGeneric(object):
             unset_label (str): name of unset regions default (undefined)
         """
         
-        # delete our current regions
-
-        regions = regions.copy()
-        image_ids = list(self.get_data('mask_images')['image_id'])
-        image_ids = [x for x in image_ids if x != self.processed_image_id]
-        for image_id in image_ids: del self._images[image_id]
+        ### delete our current regions
+        ##raise ValueError("Function not brought to compatibility")
+        ##regions = regions.copy()
+        ##image_ids = list(self.get_data('mask_images')['image_id'])
+        ##image_ids = [x for x in image_ids if x != self.processed_image_id]
+        ##for image_id in image_ids: del self._images[image_id]
 
         labels = list(regions.keys())
         ids = [uuid4().hex for x in labels]
@@ -144,18 +194,30 @@ class CellFrameGeneric(object):
             self._images[ids[-1]] = remainder
             regions[unset_label] = remainder
 
-        regions2 = pd.DataFrame({'region_label':labels,
+        # add a new region group
+        _rgdf = self.get_data('region_groups')
+        _region_group_index = _rgdf.index.max()+1
+        _rgnew = pd.Series({'region_group':region_group_name,'region_group_description':description},name=_region_group_index)
+        _rgdf = _rgdf.append(_rgnew)
+        self.set_data('region_groups',_rgdf)
+
+        _region_index_start = self.get_data('regions').index.max()+1
+        regions2 = pd.DataFrame({'region_group_index':[_region_group_index for x in labels],
+                                 'region_label':labels,
                                  'region_size':sizes,
                                  'image_id':ids
-                                })
+                                },index=[x for x in range(_region_index_start,_region_index_start+len(labels))])
         regions2.index.name = 'region_index'
-        self.set_data('regions',regions2)
+        #print(regions2)
+        _regcomb = self.get_data('regions').append(regions2)
+        self.set_data('regions',_regcomb)
         def get_label(x,y,regions_dict):
             for label in regions_dict:
                 if regions_dict[label][y][x] == 1: return label
             return np.nan
             raise ValueError("Coordinate is out of bounds for all regions.")
         recode = self.get_data('cells').copy()
+        recode['region_index'] = 0
         recode['new_region_label'] = recode.apply(lambda x: get_label(x['x'],x['y'],regions),1)
         ## see how many we need to drop because the centroid fall in an unprocessed region
         if verbose: sys.stderr.write(str(recode.loc[recode['new_region_label'].isna()].shape[0])+" cells with centroids beyond the processed region are being dropped\n")
@@ -163,8 +225,12 @@ class CellFrameGeneric(object):
         recode = recode.drop(columns='region_index').reset_index().\
             merge(regions2[['region_label']].reset_index(),
                   left_on='new_region_label',right_on='region_label').\
-            drop(columns=['region_label','new_region_label']).set_index('cell_index')
-        self.set_data('cells',recode)
+            drop(columns=['region_label','new_region_label']).set_index('cell_index').\
+            reset_index().drop(columns=['x','y'])
+        recode.index.name = 'db_id'
+        # now add the recoded to the current cell_regions
+        recode_comb = self.get_data('cell_regions').append(recode)
+        self.set_data('cell_regions',recode_comb)
         return
 
 
@@ -331,7 +397,7 @@ class CellFrameGeneric(object):
 
 
 
-    def get_raw(self,feature_label,statistic_label,all=False,channel_abbreviation=True):
+    def get_raw(self,measurement_feature_label,statistic_label,all=False,channel_abbreviation=True):
         """
         Get the raw data
 
@@ -347,11 +413,11 @@ class CellFrameGeneric(object):
         stats = self.get_data('measurement_statistics').reset_index()
         stats = stats.loc[stats['statistic_label']==statistic_label,'statistic_index'].iloc[0]
         feat = self.get_data('measurement_features').reset_index()
-        feat = feat.loc[feat['feature_label']==feature_label,'feature_index'].iloc[0]
+        feat = feat.loc[feat['measurement_feature_label']==measurement_feature_label,'measurement_feature_index'].iloc[0]
         #region = self.get_data('regions').reset_index()
         #region = region.loc[region['region_label']==region_label,'region_index'].iloc[0]
         measure = self.get_data('cell_measurements')
-        measure = measure.loc[(measure['statistic_index']==stats)&(measure['feature_index']==feat)]
+        measure = measure.loc[(measure['statistic_index']==stats)&(measure['measurement_feature_index']==feat)]
         channels = self.get_data('measurement_channels')
         if not all: channels = channels.loc[~channels['channel_label'].isin(self.excluded_channels)]
         measure = measure.merge(channels,left_on='channel_index',right_index=True)
@@ -399,48 +465,64 @@ class CellFrameGeneric(object):
         return None
         
 
-    @property
-    def cdf(self):
+    def cdf(self,region_group=None):
         """
         Return the pythologist.CellDataFrame of the frame
+
+        Args:
+            region_group (str): A region group present in the h5
+
+        Returns:
+            pythologist.CellDataFrame: the dataframe
         """
+        
+        _valid_region_group_names = sorted(self.get_data('region_groups')['region_group'].unique())
+        if region_group is None or region_group not in _valid_region_group_names:
+            raise ValueError("Must select a region group name in: "+str(_valid_region_group_names))
+
+
+
 
         # get our region sizes
-        region_count = self.get_data('regions').groupby('region_label').count()['region_size']
-        if region_count[region_count>1].shape[0]>0: raise ValueError("duplicate region labels not supported") # add a saftey check
-        region_sizes = self.get_data('regions').set_index('region_label')['region_size'].astype(int).to_dict()
-        # get our cells
-        temp1 = self.get_data('cells').drop(columns='phenotype_index').\
-                       merge(self.get_data('regions'),
-                             left_on='region_index',
-                             right_index=True).drop(columns=['image_id','region_index','region_size'])
-        temp1['regions'] = temp1.apply(lambda x: region_sizes,1)
-        temp2 = self.scored_calls()
-        if temp2  is not None:
-            temp2 = temp2.apply(lambda x:
-                dict(zip(
-                    list(x.index),
-                    list(x)
-                 ))
-            ,1).reset_index().rename(columns={0:'scored_calls'}).set_index('cell_index')
-            temp1 = temp1.merge(temp2,left_index=True,right_index=True)
-        else:
-            temp1['scored_calls'] = temp1.apply(lambda x: {},1)
-        temp3 = self.phenotype_calls().apply(lambda x:
-                dict(zip(
-                    list(x.index),
-                    list(x)
-                ))
-            ,1).reset_index().rename(columns={0:'phenotype_calls'}).set_index('cell_index')
-        
-        temp1 = temp1.merge(temp3,left_index=True,right_index=True)
-        #temp1['phenotypes_present'] = json.dumps(list(
-        #        sorted([x for x in self.get_data('phenotypes')['phenotype_label'] if x is not np.nan])
-        #    ))
+        _rgt = self.get_data('region_groups')
+        _rgt = _rgt.loc[_rgt['region_group']==region_group,:].copy()
+        if _rgt.shape[0] != 1:
+            raise ValueError("Should only have one region group by this name")
+        _rgt_index = _rgt.iloc[0,:].name
+        _rt = self.get_data('regions')
+        _rt = _rt.loc[_rt['region_group_index']==_rgt_index]
+        region_count = _rt.groupby('region_label').count()['region_size']
+        if region_count[region_count>1].shape[0]>0: 
+            raise ValueError("duplicate region labels not supported") # add a saftey check
+        region_sizes = _rt.set_index('region_label')['region_size'].astype(int).to_dict()
 
-        temp4 = None
-        # extract default values only if we have whole cell
-        #if "Whole Cell" in self.get_data('measurement_features')['feature_label'].tolist():
+
+        # get our cells
+        temp1 = self.get_data('cells').\
+            merge(self.get_data('cell_regions'),
+                  left_index=True,
+                  right_on='cell_index').\
+            merge(_rt,
+                  left_on='region_index',
+                  right_index=True).\
+            drop(columns=['image_id','region_index','region_size','region_group_index'])
+        temp1['regions'] = temp1.apply(lambda x: region_sizes,1)
+        temp1['phenotype_label'] = 'TOTAL'
+        temp1['phenotype_calls'] = temp1['phenotype_label'].apply(lambda x: {'TOTAL':1})
+
+
+        _fdt = self.get_data('feature_definitions')
+        _fdt['feature_tuple'] = _fdt.apply(lambda x: tuple([x['feature_value'],x['feature_value_label']]),1)
+        _fgt = _fdt.groupby('feature_index').apply(lambda x: set(x['feature_tuple']))
+        _binary_feature_index = _fgt.loc[_fgt=={(0, "-"), (1, "+")}].index
+        # Filter to only binary features
+        _fdt = _fdt.loc[_fdt['feature_index'].isin(_binary_feature_index),:].copy().drop(columns=['feature_tuple'])
+        _fdt = self.get_data('features').merge(_fdt,left_index=True,right_on='feature_index').drop(columns=['feature_description'])
+        _ft = _fdt.merge(self.get_data('cell_features'),left_index=True,right_on='feature_definition_index')
+        _df = _ft.pivot(index='cell_index',columns='feature_label',values='feature_value').fillna(0).astype(int).\
+            apply(lambda x: dict(zip(x.index,x)),1).reset_index().rename(columns={0:'scored_calls'})
+
+        temp1 = temp1.merge(_df,on='cell_index')
         temp4 = self.default_raw()
         if temp4 is not None:
             temp4 = temp4.apply(lambda x:
@@ -452,6 +534,7 @@ class CellFrameGeneric(object):
             temp1 = temp1.merge(temp4,left_index=True,right_index=True)
         else:
             temp1['channel_values'] = np.nan
+        #return temp1
 
         #temp5 = self.interaction_map().groupby('cell_index').\
         #    apply(lambda x: json.dumps(list(sorted(x['neighbor_cell_index'])))).reset_index().\
@@ -491,7 +574,7 @@ class CellFrameGeneric(object):
 
         temp1['frame_name'] = self.frame_name
         temp1['frame_id'] = self.id
-        temp1  = temp1.reset_index()
+        #temp1  = temp1.reset_index()
         temp1 = temp1.sort_values('cell_index').reset_index(drop=True)
         temp1['sample_name'] = 'undefined'
         temp1['project_name'] = 'undefined'
@@ -582,14 +665,13 @@ class CellSampleGeneric(object):
         """
         return self._frames[frame_id]
 
-    @property
-    def cdf(self):
+    def cdf(self,region_group=None):
         """
         Return the pythologist.CellDataFrame of the sample
         """
         output = []
         for frame_id in self.frame_ids:
-            temp = self.get_frame(frame_id).cdf
+            temp = self.get_frame(frame_id).cdf(region_group=region_group)
             temp['sample_name'] = self.sample_name
             temp['sample_id'] = self.id
             output.append(temp)
@@ -861,14 +943,13 @@ class CellProjectGeneric(object):
         f['meta'].attrs['id'] = name
         f.close()
 
-    @property
-    def cdf(self):
+    def cdf(self,region_group=None):
         """
         Return the pythologist.CellDataFrame of the project
         """
         output = []
         for sample_id in self.sample_ids:
-            temp = self.get_sample(sample_id).cdf
+            temp = self.get_sample(sample_id).cdf(region_group=region_group)
             temp['project_name'] = self.project_name
             temp['project_id'] = self.id
             output.append(temp)

@@ -1,0 +1,59 @@
+{
+    "$schema": "https://json-schema.org/schema#",
+    "type": "object",
+    "description":"These are minimal features that can be carried forward in an analysis.",
+    "properties": {
+        "mutually_exclusive_phenotype_strategies":{
+            "type":"array",
+            "description": "A sets of mutually exclusive phenotypes.",
+            "items":{
+                "type":"array",
+                "description":"The contents of a single mutually exclusive strategy.",
+                "items":{
+                    "type": "object",
+                    "properties": {
+                        "assigned_label":{
+                            "type": "string",
+                            "description":"The name given to the phenotype in InForm"
+                        },
+                        "label":{
+                            "type": "string",
+                            "description":"The label to carry forward, by default just used the assigned label if this is unset"
+                        },
+                        "keep":{
+                            "type": "boolean",
+                            "default": true
+                        }
+                    },
+                    "additionalProperties": false,
+                    "required": ["assigned_label"]
+                }
+            }
+        },
+        "channels":{
+            "type":"array",
+            "description": "The labels of mutually exclusive regions.",
+            "items":{
+                "type":"object",
+                "properties": {
+                    "inform_channel_label": {
+                        "type": "string",
+                        "description": "The string given in InForm"
+                    },
+                    "label": {
+                        "type": "string",
+                        "description": "The label to carry forward"
+                    },
+                    "analyze_threshold": {
+                        "type": "boolean",
+                        "default": false
+                    }
+                },
+                "additionalProperties": false,
+                "required": ["inform_channel_label","label"]
+            }
+        }
+    },
+    "additionalProperties": false,
+    "required": ["mutually_exclusive_phenotype_strategies","channels"]
+}
