@@ -65,6 +65,7 @@ class CellProjectInForm(CellProjectGeneric):
                        skip_segmentation_processing=False,
                        microns_per_pixel=None,
                        inform_analysis_dict=None,
+                       dry_run=False,
                        **kwargs):
         """
         Read in the project folder
@@ -104,6 +105,7 @@ class CellProjectInForm(CellProjectGeneric):
                                          verbose=verbose,require_component=require_component,
                                          require_score=require_score,
                                          skip_segmentation_processing=skip_segmentation_processing,
+                                         dry_run=dry_run,
                                          **kwargs)
             if verbose: sys.stderr.write("Added sample "+sid+"\n")
 
@@ -115,6 +117,7 @@ class CellProjectInForm(CellProjectGeneric):
                              require_component=True,
                              require_score=True,
                              skip_segmentation_processing=False,
+                             dry_run=False,
                              **kwargs):
         if self.mode == 'r': raise ValueError("Error: cannot write to a path in read-only mode.")
         if verbose: sys.stderr.write("Reading sample "+path+" for sample "+sample_name+"\n")
@@ -126,7 +129,10 @@ class CellProjectInForm(CellProjectGeneric):
                                   require_component=require_component,
                                   require_score=require_score,
                                   skip_segmentation_processing=skip_segmentation_processing,
+                                  dry_run=dry_run,
                                   **kwargs)
+        if dry_run:
+            return cellsample.id
         cellsample.to_hdf(self.h5path,location='samples/'+cellsample.id,mode='a')
         current = self.key
         if current is None:
@@ -196,6 +202,7 @@ class CellSampleInForm(CellSampleGeneric):
                        require_score=True,
                        skip_segmentation_processing=False,
                        inform_analysis_dict=None,
+                       dry_run=False,
                        **kwargs):
         """
         Read in the project folder
@@ -248,7 +255,9 @@ class CellSampleInForm(CellSampleGeneric):
                          verbose=verbose,
                          require_component=require_component,
                          require_score=require_score,
-                         skip_segmentation_processing=skip_segmentation_processing)
+                         skip_segmentation_processing=skip_segmentation_processing,
+                         dry_run=dry_run
+                         )
             frame_id = cid.id
             self._frames[frame_id]=cid
             frames.append({'frame_id':frame_id,'frame_name':frame,'frame_path':absdir})

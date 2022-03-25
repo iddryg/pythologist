@@ -7,27 +7,39 @@
             "type":"array",
             "description": "A sets of mutually exclusive phenotypes.",
             "items":{
-                "type":"array",
-                "description":"The contents of a single mutually exclusive strategy.",
-                "items":{
-                    "type": "object",
-                    "properties": {
-                        "assigned_label":{
-                            "type": "string",
-                            "description":"The name given to the phenotype in InForm"
-                        },
-                        "label":{
-                            "type": "string",
-                            "description":"The label to carry forward, by default just used the assigned label if this is unset"
-                        },
-                        "keep":{
-                            "type": "boolean",
-                            "default": true
-                        }
+                "type":"object",
+                "properties": {
+                    "strategy_label":{
+                        "type":"string",
+                        "default":"NO_LABEL_SET",
+                        "description":"The name of the strategy following 'Phenotype-' in the cell seg data text file or NO_LABEL_SET if there is no strategy label for an older version of InForm."
                     },
-                    "additionalProperties": false,
-                    "required": ["assigned_label"]
-                }
+                    "phenotype_list":{
+                        "type":"array",
+                        "description":"The contents of a single mutually exclusive strategy.",
+                        "items":{
+                            "type": "object",
+                            "properties": {
+                                "assigned_label":{
+                                    "type": "string",
+                                    "description":"The name given to the phenotype in InForm"
+                                },
+                                "label":{
+                                    "type": "string",
+                                    "description":"The label to carry forward, by default just used the assigned label if this is unset"
+                                },
+                                "keep":{
+                                    "type": "boolean",
+                                    "default": true
+                                }
+                            },
+                            "additionalProperties": false,
+                            "required": ["assigned_label"]
+                        }
+                    }
+                },
+                "additionalProperties": false,
+                "required": ["phenotype_list"]
             }
         },
         "channels":{

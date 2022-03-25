@@ -69,9 +69,12 @@ class CellFrameInForm(CellFrameGeneric):
                  inform_analysis_dict=None,
                  require_component=True,
                  require_score=True,
-                 skip_segmentation_processing=False):
+                 skip_segmentation_processing=False,
+                 dry_run=False,
+                 ):
         self.verbose = verbose
         self.frame_name = frame_name
+        self._dry_run = dry_run
 
 
         def _parse_threshold(inform_analysis_dict):
@@ -87,15 +90,16 @@ class CellFrameInForm(CellFrameGeneric):
         def _parse_mutually_exclusive(inform_analysis_dict):
             # return a tuple keyed dictionary
             _output = {}
-            for _strategy in inform_analysis_dict['mutually_exclusive_phenotype_strategies']:
+            for _strategy_dict in inform_analysis_dict['mutually_exclusive_phenotype_strategies']:
+                _strategy_label = "NO_LABEL_SET" if 'strategy_label' not in _strategy_dict else _strategy_dict['strategy_label']
+                _strategy = _strategy_dict['phenotype_list']
                 # iterating over each strategy
-                _strategy_tuple = tuple(sorted([x['assigned_label'] for x in _strategy]))
-                _output[_strategy_tuple] = {}
+                _output[_strategy_label] = {}
                 for _pheno in _strategy:
                     if 'keep' not in _pheno:
                         _pheno['keep'] = True
                     if _pheno['keep'] is False: continue
-                    _output[_strategy_tuple][_pheno['assigned_label']] = \
+                    _output[_strategy_label][_pheno['assigned_label']] = \
                         _pheno['assigned_label'] if 'label' not in _pheno else _pheno['label']
             return _output
        
@@ -130,15 +134,6 @@ class CellFrameInForm(CellFrameGeneric):
         if self.tissue_class_map_image_id is not None:
             if self.verbose: sys.stderr.write("Setting a new region group for ProcessedRegionImage.\n")
             _any_region_index = self._add_processed_image_region()
-        #    # fix the thresholds
-        #    _pre = self.get_data('thresholds').shape[0]
-        #    _thresholds = self.get_data('thresholds').groupby(['channel_index']).first().reset_index()
-        #    _thresholds['region_index'] = _any_region_index
-        #    _post = _thresholds.shape[0]
-        #    if _pre != _post:
-        #        sys.stderr.write("WARNING: Dropped extra thresholding.\n")
-        #    _thresholds.index.name = 'gate_index'
-        #    self.set_data('thresholds',_thresholds)
 
 
         self._read_data(cell_seg_data_file,
@@ -151,10 +146,10 @@ class CellFrameInForm(CellFrameGeneric):
                         skip_segmentation_processing=skip_segmentation_processing)
 
         # Now we've read in whatever we've got fromt he binary seg image
-        if self.verbose: sys.stderr.write("Reading component images.\n")
-        if require_component or (not require_component and component_image_file and os.path.isfile(component_image_file)): 
+        if (not dry_run and require_component) or (not require_component and component_image_file and os.path.isfile(component_image_file)): 
+            if self.verbose: sys.stderr.write("Reading component images.\n")
             self._read_component_image(component_image_file)
-        if self.verbose: sys.stderr.write("Finished reading component images.\n")
+            if self.verbose: sys.stderr.write("Finished reading component images.\n")
 
         return
 
@@ -234,19 +229,18 @@ class CellFrameInForm(CellFrameGeneric):
         me_feature_basics = []
         for pc in pheno_columns:
             m = re.match('Phenotype-(.*)$',pc)
-            pstr = None
+            _strategy_label = None
             if m:
-                pstr = m.group(1)
+                _strategy_label = m.group(1)
             else:
-                pstr = ", ".join(sorted(_seg['Phenotype'].dropna().unique().tolist())) 
-            _ptuple = tuple(sorted(pstr.split(', ')))
+                _strategy_label = "NO_LABEL_SET"
             _sub = _seg.loc[:,['Cell ID',pc]].copy().\
                 rename(columns={'Cell ID':'cell_index',pc:'Phenotype'}).\
                 dropna(subset=['Phenotype'])
             # we are only keeping a subset within these
-            if _ptuple not in mutually_exclusive_analysis:
-                raise ValueError("Missing expected Phenotype analysis column "+str(_ptuple)+" from among "+str(mutually_exclusive_analysis))
-            for _assigned, _label in mutually_exclusive_analysis[_ptuple].items():
+            if _strategy_label not in mutually_exclusive_analysis:
+                raise ValueError("Missing expected phenotype strategy label "+str(_strategy_label)+" from among "+str(sorted([x for x in mutually_exclusive_analysis.keys()])))
+            for _assigned, _label in mutually_exclusive_analysis[_strategy_label].items():
                 me_feature_definition.append([_label,'+',1])
                 me_feature_definition.append([_label,'-',0])
                 me_feature_basics.append([_label,'InForm mutually exclusive analysis'])
@@ -503,7 +497,7 @@ class CellFrameInForm(CellFrameGeneric):
 
             segmentation_images = self.get_data('segmentation_images').set_index('segmentation_label')
             if 'Nucleus' in segmentation_images.index and \
-               'Membrane' in segmentation_images.index and not skip_segmentation_processing:
+               'Membrane' in segmentation_images.index and not skip_segmentation_processing and not self._dry_run:
                 if self.verbose: sys.stderr.write("Making cell-map filled-in.\n")
                 ## See if we are a legacy membrane map
                 mem = self._images[self.get_data('segmentation_images').\

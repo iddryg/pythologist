@@ -5,6 +5,7 @@ from uuid import uuid4
 from pythologist_image_utilities import map_image_ids
 from pythologist_reader.qc import QC
 from pythologist import CellDataFrame
+from tempfile import SpooledTemporaryFile
 
 """
 These are classes to help deal with cell-level image data
@@ -800,11 +801,11 @@ class CellProjectGeneric(object):
         Create a CellProjectGeneric object or read from/add to an existing one
 
         Args:
-            h5path (str): path to read/from or store/to
+            h5path (str): path to read/from or store/to, only use None for a dry_run read
             mode (str): 'r' read, 'a' append, 'w' create/write, 'r+' create/append if necessary
         """
         self._key = None
-        self.h5path = h5path
+        self.h5path = h5path if h5path is not None else SpooledTemporaryFile(max_size=100*1e6)
         self.mode = mode
         self._sample_cache_name = None
         self._sample_cache = None
