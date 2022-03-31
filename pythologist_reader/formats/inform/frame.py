@@ -284,6 +284,7 @@ class CellFrameInForm(CellFrameGeneric):
 
         ###
         # Define features #2 - get all threshold features we are keeping
+        t_features = pd.DataFrame()
         if score_data_file is not None: 
             _thresholds = preliminary_threshold_read(score_data_file, 
                                                  self.get_data('measurement_statistics'), 
@@ -351,7 +352,16 @@ class CellFrameInForm(CellFrameGeneric):
         feature_definitions.index.name = 'feature_definition_index'
 
 
-        cell_features = pd.concat([me_features,t_features]).reset_index(drop=True).\
+        # If we have me_features and t_features make sure their labels do not overlap
+        if me_features.shape[0] > 0 and t_features.shape[0] > 0:
+            _lab1 = set(me_features['feature_label'])
+            _lab2 = set(t_features['feature_label'])
+            if len(_lab1 & _lab2)>0:
+                raise ValueError("Overlapping feature labels between phenotyping and scored calls are not permitted. "+str(list(_lab1 & _lab2)))
+        _feature_df = me_features
+        if t_features.shape[0] > 0:
+            _feature_df = pd.concat([me_features,t_features])
+        cell_features = _feature_df.reset_index(drop=True).\
             merge(feature_definitions.reset_index(),on=['feature_label','feature_value'])[['cell_index','feature_definition_index']]
         cell_features.index.name = 'db_id'
 
