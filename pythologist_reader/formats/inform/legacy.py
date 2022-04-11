@@ -20,7 +20,7 @@ class CellProjectInFormSeperateSegmentations(CellProjectInForm):
             path (str): location of the project directory
             project_name (str): name of the project
             sample_name_index (int): where in the directory chain is the foldername that is the sample name if not set use full path.  -1 is last directory
-            channel_abbreviations (dict): dictionary of shortcuts to translate to simpler channel names
+            inform_analysis_dict (dict): dictionary of shortcuts to translate to simpler channel names
             verbose (bool): if true print extra details
             require (bool): if true (default), require that channel componenet image be present
             microns_per_pixel (float): conversion factor
@@ -34,8 +34,10 @@ class CellSampleInFormSeperateSegmentations(CellSampleInForm):
     def create_cell_frame_class(self):
         return CellFrameInFormSeperateSegmentations()
     def read_path(self,path,sample_name=None,
-                            channel_abbreviations=None,
-                            verbose=False,require=True,require_score=True):
+                            inform_analysis_dict=None,
+                            verbose=False,
+                            require_component=True,
+                            require_score=True):
         if sample_name is None: sample_name = path
         if not os.path.isdir(path):
             raise ValueError('Path input must be a directory')
@@ -53,8 +55,6 @@ class CellSampleInFormSeperateSegmentations(CellSampleInForm):
             nuc_seg_map = os.path.join(path,m.group(1)+'nuc_seg_map.tif')
             #binary_seg_maps = os.path.join(path,m.group(1)+'binary_seg_maps.tif')
             component_image = os.path.join(path,m.group(1)+'component_data.tif')
-            tfile = os.path.join(path,m.group(1)+'tissue_seg_data.txt')
-            tissue_seg_data = tfile if os.path.exists(tfile) else None
             frame = m.group(1).rstrip('_')
             data = os.path.join(path,file)
             if not os.path.exists(score):
@@ -64,13 +64,12 @@ class CellSampleInFormSeperateSegmentations(CellSampleInForm):
             cid.read_raw(frame_name = frame,
                          cell_seg_data_file=data,
                          score_data_file=score,
-                         tissue_seg_data_file=tissue_seg_data,
                          memb_seg_image_file=memb_seg_map,
                          nuc_seg_image_file=nuc_seg_map,
                          component_image_file=component_image,
-                         channel_abbreviations=channel_abbreviations,
+                         inform_analysis_dict=inform_analysis_dict,
                          verbose=verbose,
-                         require=require,require_score=require_score)
+                         require_component=require_component,require_score=require_score)
             if verbose: sys.stderr.write("setting mask and not mask\n")
             frame_id = cid.id
             self._frames[frame_id]=cid
@@ -88,37 +87,35 @@ class CellFrameInFormSeperateSegmentations(CellFrameInForm):
                  frame_name = None,
                  cell_seg_data_file=None,
                  score_data_file=None,
-                 tissue_seg_data_file=None,
                  memb_seg_image_file=None,
                  nuc_seg_image_file=None,
                  component_image_file=None,
                  verbose=False,
-                 channel_abbreviations=None,
-                 require=True,require_score=True):
+                 inform_analysis_dict=None,
+                 require_component=True,require_score=True):
         self.frame_name = frame_name
         ### Read in the data for our object
         if verbose: sys.stderr.write("Reading text data.\n")
         self._read_data(cell_seg_data_file,
                    score_data_file,
-                   tissue_seg_data_file,
                    verbose,
-                   channel_abbreviations,require=require,require_score=require_score)
+                   inform_analysis_dict=inform_analysis_dict,require=require,require_score=require_score)
         if verbose: sys.stderr.write("Reading image data.\n")
         self._read_images(memb_seg_image_file,nuc_seg_image_file,
                    component_image_file,
                    verbose=verbose,
-                   require=require)
+                   require_component=require_component)
         return
 
     ### Lets work with image files now
     def _read_images(self,memb_seg_image_file=None,nuc_seg_image_file=None,
-                     component_image_file=None,verbose=False,require=True):
+                     component_image_file=None,verbose=False,require_component=True):
         # Start with the binary seg image file because if it has a processed image area,
         # that will be applied to all other masks and we can get that segmentation right away
 
         # Now we've read in whatever we've got fromt he binary seg image
         if verbose: sys.stderr.write("Reading component images.\n")
-        if require or (not require and component_image_file and os.path.isfile(component_image_file)): 
+        if require_component or (not require_component and component_image_file and os.path.isfile(component_image_file)): 
             self._read_component_image(component_image_file)
         if verbose: sys.stderr.write("Finished reading component images.\n")
 
