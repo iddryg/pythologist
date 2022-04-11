@@ -4,6 +4,9 @@ import numpy as np
 import math
 from pythologist.measurements import Measurement
 from collections import namedtuple
+from scipy.stats import sem
+
+_degrees_of_freedom = 1
 
 PercentageLogic = namedtuple('PercentageLogic',('numerator','denominator','label'))
 
@@ -96,23 +99,15 @@ class Counts(Measurement):
             apply(lambda x:
                 pd.Series(dict(zip(
                     [
-                     #'cumulative_region_area_pixels',
-                     #'cumulative_region_area_mm2',
-                     #'cumulative_count',
-                     #'cumulative_density_mm2',
                      'mean_density_mm2',
                      'stddev_density_mm2',
                      'stderr_density_mm2',
                      'measured_frame_count'
                     ],
                     [
-                     #x['region_area_pixels'].sum(),
-                     #x['region_area_mm2'].sum(),
-                     #x['count'].sum(),
-                     #np.nan if x['region_area_mm2'].sum() == 0 else x['count'].sum()/x['region_area_mm2'].sum(),
                      x['density_mm2'].mean(),
-                     x['density_mm2'].std(),
-                     x['density_mm2'].std()/np.sqrt(len([y for y in x['density_mm2'] if y==y])),
+                     np.nan if len([y for y in x['density_mm2'] if y==y]) <=1 else x['density_mm2'].std(ddof=_degrees_of_freedom,skipna=True),
+                     np.nan if len([y for y in x['density_mm2'] if y==y]) <=1 else sem(x['density_mm2'],ddof=_degrees_of_freedom,nan_policy='omit'),
                      len([y for y in x['density_mm2'] if y==y])
                     ]
                 )))
@@ -130,20 +125,12 @@ class Counts(Measurement):
                      'cumulative_region_area_mm2',
                      'cumulative_count',
                      'cumulative_density_mm2',
-                     #'mean_density_mm2',
-                     #'stddev_density_mm2',
-                     #'stderr_density_mm2',
-                     #'measured_frame_count'
                     ],
                     [
                      x['region_area_pixels'].sum(),
                      x['region_area_mm2'].sum(),
                      x['count'].sum(),
                      np.nan if x['region_area_mm2'].sum() == 0 else x['count'].sum()/x['region_area_mm2'].sum(),
-                     #x['density_mm2'].mean(),
-                     #x['density_mm2'].std(),
-                     #x['density_mm2'].std()/np.sqrt(len([y for y in x['density_mm2'] if y==y])),
-                     #len([y for y in x['density_mm2'] if y==y])
                     ]
                 )))
             ).reset_index()
@@ -234,11 +221,11 @@ class Counts(Measurement):
                'cumulative_fraction':np.nan if x['denominator'].sum()!=x['denominator'].sum() or x['denominator'].sum()<self.minimum_denominator_count else x['numerator'].sum()/x['denominator'].sum(),
                'cumulative_percent':np.nan if x['denominator'].sum()!=x['denominator'].sum() or x['denominator'].sum()<self.minimum_denominator_count else 100*x['numerator'].sum()/x['denominator'].sum(),
                'mean_fraction':x['fraction'].mean(),
-               'stdev_fraction':x['fraction'].std(),
-               'stderr_fraction':np.nan if len([y for y in x['fraction'] if y==y])<=1 else x['fraction'].std()/np.sqrt(len([y for y in x['fraction'] if y==y])),
+               'stdev_fraction':np.nan if len([y for y in x['fraction'] if y==y]) <=1 else x['fraction'].std(ddof=_degrees_of_freedom,skipna=True),
+               'stderr_fraction':np.nan if len([y for y in x['fraction'] if y==y]) <=1 else sem(x['fraction'],ddof=_degrees_of_freedom,nan_policy='omit'),
                'mean_percent':x['percent'].mean(),
-               'stdev_percent':x['percent'].std(),
-               'stderr_percent':np.nan if len([y for y in x['percent'] if y==y])<=1 else x['percent'].std()/np.sqrt(len([y for y in x['percent'] if y==y])),
+               'stdev_percent':np.nan if len([y for y in x['fraction'] if y==y]) <= 1 else x['percent'].std(ddof=_degrees_of_freedom,skipna=True),
+               'stderr_percent':np.nan if len([y for y in x['fraction'] if y==y]) <= 1 else sem(x['percent'],ddof=_degrees_of_freedom,nan_policy='omit'),
                'measured_frame_count':len([y for y in x['fraction'] if y==y]),
            }))
            ).reset_index()
