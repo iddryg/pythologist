@@ -915,7 +915,7 @@ class CellDataFrame(pd.DataFrame):
         return fixed
 
 
-    def scored_to_phenotype(self,phenotypes):
+    def scored_to_phenotypes(self,phenotypes):
         """
         Convert binary pehnotypes to mutually exclusive phenotypes. 
         If none of the phenotypes are set, then phenotype_label becomes nan
