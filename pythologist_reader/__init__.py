@@ -466,7 +466,7 @@ class CellFrameGeneric(object):
         return None
         
 
-    def cdf(self,region_group=None):
+    def cdf(self,region_group=None,mutually_exclusive_phenotypes=None):
         """
         Return the pythologist.CellDataFrame of the frame
 
@@ -479,7 +479,7 @@ class CellFrameGeneric(object):
         
         _valid_region_group_names = sorted(self.get_data('region_groups')['region_group'].unique())
         if region_group is None or region_group not in _valid_region_group_names:
-            raise ValueError("Must select a region group name in: "+str(_valid_region_group_names))
+            raise ValueError("region_group must be one of the set regions: "+str(_valid_region_group_names))
 
 
 
@@ -590,7 +590,10 @@ class CellFrameGeneric(object):
             ,1)
         # Let's tack on the image shape
         temp1['frame_shape'] = temp1.apply(lambda x: self.shape,1)
-        return CellDataFrame(temp1)
+        cdf = CellDataFrame(temp1)
+        if mutually_exclusive_phenotypes is not None:
+            cdf = cdf.scored_to_phenotypes(mutually_exclusive_phenotypes).drop_scored_calls(mutually_exclusive_phenotypes)
+        return cdf
 
     def binary_df(self):
         temp1 = self.phenotype_calls().stack().reset_index().\
@@ -666,13 +669,13 @@ class CellSampleGeneric(object):
         """
         return self._frames[frame_id]
 
-    def cdf(self,region_group=None):
+    def cdf(self,region_group=None,mutually_exclusive_phenotypes=None):
         """
         Return the pythologist.CellDataFrame of the sample
         """
         output = []
         for frame_id in self.frame_ids:
-            temp = self.get_frame(frame_id).cdf(region_group=region_group)
+            temp = self.get_frame(frame_id).cdf(region_group=region_group,mutually_exclusive_phenotypes=mutually_exclusive_phenotypes)
             temp['sample_name'] = self.sample_name
             temp['sample_id'] = self.id
             output.append(temp)
@@ -944,13 +947,13 @@ class CellProjectGeneric(object):
         f['meta'].attrs['id'] = name
         f.close()
 
-    def cdf(self,region_group=None):
+    def cdf(self,region_group=None,mutually_exclusive_phenotypes=None):
         """
         Return the pythologist.CellDataFrame of the project
         """
         output = []
         for sample_id in self.sample_ids:
-            temp = self.get_sample(sample_id).cdf(region_group=region_group)
+            temp = self.get_sample(sample_id).cdf(region_group=region_group,mutually_exclusive_phenotypes=mutually_exclusive_phenotypes)
             temp['project_name'] = self.project_name
             temp['project_id'] = self.id
             output.append(temp)

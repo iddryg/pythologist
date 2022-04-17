@@ -44,7 +44,9 @@ class CellSampleInFormCustomMask(CellSampleInForm):
                             skip_segmentation_processing=False,
                             custom_mask_name='Tumor',
                             other_mask_name='Stroma',
-                            alternate_annotation_path=None):
+                            alternate_annotation_path=None,
+                            dry_run=False
+                            ):
         if sample_name is None: sample_name = path
         if not os.path.isdir(path):
             raise ValueError('Path input must be a directory')
@@ -82,7 +84,8 @@ class CellSampleInFormCustomMask(CellSampleInForm):
                          verbose=verbose,
                          require_component=require_component,
                          skip_segmentation_processing=skip_segmentation_processing,
-                         require_score=require_score
+                         require_score=require_score,
+                         dry_run=dry_run
 
                          )
             if verbose: sys.stderr.write("setting mask and not mask\n")
@@ -159,7 +162,14 @@ class CellSampleInFormLineArea(CellSampleInForm):
         return CellFrameInFormLineArea()
     def read_path(self,path,sample_name=None,
                             inform_analysis_dict=None,
-                            verbose=False,require_component=True,require_score=True,skip_segmentation_processing=False,steps=76,alternate_annotation_path=None):
+                            verbose=False,
+                            require_component=True,
+                            require_score=True,
+                            skip_segmentation_processing=False,
+                            steps=76,
+                            alternate_annotation_path=None,
+                            dry_run=False,
+                            ):
         if sample_name is None: sample_name = path
         if not os.path.isdir(path):
             raise ValueError('Path input must be a directory')
@@ -197,7 +207,9 @@ class CellSampleInFormLineArea(CellSampleInForm):
                          verbose=verbose,
                          require_component=require_component,
                          require_score=require_score,
-                         skip_segmentation_processing=skip_segmentation_processing)
+                         skip_segmentation_processing=skip_segmentation_processing,
+                         dry_run=dry_run
+                         )
             if verbose: sys.stderr.write("setting tumor and stroma and margin\n")
             cid.set_line_area(margin,tumor,steps=steps,verbose=verbose)
             frame_id = cid.id
@@ -219,33 +231,59 @@ class CellFrameInFormLineArea(CellFrameInForm):
             self._data[x] = pd.DataFrame(columns=self.data_tables[x]['columns'])
             self._data[x].index.name = self.data_tables[x]['index']
     def set_line_area(self,line_image,area_image,steps=20,verbose=False):
+        processed_image = self.get_image(self.processed_image_id).astype(np.uint8)
+        zero_binary = processed_image&(~processed_image)
         drawn_binary = np.zeros(self.shape)
-        if os.path.exists(line_image):
+        area_binary = read_tiff_stack(area_image)[0]['raw_image']
+        area_binary = make_binary_image_array(area_binary)
+        full_tumor = area_binary&processed_image
+        image_id2= uuid4().hex
+        self._images[image_id2] = area_binary
+        if line_image is not None and os.path.exists(line_image):
             drawn_binary = read_tiff_stack(line_image)[0]['raw_image']
             drawn_binary = make_binary_image_array(drawn_binary)
-        elif verbose:
-            sys.stderr.write("Skipping the invasive margin since there is none present.\n")
+        else:
+            # specialcase of no line
+            df = pd.DataFrame({'custom_label':['Area'],'image_id':[image_id2]})
+            df.index.name = 'db_id'
+            self.set_data('custom_images',df)
+            inner_tumor_binary = full_tumor&processed_image
+            inner_margin_binary = zero_binary
+            outer_margin_binary = zero_binary
+            outer_stroma_binary = zero_binary
+            undefined_binary = (~full_tumor)&processed_image
+            if verbose:
+                sys.stderr.write("Skipping the invasive margin since there is none present.\n")
+            d = {'InnerTumor':inner_tumor_binary,
+             'InnerMargin':inner_margin_binary,
+             'OuterMargin':outer_margin_binary,
+             'OuterStroma':outer_stroma_binary,
+             'Undefined':undefined_binary
+            }
+            self.set_regions('InFormLineArea',d,description="Tumor stroma interface set from a mask and optional drawn line.")
+            return d
         image_id1 = uuid4().hex
         self._images[image_id1] = drawn_binary
 
-        area_binary = read_tiff_stack(area_image)[0]['raw_image']
-        area_binary = make_binary_image_array(area_binary)
-        image_id2= uuid4().hex
-        self._images[image_id2] = area_binary
         df = pd.DataFrame({'custom_label':['Drawn','Area'],'image_id':[image_id1,image_id2]})
         df.index.name = 'db_id'
         self.set_data('custom_images',df)
 
 
         grown = binary_image_dilation(drawn_binary,steps=steps)
-        processed_image = self.get_image(self.processed_image_id).astype(np.uint8)
         margin_binary = grown&processed_image
-        tumor_binary = (area_binary&(~grown))&processed_image
-        stroma_binary = (~((tumor_binary|grown)&processed_image))&processed_image
+        inner_tumor_binary = (full_tumor&(~margin_binary))&processed_image
+        inner_margin_binary = (full_tumor&(margin_binary))&processed_image
+        outer_margin_binary = (margin_binary&(~inner_margin_binary))&processed_image
+        outer_stroma_binary = (~(inner_tumor_binary|margin_binary))&processed_image
+        undefined_binary = zero_binary
 
-        d = {'Margin':margin_binary,
-                          'Tumor':tumor_binary,
-                          'Stroma':stroma_binary}
+        d = {'InnerTumor':inner_tumor_binary,
+             'InnerMargin':inner_margin_binary,
+             'OuterMargin':outer_margin_binary,
+             'OuterStroma':outer_stroma_binary,
+             'Undefined':undefined_binary
+            }
         self.set_regions('InFormLineArea',d,description="Tumor stroma interface set from a mask and optional drawn line.")
         return d
 
