@@ -61,7 +61,7 @@ class Counts(Measurement):
                 df = self.cdf.subset(sl)
                 #df = df.groupby(mergeon).count()[['cell_index']].\
                 #    rename(columns={'cell_index':'count'}).reset_index()
-                df = df.groupby(mergeon).groupby(mergeon+['phenotype_label']).\
+                df = df.groupby(mergeon).\
                     apply(lambda x: pd.Series(dict(zip(
                         ['count','cell_area_pixels'],
                         [len(x['cell_index']),sum(x['cell_area'])]
@@ -209,39 +209,112 @@ class Counts(Measurement):
             numerator = numerator[criteria+['count']].rename(columns={'count':'numerator'})
             denominator = denominator[criteria+['count']].rename(columns={'count':'denominator'})
             combo = numerator.merge(denominator,on=criteria, how='outer')
-            combo['fraction'] = combo.\
-                apply(lambda x: np.nan if x['denominator']<self.minimum_denominator_count else x['numerator']/x['denominator'],1)
-            combo['percent'] = combo['fraction'].multiply(100)
+            combo['percent'] = combo.\
+                apply(lambda x: np.nan if x['denominator']<self.minimum_denominator_count else 100*x['numerator']/x['denominator'],1)
             combo['phenotype_label'] = entry.label
             results.append(combo)
-        return pd.concat(results)
+        df = pd.concat(results)
+        df['qualified_percent'] = df['denominator'].apply(lambda x: x>=self.minimum_denominator_count)
+        return df
     def sample_percentages(self,percentage_logic_list):
-        mergeon = self.cdf.sample_columns+['region_label']
+        #mergeon = self.cdf.sample_columns+['region_label']
 
-        fc = self.measured_regions[self.cdf.frame_columns+['region_label']].drop_duplicates().groupby(mergeon).\
-            count()[['frame_id']].rename(columns={'frame_id':'frame_count'}).\
+        #fc = self.measured_regions[self.cdf.frame_columns+['region_label']].drop_duplicates().groupby(mergeon).\
+        #    count()[['frame_id']].rename(columns={'frame_id':'frame_count'}).\
+        #    reset_index()
+
+        # Get observed regions
+        #fo = self.measured_regions[self.cdf.sample_columns+['region_label']].drop_duplicates()
+        # Get sample count
+        fc = self.measured_regions[self.cdf.frame_columns+['region_label']].drop_duplicates().groupby(self.cdf.sample_columns+['region_label']).\
+            count()[['frame_id']].rename(columns={'frame_id':'measured_frame_count'}).\
             reset_index()
+        #fc = fo.merge(fc,on=self.cdf.sample_columns,how='left').fillna(0)
+        fpheno = pd.DataFrame({'phenotype_label':[x.label for x in percentage_logic_list]})
+        fpheno['_key'] = 1
+        fc['_key'] = 1
+        fc = fc.merge(fpheno,on=['_key']).drop(columns=['_key'])
 
+        #sp = self.sample_percentages(percentage_logic_list)
+        # Get measured sample counts
+        #msc = sp[['project_id','project_name','sample_id','sample_name','region_label','cumulative_denominator','phenotype_label']].\
+        #    drop_duplicates()
+        #msc = msc.loc[msc['cumulative_denominator']>=self.minimum_denominator_count].drop_duplicates().\
+        #    groupby(['project_id','project_name','region_label','phenotype_label']).count()[['sample_id']].\
+        #    reset_index().\
+        #    rename(columns={'sample_id':'measured_sample_count'})
+        #sc = sc.merge(msc,on=['project_id','project_name','region_label','phenotype_label'],how='left').fillna(0)
+        #sc['measured_sample_count'] = sc['measured_sample_count'].astype(int)
 
         # Do this with filtering for the mean stderr versions
         fp = self.frame_percentages(percentage_logic_list)
+        mfc = fp[self.cdf.frame_columns+['region_label','denominator','phenotype_label']].\
+            drop_duplicates()
+        mfc = mfc.loc[mfc['denominator']>=self.minimum_denominator_count].drop_duplicates().\
+            groupby(self.cdf.sample_columns+['region_label','phenotype_label']).count()[['frame_id']].\
+            reset_index().\
+            rename(columns={'frame_id':'qualified_frame_count'})
+        #print(fc.columns)
+        #print(mfc.columns)
+        fc = fc.merge(mfc,on=self.cdf.sample_columns+['region_label','phenotype_label'],how='left').fillna(0)
+
+
         cnts = fp.groupby(self.cdf.sample_columns+['phenotype_label','region_label']).\
            apply(lambda x:
            pd.Series(dict({
                'cumulative_numerator':x['numerator'].sum(),
                'cumulative_denominator':x['denominator'].sum(),
-               'cumulative_fraction':np.nan if x['denominator'].sum()!=x['denominator'].sum() or x['denominator'].sum()<self.minimum_denominator_count else x['numerator'].sum()/x['denominator'].sum(),
                'cumulative_percent':np.nan if x['denominator'].sum()!=x['denominator'].sum() or x['denominator'].sum()<self.minimum_denominator_count else 100*x['numerator'].sum()/x['denominator'].sum(),
-               'mean_fraction':x['fraction'].mean(),
-               'stdev_fraction':np.nan if len([y for y in x['fraction'] if y==y]) <=1 else x['fraction'].std(ddof=_degrees_of_freedom,skipna=True),
-               'stderr_fraction':np.nan if len([y for y in x['fraction'] if y==y]) <=1 else sem(x['fraction'],ddof=_degrees_of_freedom,nan_policy='omit'),
                'mean_percent':x['percent'].mean(),
-               'stdev_percent':np.nan if len([y for y in x['fraction'] if y==y]) <= 1 else x['percent'].std(ddof=_degrees_of_freedom,skipna=True),
-               'stderr_percent':np.nan if len([y for y in x['fraction'] if y==y]) <= 1 else sem(x['percent'],ddof=_degrees_of_freedom,nan_policy='omit'),
-               'measured_frame_count':len([y for y in x['fraction'] if y==y]),
+               'stdev_percent':np.nan if len([y for y in x['percent'] if y==y]) <= 1 else x['percent'].std(ddof=_degrees_of_freedom,skipna=True),
+               'stderr_percent':np.nan if len([y for y in x['percent'] if y==y]) <= 1 else sem(x['percent'],ddof=_degrees_of_freedom,nan_policy='omit'),
+               #'measured_frame_count':len([y for y in x['percent'] if y==y]),
            }))
            ).reset_index()
-        cnts = cnts.merge(fc,on=mergeon)
-        cnts['measured_frame_count'] = cnts['measured_frame_count'].astype(int)
+        cnts = cnts.merge(fc,on=self.cdf.sample_columns+['region_label','phenotype_label'])
+        cnts['qualified_frame_count'] = cnts['qualified_frame_count'].astype(int)
+        cnts['cumulative_numerator'] = cnts['cumulative_numerator'].astype(int)
+        cnts['cumulative_denominator'] = cnts['cumulative_denominator'].astype(int)
+        cnts['qualified_cumulative_percent'] = cnts['cumulative_denominator'].apply(lambda x: x>=self.minimum_denominator_count)
+        #stc = fp.groupby(self.cdf.sample_columns+['region_label']).sum()[['denominator']]
+        #cnts['sample_total_count'] = cnts['sample_total_count'].astype(int)
+
 
         return cnts
+    def project_percentages(self,percentage_logic_list):
+        #mergeon = self.cdf.project_columns+['phenotype_label','region_label']
+
+        # Get observed regions
+        #so = self.measured_regions[self.cdf.project_columns+['region_label']].drop_duplicates()
+        # Get sample count
+
+        sc = self.measured_regions[self.cdf.sample_columns+['region_label']].drop_duplicates().groupby(self.cdf.project_columns+['region_label']).\
+            count()[['sample_id']].rename(columns={'sample_id':'measured_sample_count'}).\
+            reset_index()
+        #sc = so.merge(sc,on=self.cdf.project_columns,how='left').fillna(0)
+        spheno = pd.DataFrame({'phenotype_label':[x.label for x in percentage_logic_list]})
+        spheno['_key'] = 1
+        sc['_key'] = 1
+        sc = sc.merge(spheno,on=['_key']).drop(columns=['_key'])
+
+        sp = self.sample_percentages(percentage_logic_list)
+        # Get measured sample counts
+        msc = sp[['project_id','project_name','sample_id','sample_name','region_label','cumulative_denominator','phenotype_label']].\
+            drop_duplicates()
+        msc = msc.loc[msc['cumulative_denominator']>=self.minimum_denominator_count].drop_duplicates().\
+            groupby(['project_id','project_name','region_label','phenotype_label']).count()[['sample_id']].\
+            reset_index().\
+            rename(columns={'sample_id':'qualified_sample_count'})
+        sc = sc.merge(msc,on=['project_id','project_name','region_label','phenotype_label'],how='left').fillna(0)
+        sc['qualified_sample_count'] = sc['qualified_sample_count'].astype(int)
+
+        pp = sp.groupby(self.cdf.project_columns+['phenotype_label','region_label']).sum()\
+            [['cumulative_numerator','cumulative_denominator']].reset_index()
+        pp['cumulative_percent'] = pp.apply(lambda x: np.nan if x['cumulative_denominator']<self.minimum_denominator_count else 100*x['cumulative_numerator']/x['cumulative_denominator'],1)
+        pp = pp.merge(sc,on=self.cdf.project_columns+['region_label','phenotype_label'])
+        pp['cumulative_numerator'] = pp['cumulative_numerator'].astype(int)
+        pp['cumulative_denominator'] = pp['cumulative_denominator'].astype(int)
+        pp['qualified_cumulative_percent'] = pp['cumulative_denominator'].apply(lambda x: x>=self.minimum_denominator_count)
+
+        return pp
+

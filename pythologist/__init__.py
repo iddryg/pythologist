@@ -360,10 +360,7 @@ class CellDataFrame(pd.DataFrame):
         Returns:
             pandas.DataFrame: Output a dataframe with regions and region sizes
         """
-        mergeon = ['project_id','project_name',
-                'sample_id','sample_name',
-                'frame_id','frame_name',
-                ]
+        mergeon = self.frame_columns
         temp = self.loc[:,mergeon+['regions']].\
             set_index(mergeon)['regions'].apply(json.dumps).\
             reset_index().drop_duplicates()
@@ -378,7 +375,11 @@ class CellDataFrame(pd.DataFrame):
                 rows.append(dict(zip(a,b)))
         rows = pd.DataFrame(rows).drop(columns='regions').\
             drop_duplicates()[mergeon+['region_label','region_area_pixels']]
+        _cnt = self.groupby(self.frame_columns+['region_label']).count()[['cell_index']].reset_index().\
+            rename(columns={'cell_index':'region_cell_count'})
         #rows = rows.loc[rows['region_area_pixels']>0].copy()
+        rows = rows.merge(_cnt,on=self.frame_columns+['region_label'],how='left').fillna(0)
+        rows['region_cell_count'] = rows['region_cell_count'].astype(int)
         return rows
 
     def segmentation_images(self,*args,**kwargs):
@@ -600,8 +601,40 @@ class CellDataFrame(pd.DataFrame):
             _do_fill(x['scored_calls'],pnames)
             ,1)
         return output
-    
 
+    def filter_regions_by_area_pixels(self,region_area_pixels=1):
+        """
+        Strip away regions that dont have a minimum region area in square pixels
+        """
+        def _trim_regions_by_size(d,region_area_pixels):
+            o = d.copy()
+            for k,v in d.items():
+                if v < region_area_pixels:
+                    del o[k]
+            return o
+        output = self.copy()
+        output['regions'] = output['regions'].\
+            apply(lambda x: _trim_regions_by_size(x,region_area_pixels))
+        output = output.loc[output.apply(lambda x: x['region_label'] in x['regions'],1),:]
+        return output
+    
+    def drop_regions(self,region_names):
+        """
+        Take a region name or region names and rop those from the regions
+        """
+        def _trim_regions(d,region_names):
+            o = d.copy()
+            ks = set(o.keys())&set(region_names)
+            for rn in ks:
+                del o[rn]
+            return o
+        if isinstance(region_names,str):
+            region_names = [region_names]
+        output = self.copy()
+        output = output.loc[~output['region_label'].isin(region_names),:]
+        output['regions'] = output['regions'].\
+            apply(lambda x: _trim_regions(x,region_names))
+        return output
 
     def drop_scored_calls(self,names):
         """
