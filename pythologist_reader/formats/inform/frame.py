@@ -72,6 +72,10 @@ class CellFrameInForm(CellFrameGeneric):
                  skip_segmentation_processing=False,
                  dry_run=False,
                  ):
+        """
+        If skip_segmentation_processing is False, cell_area and edge_length will come from the cell_map
+        If skip_segmentation_processing is True, cell_area will come from the cell seg data text file and edge_length will be null, and neighbors wont be present
+        """
         self.verbose = verbose
         self.frame_name = frame_name
         self._dry_run = dry_run

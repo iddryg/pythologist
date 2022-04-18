@@ -79,8 +79,7 @@ class Counts(Measurement):
             rename(columns={'count':'frame_total_count'}).reset_index()
         cnts = cnts.merge(totals,on=mergeon)
         cnts['population_percent'] = cnts.apply(lambda x: np.nan if x['frame_total_count']==0 else 100*x['count']/x['frame_total_count'],1)
-        cnts['area_coverage_fraction'] = cnts.apply(lambda x: np.nan if x['region_area_mm2']==0 else x['cell_area_pixels']/x['region_area_pixels'],1)
-        cnts['area_coverage_percent'] = cnts['area_coverage_fraction'].apply(lambda x: np.nan if x!=x else 100*x)
+        cnts['area_coverage_percent'] = cnts.apply(lambda x: np.nan if x['region_area_pixels'] <  self.minimum_region_size_pixels else 100*x['cell_area_pixels']/x['region_area_pixels'],1)
 
         # make sure regions of size zero have counts of np.nan
         if _apply_filter:
@@ -147,7 +146,8 @@ class Counts(Measurement):
                      x['region_area_pixels'].sum(),
                      x['region_area_mm2'].sum(),
                      x['count'].sum(),
-                     np.nan if x['region_area_mm2'].sum() == 0 else x['count'].sum()/x['region_area_mm2'].sum(),
+                     np.nan if x['region_area_pixels'].sum() < self.minimum_region_size_pixels else x['count'].sum()/x['region_area_mm2'].sum(),
+                     np.nan if x['region_area_pixels'].sum() < self.minimum_region_size_pixels else x['cell_area_pixels'].sum()/x['region_area_pixels'].sum()
                     ]
                 )))
             ).reset_index()
