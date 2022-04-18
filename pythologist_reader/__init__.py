@@ -41,7 +41,7 @@ class CellFrameGeneric(object):
         self.frame_name = None
         self.data_tables = {
         'cells':{'index':'cell_index',            
-                  'columns':['x','y']},
+                  'columns':['x','y','cell_area','edge_length']},
         # Tables for setting measurements
         'cell_measurements':{'index':'measurement_index', 
                              'columns':['cell_index','statistic_index','measurement_feature_index','channel_index','value']},
@@ -84,12 +84,12 @@ class CellFrameGeneric(object):
             'index':'db_id',
             'columns':['mask_label','image_id']
         },
-        'thresholds':{
-            'index':'gate_index',
-            'columns':['threshold_value','statistic_index',
-                       'measurement_feature_index','channel_index',
-                       'region_index']
-        },
+        #'thresholds':{
+        #    'index':'gate_index',
+        #    'columns':['threshold_value','statistic_index',
+        #               'measurement_feature_index','channel_index',
+        #               'region_index']
+        #},
         'cell_tags':{'index':'db_id',            
                      'columns':['tag_index','cell_index']},
         'tags':{'index':'tag_index',
@@ -217,7 +217,7 @@ class CellFrameGeneric(object):
                 if regions_dict[label][y][x] == 1: return label
             return np.nan
             raise ValueError("Coordinate is out of bounds for all regions.")
-        recode = self.get_data('cells').copy()
+        recode = self.get_data('cells')[['x','y']].copy()
         recode['region_index'] = 0
         recode['new_region_label'] = recode.apply(lambda x: get_label(x['x'],x['y'],regions),1)
         ## see how many we need to drop because the centroid fall in an unprocessed region
@@ -366,9 +366,9 @@ class CellFrameGeneric(object):
         im.index.name='db_id'
         self.set_data('cell_interactions',im)
 
-    @property
-    def thresholds(self):
-        raise ValueError('Override this to use it.')
+    #@property
+    #def thresholds(self):
+    #    raise ValueError('Override this to use it.')
 
     def get_channels(self,all=False):
         """
@@ -569,7 +569,11 @@ class CellFrameGeneric(object):
         temp5 = cell_area.merge(edge_length,left_index=True,right_index=True).merge(neighbors,left_index=True,right_index=True,how='left')
         temp5.loc[temp5['neighbors'].isna(),'neighbors'] = temp5.loc[temp5['neighbors'].isna(),'neighbors'].apply(lambda x: {}) # these are ones we actuall have measured
 
-        temp1 = temp1.merge(temp5,left_index=True,right_index=True,how='left')
+        # If we DO have cell_map, merge in
+        if self.cell_map() is not None:
+            temp1 = temp1.drop(columns=['cell_area','edge_length']).merge(temp5,left_index=True,right_index=True,how='left')
+        else:
+            temp1 = temp1.merge(temp5.drop(columns=['cell_area','edge_length']),left_index=True,right_index=True,how='left')
         temp1.loc[temp1['neighbors'].isna(),'neighbors'] = np.nan # These we were not able to measure
 
 

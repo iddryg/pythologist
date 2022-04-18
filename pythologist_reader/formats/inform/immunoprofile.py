@@ -1,7 +1,7 @@
 from pythologist_reader.formats.inform.frame import CellFrameInForm, preliminary_threshold_read
 from pythologist_reader.formats.inform.sets import CellSampleInForm, CellProjectInForm
 from pythologist_reader.formats.inform.custom import CellFrameInFormLineArea, CellFrameInFormCustomMask
-import os, re, sys
+import os, re, sys, json
 from tempfile import mkdtemp
 from glob import glob
 from shutil import copytree, copy, rmtree
@@ -17,7 +17,9 @@ class CellProjectInFormImmunoProfile(CellProjectInForm):
     def __init__(self,*argv,**kwargs):
         super().__init__(*argv,**kwargs)
         # if we are creating a new project go ahead and give a default name until otherwise set
-        if kwargs['mode']=='w': self.project_name = 'ImmunoProfile'
+        if kwargs['mode']=='w': 
+            self.project_name = 'ImmunoProfile'
+            self.microns_per_pixel = 0.496
         return
 
     def create_cell_sample_class(self):
@@ -25,25 +27,18 @@ class CellProjectInFormImmunoProfile(CellProjectInForm):
 
     def add_sample_path(self,path,
                       sample_name=None,
-                      export_names = ['FOXP3','PD1_PDL1'],
-                      channel_abbreviations={
-                                     'PD-L1 (Opal 520)':'PDL1',
-                                     'Foxp3 (Opal 570)':'FOXP3',
-                                     'PD-1 (Opal 620)':'PD1'},
                       verbose=False,
-                      microns_per_pixel=0.496,
                       invasive_margin_width_microns=40,
                       invasive_margin_drawn_line_width_pixels=10,
-                      skip_margin=False,
-                      skip_segmentation_processing=False,
-                      skip_all_regions=False,
-                      deidentify=False,
-                      **kwargs):
+                      tumor_stain_name=None,
+                      tumor_phenotype_name=None,
+                      skip_segmentation_processing=True
+                      ):
         """
         Read add a sample in as single project folder and add it to the CellProjectInFormImmunoProfile
 
 
-        such as ``IP-99-A00001``:
+        such as ``IP-99-A00001/INFORM_ANALYSIS``:
 
         | IP-99-A00001/
         | └── INFORM_ANALYSIS
@@ -73,19 +68,20 @@ class CellProjectInFormImmunoProfile(CellProjectInForm):
 
 
         # fix the margin width
-        grow_margin_steps = int(invasive_margin_width_microns/microns_per_pixel-invasive_margin_drawn_line_width_pixels/2)
+        grow_margin_steps = round(float(invasive_margin_width_microns)/self.microns_per_pixel-float(invasive_margin_drawn_line_width_pixels)/2)
         if verbose: sys.stderr.write("To reach a margin width in each direction of "+str(invasive_margin_width_microns)+"um we will grow the line by "+str(grow_margin_steps)+" pixels\n")
 
 
-        if microns_per_pixel is not None: self.microns_per_pixel = microns_per_pixel
+        #if microns_per_pixel is not None: self.microns_per_pixel = microns_per_pixel
         if verbose: sys.stderr.write("microns_per_pixel "+str(self.microns_per_pixel)+"\n")
 
         # read all terminal folders as sample_names unless there is none then the sample name is blank
         abspath = os.path.abspath(path)
         if not os.path.isdir(abspath): raise ValueError("Error project path must be a directory")
-        if len(os.path.split(abspath)) < 2: raise ValueError("expecting an IP path structure")
-        bpath1 = os.path.join(abspath,'INFORM_ANALYSIS')
-        if not os.path.isdir(bpath1): raise ValueError("expecting an INFORM_ANLAYSIS directory as a child directory of IP path")
+        if os.path.split(abspath)[-1] != 'INFORM_ANALYSIS': raise ValueError("expecting an INFORM_ANALYSIS directory")
+        #if len(os.path.split(abspath)) < 2: raise ValueError("expecting an IP path structure")
+        #bpath1 = os.path.join(abspath,'INFORM_ANALYSIS')
+        #if not os.path.isdir(bpath1): raise ValueError("expecting an INFORM_ANLAYSIS directory as a child directory of IP path")
 
 
         #if autodectect_tumor:
@@ -105,24 +101,20 @@ class CellProjectInFormImmunoProfile(CellProjectInForm):
 
         if verbose: sys.stderr.write("Reading sample "+path+" for sample "+sample_name+"\n")
 
-        errors,warnings = _light_QC(path,export_names,verbose)
-        if len(errors) > 0:
-            raise ValueError("====== ! Fatal errors encountered in light QC ======\n\n"+"\n".join(errors))
+        #errors,warnings = _light_QC(path,export_names,verbose)
+        #if len(errors) > 0:
+        #    raise ValueError("====== ! Fatal errors encountered in light QC ======\n\n"+"\n".join(errors))
 
         # Read in one sample FOR this project
         cellsample = self.create_cell_sample_class()
         cellsample.read_path(path,sample_name=sample_name,
-                                  channel_abbreviations=channel_abbreviations,
-                                  verbose=verbose,
-                                  require=True,
-                                  require_score=True,
-                                  skip_segmentation_processing=skip_segmentation_processing,
-                                  export_names=export_names,
-                                  deidentify=deidentify,
-                                  steps = grow_margin_steps,
+                            tumor_stain_name=tumor_stain_name,
+                            tumor_phenotype_name=tumor_phenotype_name,
+                            verbose=verbose,
+                            steps=grow_margin_steps,
+                            skip_segmentation_processing=skip_segmentation_processing
                                   )
 
-        if deidentify: cellsample.sample_name = cellsample.id
         # Save the sample TO this project
         cellsample.to_hdf(self.h5path,location='samples/'+cellsample.id,mode='a')
         current = self.key
@@ -249,123 +241,188 @@ def _light_QC(path,export_names,verbose):
 class CellSampleInFormImmunoProfile(CellSampleInForm):
     def create_cell_frame_class(self):
         return CellFrameInFormLineArea() # this will be called when we read the HDF
-    def create_cell_frame_class_line_area(self):
-        return CellFrameInFormLineArea()
-    def create_cell_frame_class_custom_mask(self):
-        return CellFrameInFormCustomMask()
+    #def create_cell_frame_class_line_area(self):
+    #    return CellFrameInFormLineArea()
+    #def create_cell_frame_class_custom_mask(self):
+    #    return CellFrameInFormCustomMask()
     def read_path(self,path,sample_name=None,
-                            channel_abbreviations=None,
+                            tumor_stain_name=None,
+                            tumor_phenotype_name=None,
                             verbose=False,
-                            require=True,
-                            require_score=True,
                             steps=76,
-                            skip_margin=False,
-                            skip_segmentation_processing=False,
-                            skip_all_regions=False,
-                            export_names=[],
-                            deidentify=False):
-        if len(export_names)==0: raise ValueError("You need to know the names of the export(s)")
+                            skip_segmentation_processing=True
+                ):
         if sample_name is None: sample_name = path
         if not os.path.isdir(path):
             raise ValueError('Path input must be a directory')
+        if tumor_stain_name is None or tumor_phenotype_name is None:
+            raise ValueError("tumor_stain_name and tumor_phenotype_name must be set")
         absdir = os.path.abspath(path)
-        exportdir = os.path.join(absdir,'INFORM_ANALYSIS',export_names[0])
-        files = os.listdir(exportdir)
-        segs = [x for x in files if re.search('_cell_seg_data.txt$',x)]
-        if len(segs) == 0: raise ValueError("There needs to be cell_seg_data in the folder.")
+
+
+        frame_prefixes = []
+        for _file in glob(os.path.join(path,'PD1_PDL1')+'/*_cell_seg_data.txt'):
+            _temp,_prefix = os.path.split(re.match('(.+)_cell_seg_data.txt',_file).group(1))
+            frame_prefixes.append(_prefix)
+
         frames = []
-        if skip_margin and verbose: sys.stderr.write("FORCE SKIP ANY MARGIN FILES.. Tumor and Stroma Only\n")
-        if skip_all_regions and verbose: sys.stderr.write("FORCE SKIP ALL REGION ANNOTATIONS .. Processed image will be annotated as a region 'Any'\n")
-        for file in segs:
-            m = re.match('(.*)cell_seg_data.txt$',file)
-            score = os.path.join(exportdir,m.group(1)+'score_data.txt')
-            #summary = os.path.join(path,m.group(1)+'cell_seg_data_summary.txt')
-            parent = os.path.split(exportdir)[0]
-            #print(path)
-            binary_seg_maps = os.path.join(exportdir,m.group(1)+'binary_seg_maps.tif')
-            component_image = os.path.join(exportdir,m.group(1)+'component_data.tif')
-            tfile = os.path.join(exportdir,m.group(1)+'tissue_seg_data.txt')
-            tumor = os.path.join(parent,'GIMP',m.group(1)+'Tumor.tif')
-            margin = os.path.join(parent,'GIMP',m.group(1)+'Invasive_Margin.tif')
-            tissue_seg_data = tfile if os.path.exists(tfile) else None
-            frame = m.group(1).rstrip('_')
-            data = os.path.join(exportdir,file)
-            if not os.path.exists(score):
-                    raise ValueError('Missing score file '+score)
-            if verbose: sys.stderr.write('Acquiring frame '+data+"\n")
-
-            ### This is the part where we actually read in a frame
-
-            cid = None
-            if os.path.exists(margin) and not skip_margin and not skip_all_regions:
-                if verbose: sys.stderr.write("LINE AREA TYPE\n")
-                cid = self.create_cell_frame_class_line_area()
-                cid.read_raw(frame_name = frame,
-                             cell_seg_data_file=data,
-                             score_data_file=score,
-                             tissue_seg_data_file=tissue_seg_data,
-                             binary_seg_image_file=binary_seg_maps,
-                             component_image_file=component_image,
-                             channel_abbreviations=channel_abbreviations,
+        for _frame_prefix in sorted(frame_prefixes):
+            if verbose:
+                sys.stderr.write("--- reading frame: "+str(_frame_prefix)+"\n")
+            cid = _read_path(path,
+                             _frame_prefix,
+                             get_strat_dict(tumor_stain_name,tumor_phenotype_name),
+                             steps=steps,
                              verbose=verbose,
-                             require=require,
-                             require_score=require_score,
-                             skip_segmentation_processing=skip_segmentation_processing)
-                #print(cid)
-                update_with_other_scores(cid,parent,m.group(1),export_names[1:])
-                if verbose: sys.stderr.write("growing margin by "+str(steps)+" steps\n")
-                if not skip_all_regions: cid.set_line_area(margin,tumor,steps=steps,verbose=verbose)
-            else:
-                if verbose: sys.stderr.write("TUMOR MASK ONLY TYPE\n")
-                cid = self.create_cell_frame_class_custom_mask()
-                cid.read_raw(frame_name = frame,
-                         cell_seg_data_file=data,
-                         score_data_file=score,
-                         tissue_seg_data_file=tissue_seg_data,
-                         binary_seg_image_file=binary_seg_maps,
-                         component_image_file=component_image,
-                         channel_abbreviations=channel_abbreviations,
-                         verbose=verbose,
-                         require=require,
-                         require_score=require_score,
-                         skip_segmentation_processing=skip_segmentation_processing)
-                #print(cid)
-                # Must update the score file before refactoring regions
-                update_with_other_scores(cid,parent,m.group(1),export_names[1:])
-                stroma_name = 'Stroma-No-Margin'
-                if os.path.exists(margin) and skip_margin: stroma_name = 'Stroma-Ignore-Margin'
-                if not skip_all_regions: cid.set_area(tumor,'Tumor',stroma_name,verbose=verbose)
-
-            if deidentify: cid.frame_name = cid.id
-
-            #### Now we have read in a frame and we add it to the table keeping track of frames
-
+                             skip_segmentation_processing=skip_segmentation_processing
+                             )
             frame_id = cid.id
             self._frames[frame_id]=cid
-            frames.append({'frame_id':frame_id,'frame_name':frame,'frame_path':absdir})
+            frames.append({'frame_id':frame_id,'frame_name':_frame_prefix,'frame_path':path})
             if verbose: sys.stderr.write("finished tumor and stroma and margin\n")
         self._key = pd.DataFrame(frames)
         self._key.index.name = 'db_id'
         self.sample_name = sample_name
 
-def update_with_other_scores(frame, parent, file_prefix, alt_folders):
-    # Now lets look for additional scores for this frame
-    for altfolder in alt_folders:
-        # see if there is an approrpriate score in this
-        altpath = os.path.join(parent,altfolder,file_prefix+'score_data.txt')
-        if not os.path.exists(altpath): 
-                    if verbose: sys.stderr.write("WARNING: Missing a score file in the alternate folder "+str(altpath)+"\n")
-                    continue
-        # If we are still here we have a score file
-        # This part is a little hacky .. we are going to bring a function from an CellFrameInForm just so we can use its "preliminary_threshold_read" function
-        altscore = preliminary_threshold_read(altpath, frame.get_data('measurement_statistics'), 
-                                                       frame.get_data('measurement_features'), 
-                                                       frame.get_data('measurement_channels'), 
-                                                       frame.get_data('regions')).reset_index().copy()
-        current_max = max(frame.get_data('thresholds').index)
-        altscore['gate_index'] = altscore['gate_index'].apply(lambda x: x+current_max+1)
-        newscore = pd.concat([frame.get_data('thresholds').reset_index(),altscore],sort=True).set_index('gate_index')
-        frame.set_data('thresholds',newscore)
-    return
+
+def get_strat_dict(tumor_stain_name,tumor_phenotype_name):
+    """
+    i.e. Cytokeratin (Opal 690), and CYTOKERATIN
+    """
+    strat = {
+    "mutually_exclusive_phenotype_strategies":[
+        {
+            "phenotype_list":[
+                {
+                    "assigned_label":"CD8"
+                },
+                {
+                    "assigned_label":tumor_phenotype_name,
+                    "label":"TUMOR"
+                },
+                {
+                    "assigned_label":"OTHER"
+                }
+            ]
+        },
+    ],
+    "channels":[
+        {
+            "inform_channel_label":"PD-1 (Opal 620)",
+            "label":"PD1"
+        },
+        {
+            "inform_channel_label":"PD-L1 (Opal 520)",
+            "label":"PDL1"
+        },
+        {
+            "inform_channel_label": "DAPI",
+            "label":"DAPI"
+        },
+        {
+            "inform_channel_label": "CD8 (Opal 480)",
+            "label":"CD8"
+        },
+        {
+            "inform_channel_label": "Foxp3 (Opal 570)",
+            "label":"FOXP3"
+        },
+        {
+            "inform_channel_label": tumor_stain_name,
+            "label":"TUMOR"
+        },
+        {
+            "inform_channel_label": "CD68 (Opal 780)",
+            "label":"CD68"
+        }
+    ]
+    }
+    def _deepcopy(d):
+        return json.loads(json.dumps(d))
+    strat_dict = {}
+    strat_dict['PD1_PDL1'] = _deepcopy(strat)
+    strat_dict['FOXP3'] = _deepcopy(strat)
+
+    for x in strat_dict['PD1_PDL1']['channels']:
+        if x['label'] in ["PD1","PDL1"]:
+            x['analyze_threshold'] = True
+
+    for x in strat_dict['FOXP3']['channels']:
+        if x['label'] in ["FOXP3"]:
+            x['analyze_threshold'] = True
+    return strat_dict
+
+def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,skip_segmentation_processing=False):
+    if verbose: sys.stderr.write("Processing export: "+str(export_name)+"\n")
+    cfi = CellFrameInFormLineArea()
+    _export_prefix = os.path.join(path,export_name,frame_name)
+    cfi.read_raw(
+        frame_name = frame_name,
+        cell_seg_data_file = _export_prefix+'_cell_seg_data.txt',
+        score_data_file = _export_prefix+'_score_data.txt',
+        binary_seg_image_file = _export_prefix+'_binary_seg_maps.tif',
+        #component_image_file = base_path+'component_data.tif',
+        inform_analysis_dict = strat_dict[export_name],
+        verbose = verbose,
+        require_component = False,
+        require_score = True,
+        dry_run = False,
+        skip_segmentation_processing=skip_segmentation_processing
+    )
+    cfi.set_line_area(
+        os.path.join(path,'GIMP',frame_name+'_Invasive_Margin.tif'),
+        os.path.join(path,'GIMP',frame_name+'_Tumor.tif'),
+        steps = steps,
+        verbose = verbose
+    )
+    cfi.microns_per_pixel = 0.496
+    return cfi
+
+def _read_path(path,frame_name,strat_dict,steps=76,verbose=False,skip_segmentation_processing=False):
+    _mutually_exclusive_phenotypes = ['CD8','TUMOR','OTHER']
+    _e1 = _read_export(path,frame_name,'PD1_PDL1',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing)
+    _e2 = _read_export(path,frame_name,'FOXP3',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing)
+
+    # get the feature tables from FOXP3
+    _features = _e2.get_data('features')
+    _features = _features.loc[_features['feature_label']=='FOXP3',:]
+    _features_index = _features.iloc[0].name
+    _feature_definitions = _e2.get_data('feature_definitions')
+    _feature_definitions = _feature_definitions.loc[_feature_definitions['feature_index']==_features_index,:] 
+    _feature_definitions_indecies = [x for x in _feature_definitions.index]
+    _cell_features = _e2.get_data('cell_features')
+    _cell_features = _cell_features.loc[_cell_features['feature_definition_index'].isin(_feature_definitions_indecies),:]
+    _t2 = _features.merge(_feature_definitions,left_index=True,right_on='feature_index').\
+       merge(_cell_features,left_index=True,right_on='feature_definition_index',)
+
+    # get the maximum feature indecies from PD1_PDL1
+    features_iter = _e1.get_data('features').index.max()+1
+    feature_definitions_iter = _e1.get_data('feature_definitions').index.max()+1
+    cell_features_iter = _e1.get_data('cell_features').index.max()+1
+
+    # make a big table
+    _t3 = _t2.copy().reset_index()
+    _t3['feature_index'] = _t3['feature_index'].apply(lambda x: x+features_iter)
+    _t3['feature_definition_index'] = _t3['feature_definition_index'].apply(lambda x: x+feature_definitions_iter)
+    _t3['db_id'] = _t3['db_id'].apply(lambda x: x+cell_features_iter)
+
+    # shift indecies so we can merge features
+    _cf = _t3[_cell_features.reset_index().columns].set_index('db_id')
+    _fd = _t3[_feature_definitions.reset_index().columns].drop_duplicates().\
+        set_index('feature_definition_index')
+    _fs = _t3[_features.reset_index().columns].drop_duplicates().\
+        set_index('feature_index')
+
+    # merge our tables
+    _e1.set_data('cell_features',pd.concat([_e1.get_data('cell_features'),_cf]))
+    _e1.set_data('feature_definitions',pd.concat([_e1.get_data('feature_definitions'),_fd]))
+    _e1.set_data('features',pd.concat([_e1.get_data('features'),_fs]))
+    return _e1
 
 
+    #_cdf1 = _e1.cdf(region_group='InFormLineArea',mutually_exclusive_phenotypes=_mutually_exclusive_phenotypes)
+    #_cdf2 = _e2.cdf(region_group='InFormLineArea',mutually_exclusive_phenotypes=_mutually_exclusive_phenotypes)
+    #_cdf, _f = _cdf1.merge_scores(_cdf2)
+    #if _f.shape[0] > 0:
+    #    raise ValueError("Mismatched segmentation of size: "+str(_f.shape[0]))
+    #return _cdf

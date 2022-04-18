@@ -1,4 +1,4 @@
-import os, re, json, sys
+import os, re, json, sys, math
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
@@ -210,11 +210,16 @@ class CellFrameInForm(CellFrameGeneric):
 
         ##########
         # Set the cells
-        _cells = _seg.loc[:,['Cell ID','Cell X Position','Cell Y Position']].\
+        _cells = _seg.loc[:,['Cell ID','Cell X Position','Cell Y Position','Entire Cell Area (pixels)']].\
                               rename(columns={'Cell ID':'cell_index',
                                               'Cell X Position':'x',
-                                              'Cell Y Position':'y'})
-        _cells = _cells.applymap(int).set_index('cell_index')
+                                              'Cell Y Position':'y',
+                                              'Entire Cell Area (pixels)':'cell_area'})
+        _cells['edge_length'] = np.nan #_cells['cell_area'].apply(lambda x: math.ceil(2*math.sqrt(math.pi*float(x))))
+        _cells = _cells.set_index('cell_index')
+        _cells['x'] = _cells['x'].astype(int)
+        _cells['y'] = _cells['y'].astype(int)
+        _cells['cell_area'] = _cells['cell_area'].astype(int)
 
         
         pheno_columns = [x for x in _seg.columns if 'Phenotype-' in x]
@@ -292,15 +297,15 @@ class CellFrameInForm(CellFrameGeneric):
                                                  self.get_data('measurement_channels'), 
                                                  self.get_data('regions'))
             if self.verbose: sys.stderr.write("Finished reading score.\n")
-            self.set_data('thresholds',_thresholds)
+            #self.set_data('thresholds',_thresholds)
 
             ### Take a greedy thresholds
-            _thresholds = self.get_data('thresholds').groupby(['channel_index']).first().\
-                reset_index()
-            _thresholds.index.name = 'gate_index'
+            #_thresholds = self.get_data('thresholds').groupby(['channel_index']).first().\
+            #    reset_index()
+            #_thresholds.index.name = 'gate_index'
             _any_region_index = self.get_data('regions').reset_index().set_index('region_label').loc['Any']['region_index']
-            _thresholds['region_index'] = _any_region_index
-            self.set_data('thresholds',_thresholds)
+            #_thresholds['region_index'] = _any_region_index
+            #self.set_data('thresholds',_thresholds)
 
             # set the cell regions
             _cr = self.get_data('cell_regions').copy()
