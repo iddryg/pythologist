@@ -272,7 +272,7 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
             'path':path,
             'strat_dict':strat_dict,
             'steps':steps,
-            'verbose':verbose,
+            'verbose':verbose if processes==1 else False,
             'skip_segmentation_processing':skip_segmentation_processing,
             'gimp_repositioned':gimp_repositioned
         }
@@ -286,7 +286,7 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
             with Pool(processes=processes) as pool:
                 cids = [x for x in pool.imap(_read_path2,frame_args)]
         else:
-            cids = [_read_path(**x) for x in frame_args]
+            cids = [_read_path2(x) for x in frame_args]
         for i,cid in enumerate(cids):
             frame_id = cid.id
             self._frames[frame_id]=cid
@@ -359,11 +359,17 @@ def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,s
     cfi.microns_per_pixel = 0.496
     return cfi
 def _read_path2(argdict):
-    return _read_path(**argdict)
+    if argdict['verbose']:
+        sys.stderr.write("===== starting frame "+argdict['frame_name']+"\n")
+    v = _read_path(**argdict)
+    if argdict['verbose']:
+        sys.stderr.write("------- ending frame "+argdict['frame_name']+"\n")
+    return v
+
 
 def _read_path(path=None,frame_name=None,strat_dict=None,steps=76,verbose=False,skip_segmentation_processing=True,gimp_repositioned=False):
-    if verbose:
-        sys.stderr.write("--- running frame: "+str(frame_name)+"\n")
+    #if verbose:
+    #    sys.stderr.write("--- running frame: "+str(frame_name)+"\n")
     _mutually_exclusive_phenotypes = ['CD8','TUMOR','OTHER']
     # Make separate dicts for each export
     _e1 = _read_export(path,frame_name,'PD1_PDL1',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing,gimp_repositioned=gimp_repositioned)
