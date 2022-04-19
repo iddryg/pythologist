@@ -272,7 +272,7 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
             'path':path,
             'strat_dict':strat_dict,
             'steps':steps,
-            'verbose':verbose if processes==1 else False,
+            'verbose':verbose,
             'skip_segmentation_processing':skip_segmentation_processing,
             'gimp_repositioned':gimp_repositioned
         }
@@ -284,9 +284,9 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
         cids = None
         if processes>1:
             with Pool(processes=processes) as pool:
-                cids = [x for x in pool.imap(_read_path2,frame_args)]
+                cids = [x for x in pool.imap(_read_path_MULTITHREAD,frame_args)]
         else:
-            cids = [_read_path2(x) for x in frame_args]
+            cids = [_read_path_SINGLETHREAD(x) for x in frame_args]
         for i,cid in enumerate(cids):
             frame_id = cid.id
             self._frames[frame_id]=cid
@@ -358,12 +358,27 @@ def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,s
     )
     cfi.microns_per_pixel = 0.496
     return cfi
-def _read_path2(argdict):
-    if argdict['verbose']:
+def _read_path_MULTITHREAD(argdict):
+    verbose = argdict['verbose']
+    if verbose:
         sys.stderr.write("===== starting frame "+argdict['frame_name']+"\n")
+        sys.stderr.flush()
+    argdict['verbose'] = False
     v = _read_path(**argdict)
-    if argdict['verbose']:
+    if verbose:
         sys.stderr.write("------- ending frame "+argdict['frame_name']+"\n")
+        sys.stderr.flush()
+    return v
+
+def _read_path_SINGLETHREAD(argdict):
+    verbose = argdict['verbose']
+    if verbose:
+        sys.stderr.write("===== starting frame "+argdict['frame_name']+"\n")
+        sys.stderr.flush()
+    v = _read_path(**argdict)
+    if verbose:
+        sys.stderr.write("------- ending frame "+argdict['frame_name']+"\n")
+        sys.stderr.flush()
     return v
 
 
