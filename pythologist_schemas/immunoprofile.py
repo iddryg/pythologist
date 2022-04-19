@@ -16,6 +16,7 @@ def execute_immunoprofile_extraction(
     invasive_margin_width_microns = 40,
     invasive_margin_drawn_line_width_pixels = 10,
     processes = 1,
+    gimp_repositioned = False,
     verbose=False
     ):
     """
@@ -33,7 +34,8 @@ def execute_immunoprofile_extraction(
               verbose=verbose,
               steps=round((invasive_margin_width_microns/microns_per_pixel)-(invasive_margin_drawn_line_width_pixels/2)),
               processes=processes,
-              skip_segmentation_processing=True
+              skip_segmentation_processing=True,
+              gimp_repositioned=gimp_repositioned
             )
 
     # make the cell dataframe

@@ -249,6 +249,7 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
                             verbose=False,
                             steps=76,
                             skip_segmentation_processing=True,
+                            gimp_repositioned=False,
                             processes=1,
                 ):
         if sample_name is None: sample_name = path
@@ -272,7 +273,8 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
             'strat_dict':strat_dict,
             'steps':steps,
             'verbose':verbose,
-            'skip_segmentation_processing':skip_segmentation_processing
+            'skip_segmentation_processing':skip_segmentation_processing,
+            'gimp_repositioned':gimp_repositioned
         }
         frame_args = []
         for x in sorted(frame_prefixes):
@@ -326,7 +328,7 @@ def get_strat_dict(panel_name,panel_version,panels):
     return {'PD1_PDL1':s1,'FOXP3':s2}
 
 
-def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,skip_segmentation_processing=True):
+def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,skip_segmentation_processing=True,gimp_repositioned=False):
     if verbose: sys.stderr.write("Processing export: "+str(export_name)+"\n")
     cfi = CellFrameInFormLineArea()
     _export_prefix = os.path.join(path,export_name,frame_name)
@@ -343,9 +345,14 @@ def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,s
         dry_run = False,
         skip_segmentation_processing=skip_segmentation_processing
     )
+    path1 = os.path.join(path,'GIMP',frame_name+'_Invasive_Margin.tif')
+    path2 = os.path.join(path,'GIMP',frame_name+'_Tumor.tif')
+    if gimp_repositioned:
+        path1 = os.path.join(path,'FOXP3',frame_name+'_Invasive_Margin.tif')
+        path2 = os.path.join(path,'FOXP3',frame_name+'_Tumor.tif')
     cfi.set_line_area(
-        os.path.join(path,'GIMP',frame_name+'_Invasive_Margin.tif'),
-        os.path.join(path,'GIMP',frame_name+'_Tumor.tif'),
+        path1,
+        path2,
         steps = steps,
         verbose = verbose
     )
@@ -354,11 +361,11 @@ def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,s
 def _read_path2(argdict):
     return _read_path(**argdict)
 
-def _read_path(path=None,frame_name=None,strat_dict=None,steps=76,verbose=False,skip_segmentation_processing=True):
+def _read_path(path=None,frame_name=None,strat_dict=None,steps=76,verbose=False,skip_segmentation_processing=True,gimp_repositioned=False):
     if verbose:
         sys.stderr.write("--- running frame: "+str(frame_name)+"\n")
     _mutually_exclusive_phenotypes = ['CD8','TUMOR','OTHER']
     # Make separate dicts for each export
-    _e1 = _read_export(path,frame_name,'PD1_PDL1',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing)
-    _e2 = _read_export(path,frame_name,'FOXP3',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing)
+    _e1 = _read_export(path,frame_name,'PD1_PDL1',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing,gimp_repositioned=gimp_repositioned)
+    _e2 = _read_export(path,frame_name,'FOXP3',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing,gimp_repositioned=gimp_repositioned)
     return _e1.import_cell_features(_e2,['FOXP3'])
