@@ -26,13 +26,17 @@ def execute_immunoprofile_extraction(
     reports = json.loads(open(report_source,'r').read())
     # read in the data
     csi = CellSampleInFormImmunoProfile()
+
+    step_size = round((invasive_margin_width_microns/microns_per_pixel)-(invasive_margin_drawn_line_width_pixels/2))
+    if verbose:
+        sys.stderr.write("Step size for watershed: "+str(step_size)+"\n")
     csi.read_path(path=path,
               sample_name=sample_name,
               panel_name=panel_name,
               panel_version=panel_version,
               panels=panels,
               verbose=verbose,
-              steps=round((invasive_margin_width_microns/microns_per_pixel)-(invasive_margin_drawn_line_width_pixels/2)),
+              steps=step_size,
               processes=processes,
               skip_segmentation_processing=True,
               gimp_repositioned=gimp_repositioned
