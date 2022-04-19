@@ -45,11 +45,16 @@ def execute_immunoprofile_extraction(
     # make the cell dataframe
     cdf = csi.cdf(region_group='InFormLineArea',
               mutually_exclusive_phenotypes=panels[panel_name][panel_version]['phenotypes']).\
-    drop_regions(['Undefined','OuterStroma']).filter_regions_by_area_pixels()
+    drop_regions(['Undefined','OuterStroma'])#.filter_regions_by_area_pixels()
     cdf.microns_per_pixel = microns_per_pixel
 
     regions = {}
     # Drop everything except the region we are using in each one
+    #included_margin = []
+    #if 'InnerMargin' in cdf.regions:
+    #    included_margin += ['InnerMargin']
+    #if 'Margin' in cdf.regions:
+    #    included_margin += ['InnerMargin']
     regions['Tumor + Invasive Margin'] = cdf.\
         combine_regions(['InnerMargin', 'InnerTumor', 'OuterMargin'],'Tumor + Invasive Margin')
     regions['Invasive Margin'] = cdf.\
