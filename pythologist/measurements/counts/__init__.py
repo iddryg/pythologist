@@ -83,7 +83,7 @@ class Counts(Measurement):
 
         # make sure regions of size zero have counts of np.nan
         if _apply_filter:
-            cnts.loc[cnts['frame_total_count']<self.minimum_denominator_count,['fraction','percent']] = np.nan
+            cnts.loc[cnts['frame_total_count']<self.minimum_denominator_count,['fraction_total_count','population_percent']] = np.nan
             cnts.loc[cnts['region_area_pixels']<self.minimum_region_size_pixels,['density_mm2']] = np.nan
         # Deal with the percents if we are measuring them
 

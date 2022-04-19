@@ -6,9 +6,9 @@ import json
 def execute_immunoprofile_extraction(
     path,
     sample_name,
-    panels,
-    reports,
+    panel_source,
     panel_name,
+    report_source,
     panel_version,
     report_name,
     report_version,
@@ -18,8 +18,11 @@ def execute_immunoprofile_extraction(
     processes = 1,
     verbose=False
     ):
-
-
+    """
+    Perform the functionality of ipiris
+    """
+    panels = json.loads(open(panel_source,'r').read())
+    reports = json.loads(open(report_source,'r').read())
     # read in the data
     csi = CellSampleInFormImmunoProfile()
     csi.read_path(path=path,
@@ -29,7 +32,8 @@ def execute_immunoprofile_extraction(
               panels=panels,
               verbose=verbose,
               steps=round((invasive_margin_width_microns/microns_per_pixel)-(invasive_margin_drawn_line_width_pixels/2)),
-              processes=processes
+              processes=processes,
+              skip_segmentation_processing=True
             )
 
     # make the cell dataframe
@@ -53,13 +57,16 @@ def execute_immunoprofile_extraction(
         drop_regions(['OuterMargin'])
 
     # Now read through and build the report
-    count_densities = []
-    count_percentages = []
-    count_areas = []
+    sample_count_densities = []
+    sample_count_percentages = []
+
+    frame_count_densities = []
+    frame_count_percentages = []
 
     # reconstruct the ugly R report
     report = []
 
+    report_format = reports[report_name][report_version]
     for _row_number, _report_row in enumerate(report_format['report_rows']):
         orow = _report_row.copy()
         orow['row_number'] = _row_number + 1
@@ -88,32 +95,43 @@ def execute_immunoprofile_extraction(
     
         # now extract features
         if _report_row['test'] == 'Count Density':
-            _scnts = _counts.\
-            sample_counts(SL(phenotypes=[_report_row['phenotype']],
-                             label=_report_row['biomarker_label']))\
-            [['sample_name',
-              'region_label',
-              'phenotype_label',
-              'mean_density_mm2',
-              'stderr_density_mm2',
-              'stddev_density_mm2',
-              'frame_count',
-              'measured_frame_count',
-             ]].\
-            rename(columns={'mean_density_mm2':'count_density',
-                            'stderr_density_mm2':'standard_error',
-                            'stddev_density_mm2':'standard_deviation',
-                            'measured_frame_count':'measured_count'
-                           })
-            count_densities.append(_scnts)
+            _pop1 = [SL(phenotypes=[_report_row['phenotype']],
+                       label=_report_row['biomarker_label'])]
+            _scnts = _counts.sample_counts(_pop1)
+            _fcnts = _counts.frame_counts(_pop1)
+            _scnts['row_number'] = orow['row_number']
+            _fcnts['row_number'] = orow['row_number']
+            sample_count_densities.append(_scnts)
+            frame_count_densities.append(_fcnts)
+            _scnts = _scnts\
+                [['sample_name',
+                  'region_label',
+                  'phenotype_label',
+                  'mean_density_mm2',
+                  'stderr_density_mm2',
+                  'stddev_density_mm2',
+                  'frame_count',
+                  'measured_frame_count',
+                ]].\
+                rename(columns={'mean_density_mm2':'count_density',
+                                'stderr_density_mm2':'standard_error',
+                                'stddev_density_mm2':'standard_deviation',
+                                'measured_frame_count':'measured_count'
+                               })
             odata = _scnts.iloc[0].to_dict()
         if _report_row['test'] == 'Percent Population':
-            _spcts = _counts.\
-            sample_percentages([PL(numerator=SL(phenotypes=_report_row['numerator_phenotypes']),
-                                   denominator=SL(phenotypes=_report_row['denominator_phenotypes']),
-                                   label = _report_row['biomarker_label']
-                                 )
-                               ])\
+            _pop2 = [PL(numerator=SL(phenotypes=_report_row['numerator_phenotypes']),
+                        denominator=SL(phenotypes=_report_row['denominator_phenotypes']),
+                        label = _report_row['biomarker_label']
+                       )
+                    ]
+            _spcts = _counts.sample_percentages(_pop2)
+            _fpcts = _counts.frame_percentages(_pop2)
+            _spcts['row_number'] = orow['row_number']
+            _fpcts['row_number'] = orow['row_number']
+            sample_count_percentages.append(_spcts)
+            frame_count_percentages.append(_fpcts)
+            _spcts = _spcts\
             [['sample_name',
               'region_label',
               'phenotype_label',
@@ -142,29 +160,30 @@ def execute_immunoprofile_extraction(
             _spcts['cumulative_fraction'] = _spcts['cumulative_percent'].\
                 apply(lambda x: np.nan if x!=x else x/100)
             odata = _spcts.iloc[0].to_dict()
-            count_percentages.append(_spcts)
         if _report_row['test'] == 'Population Area':
-            _sarea = _counts.\
-            sample_counts(SL(phenotypes=[_report_row['phenotype']],
-                             label=_report_row['biomarker_label']))\
-            [['sample_name',
-              'region_label',
-              'phenotype_label',
-              'cumulative_area_coverage_percent',
-              'cumulative_region_area_pixels',
-              'cumulative_cell_area_pixels',
-              'frame_count',
-              'mean_area_coverage_percent',
-              'stderr_area_coverage_percent',
-              'stddev_area_coverage_percent'
-             ]].rename(columns={
-            'cumulative_cell_area_pixels':'area',
-            'cumulative_region_area_pixels':'total_area',
-            'cumulative_area_coverage_percent':'cumulative_coverage_percent',
-            'mean_area_coverage_percent':'mean_coverage_percent',
-            'stderr_area_coverage_percent':'stderr_coverage_percent',
-            'stddev_area_coverage_percent':'stddev_coverage_percent'
-            })
+            _pop3 = [SL(phenotypes=[_report_row['phenotype']],
+                        label=_report_row['biomarker_label'])]
+            _sarea = _counts.sample_counts(_pop3)
+            _sarea['row_number'] = orow['row_number']
+            _sarea = _sarea\
+                [['sample_name',
+                  'region_label',
+                  'phenotype_label',
+                  'cumulative_area_coverage_percent',
+                  'cumulative_region_area_pixels',
+                  'cumulative_cell_area_pixels',
+                  'frame_count',
+                  'mean_area_coverage_percent',
+                  'stderr_area_coverage_percent',
+                  'stddev_area_coverage_percent'
+                 ]].rename(columns={
+                'cumulative_cell_area_pixels':'area',
+                'cumulative_region_area_pixels':'total_area',
+                'cumulative_area_coverage_percent':'cumulative_coverage_percent',
+                'mean_area_coverage_percent':'mean_coverage_percent',
+                'stderr_area_coverage_percent':'stderr_coverage_percent',
+                'stddev_area_coverage_percent':'stddev_coverage_percent'
+                })
             _sarea['mean_coverage_fraction']=_sarea['mean_coverage_percent'].\
                 apply(lambda x: np.nan if x!=x else x/100)
             _sarea['stderr_coverage_fraction']=_sarea['stderr_coverage_percent'].\
@@ -174,7 +193,6 @@ def execute_immunoprofile_extraction(
             _sarea['cumulative_coverage_fraction']=_sarea['cumulative_coverage_percent'].\
                 apply(lambda x: np.nan if x!=x else x/100)
             odata = _sarea.iloc[0].to_dict()
-            count_areas.append(_sarea)
             # if you're in this then change region
             orow['region_label'] = orow['region']
             del orow['region']
@@ -183,9 +201,11 @@ def execute_immunoprofile_extraction(
             'output':odata
         }
         report.append(output_set)
-    count_densities = pd.concat(count_densities).reset_index(drop=True)
-    count_percentages = pd.concat(count_percentages).reset_index(drop=True)
-    count_areas = pd.concat(count_areas).reset_index(drop=True)
+    sample_count_densities = pd.concat(sample_count_densities).reset_index(drop=True)
+    sample_count_percentages = pd.concat(sample_count_percentages).reset_index(drop=True)
+
+    frame_count_densities = pd.concat(frame_count_densities).reset_index(drop=True)
+    frame_count_percentages = pd.concat(frame_count_percentages).reset_index(drop=True)
 
     full_report = {
         'sample':sample_name,
@@ -200,10 +220,18 @@ def execute_immunoprofile_extraction(
             'invasive_margin_width_microns':invasive_margin_width_microns,
             'microns_per_pixel':microns_per_pixel,
             'panel_name':panel_name,
+            'panel_source':panel_source,
             'panel_version':panel_version,
             'report_name':report_name,
+            'report_source':report_source,
             'report_version':report_version,
             'sample_name':sample_name
         }
     }
-    return full_report
+    dfs = {
+        'sample_count_densities':sample_count_densities.drop(columns=['project_id','project_name','sample_id','population_percent','sample_total_count']),
+        'sample_count_percentages':sample_count_percentages.drop(columns=['project_id','project_name','sample_id']),
+        'frame_count_densities':frame_count_densities.drop(columns=['project_id','project_name','sample_id','frame_id','population_percent','frame_total_count']),
+        'frame_count_percentages':frame_count_percentages.drop(columns=['project_id','project_name','sample_id','frame_id'])
+    }
+    return full_report, csi, dfs

@@ -326,7 +326,7 @@ def get_strat_dict(panel_name,panel_version,panels):
     return {'PD1_PDL1':s1,'FOXP3':s2}
 
 
-def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,skip_segmentation_processing=False):
+def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,skip_segmentation_processing=True):
     if verbose: sys.stderr.write("Processing export: "+str(export_name)+"\n")
     cfi = CellFrameInFormLineArea()
     _export_prefix = os.path.join(path,export_name,frame_name)
@@ -354,7 +354,7 @@ def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,s
 def _read_path2(argdict):
     return _read_path(**argdict)
 
-def _read_path(path=None,frame_name=None,strat_dict=None,steps=76,verbose=False,skip_segmentation_processing=False):
+def _read_path(path=None,frame_name=None,strat_dict=None,steps=76,verbose=False,skip_segmentation_processing=True):
     if verbose:
         sys.stderr.write("--- running frame: "+str(frame_name)+"\n")
     _mutually_exclusive_phenotypes = ['CD8','TUMOR','OTHER']
