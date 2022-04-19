@@ -291,7 +291,6 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
             frame_id = cid.id
             self._frames[frame_id]=cid
             frames.append({'frame_id':frame_id,'frame_name':frame_args[i]['frame_name'],'frame_path':frame_args[i]['path']})
-            if verbose: sys.stderr.write("finished tumor and stroma and margin\n")
         self._key = pd.DataFrame(frames)
         self._key.index.name = 'db_id'
         self.sample_name = sample_name
@@ -356,6 +355,8 @@ def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,s
         steps = steps,
         verbose = verbose
     )
+    if verbose: 
+        sys.stderr.write("finished tumor and stroma and margin\n")
     cfi.microns_per_pixel = 0.496
     return cfi
 def _read_path_MULTITHREAD(argdict):
