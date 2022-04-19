@@ -8,6 +8,7 @@ from shutil import copytree, copy, rmtree
 import pandas as pd
 from pythologist_image_utilities import read_tiff_stack, make_binary_image_array, binary_image_dilation
 from uuid import uuid4
+from multiprocessing import Pool
 
 
 class CellProjectInFormImmunoProfile(CellProjectInForm):
@@ -241,22 +242,20 @@ def _light_QC(path,export_names,verbose):
 class CellSampleInFormImmunoProfile(CellSampleInForm):
     def create_cell_frame_class(self):
         return CellFrameInFormLineArea() # this will be called when we read the HDF
-    #def create_cell_frame_class_line_area(self):
-    #    return CellFrameInFormLineArea()
-    #def create_cell_frame_class_custom_mask(self):
-    #    return CellFrameInFormCustomMask()
     def read_path(self,path,sample_name=None,
-                            tumor_stain_name=None,
-                            tumor_phenotype_name=None,
+                            panel_name = None,
+                            panel_version = None,
+                            panels = None,
                             verbose=False,
                             steps=76,
-                            skip_segmentation_processing=True
+                            skip_segmentation_processing=True,
+                            processes=1,
                 ):
         if sample_name is None: sample_name = path
         if not os.path.isdir(path):
             raise ValueError('Path input must be a directory')
-        if tumor_stain_name is None or tumor_phenotype_name is None:
-            raise ValueError("tumor_stain_name and tumor_phenotype_name must be set")
+        #if tumor_stain_name is None or tumor_phenotype_name is None:
+        #    raise ValueError("tumor_stain_name and tumor_phenotype_name must be set")
         absdir = os.path.abspath(path)
 
 
@@ -265,92 +264,67 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
             _temp,_prefix = os.path.split(re.match('(.+)_cell_seg_data.txt',_file).group(1))
             frame_prefixes.append(_prefix)
 
+        strat_dict = get_strat_dict(panel_name,panel_version,panels)
+
         frames = []
-        for _frame_prefix in sorted(frame_prefixes):
-            if verbose:
-                sys.stderr.write("--- reading frame: "+str(_frame_prefix)+"\n")
-            cid = _read_path(path,
-                             _frame_prefix,
-                             get_strat_dict(tumor_stain_name,tumor_phenotype_name),
-                             steps=steps,
-                             verbose=verbose,
-                             skip_segmentation_processing=skip_segmentation_processing
-                             )
+        path_inputs = {
+            'path':path,
+            'strat_dict':strat_dict,
+            'steps':steps,
+            'verbose':verbose,
+            'skip_segmentation_processing':skip_segmentation_processing
+        }
+        frame_args = []
+        for x in sorted(frame_prefixes):
+            d = json.loads(json.dumps(path_inputs))
+            d['frame_name'] = x
+            frame_args.append(d)
+        cids = None
+        if processes>1:
+            with Pool(processes=processes) as pool:
+                cids = [x for x in pool.imap(_read_path2,frame_args)]
+        else:
+            cids = [_read_path(**x) for x in frame_args]
+        for i,cid in enumerate(cids):
             frame_id = cid.id
             self._frames[frame_id]=cid
-            frames.append({'frame_id':frame_id,'frame_name':_frame_prefix,'frame_path':path})
+            frames.append({'frame_id':frame_id,'frame_name':frame_args[i]['frame_name'],'frame_path':frame_args[i]['path']})
             if verbose: sys.stderr.write("finished tumor and stroma and margin\n")
         self._key = pd.DataFrame(frames)
         self._key.index.name = 'db_id'
         self.sample_name = sample_name
 
 
-def get_strat_dict(tumor_stain_name,tumor_phenotype_name):
+
+def get_strat_dict(panel_name,panel_version,panels):
     """
     i.e. Cytokeratin (Opal 690), and CYTOKERATIN
     """
+
     strat = {
-    "mutually_exclusive_phenotype_strategies":[
-        {
-            "phenotype_list":[
-                {
-                    "assigned_label":"CD8"
-                },
-                {
-                    "assigned_label":tumor_phenotype_name,
-                    "label":"TUMOR"
-                },
-                {
-                    "assigned_label":"OTHER"
-                }
-            ]
-        },
-    ],
-    "channels":[
-        {
-            "inform_channel_label":"PD-1 (Opal 620)",
-            "label":"PD1"
-        },
-        {
-            "inform_channel_label":"PD-L1 (Opal 520)",
-            "label":"PDL1"
-        },
-        {
-            "inform_channel_label": "DAPI",
-            "label":"DAPI"
-        },
-        {
-            "inform_channel_label": "CD8 (Opal 480)",
-            "label":"CD8"
-        },
-        {
-            "inform_channel_label": "Foxp3 (Opal 570)",
-            "label":"FOXP3"
-        },
-        {
-            "inform_channel_label": tumor_stain_name,
-            "label":"TUMOR"
-        },
-        {
-            "inform_channel_label": "CD68 (Opal 780)",
-            "label":"CD68"
-        }
-    ]
+        'mutually_exclusive_phenotype_strategies':[
+            {
+                "phenotype_list":[
+                    {'assigned_label':x} for x in panels[panel_name][panel_version]['phenotypes']
+                ]
+            }
+        ],
+        'channels':[
+            {'inform_channel_label':x['stain'],
+             'label':x['label']
+            } for x in panels[panel_name][panel_version]['thresholds']
+        ]
     }
-    def _deepcopy(d):
-        return json.loads(json.dumps(d))
-    strat_dict = {}
-    strat_dict['PD1_PDL1'] = _deepcopy(strat)
-    strat_dict['FOXP3'] = _deepcopy(strat)
+    s1 = json.loads(json.dumps(strat))
+    for d in s1['channels']:
+        if d['label'] in ['PD1','PDL1']:
+            d['analyze_threshold'] = True
+    s2 = json.loads(json.dumps(strat))
+    for d in s2['channels']:
+        if d['label'] in ['FOXP3']:
+            d['analyze_threshold'] = True
+    return {'PD1_PDL1':s1,'FOXP3':s2}
 
-    for x in strat_dict['PD1_PDL1']['channels']:
-        if x['label'] in ["PD1","PDL1"]:
-            x['analyze_threshold'] = True
-
-    for x in strat_dict['FOXP3']['channels']:
-        if x['label'] in ["FOXP3"]:
-            x['analyze_threshold'] = True
-    return strat_dict
 
 def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,skip_segmentation_processing=False):
     if verbose: sys.stderr.write("Processing export: "+str(export_name)+"\n")
@@ -377,52 +351,14 @@ def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,s
     )
     cfi.microns_per_pixel = 0.496
     return cfi
+def _read_path2(argdict):
+    return _read_path(**argdict)
 
-def _read_path(path,frame_name,strat_dict,steps=76,verbose=False,skip_segmentation_processing=False):
+def _read_path(path=None,frame_name=None,strat_dict=None,steps=76,verbose=False,skip_segmentation_processing=False):
+    if verbose:
+        sys.stderr.write("--- running frame: "+str(frame_name)+"\n")
     _mutually_exclusive_phenotypes = ['CD8','TUMOR','OTHER']
+    # Make separate dicts for each export
     _e1 = _read_export(path,frame_name,'PD1_PDL1',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing)
     _e2 = _read_export(path,frame_name,'FOXP3',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing)
-
-    # get the feature tables from FOXP3
-    _features = _e2.get_data('features')
-    _features = _features.loc[_features['feature_label']=='FOXP3',:]
-    _features_index = _features.iloc[0].name
-    _feature_definitions = _e2.get_data('feature_definitions')
-    _feature_definitions = _feature_definitions.loc[_feature_definitions['feature_index']==_features_index,:] 
-    _feature_definitions_indecies = [x for x in _feature_definitions.index]
-    _cell_features = _e2.get_data('cell_features')
-    _cell_features = _cell_features.loc[_cell_features['feature_definition_index'].isin(_feature_definitions_indecies),:]
-    _t2 = _features.merge(_feature_definitions,left_index=True,right_on='feature_index').\
-       merge(_cell_features,left_index=True,right_on='feature_definition_index',)
-
-    # get the maximum feature indecies from PD1_PDL1
-    features_iter = _e1.get_data('features').index.max()+1
-    feature_definitions_iter = _e1.get_data('feature_definitions').index.max()+1
-    cell_features_iter = _e1.get_data('cell_features').index.max()+1
-
-    # make a big table
-    _t3 = _t2.copy().reset_index()
-    _t3['feature_index'] = _t3['feature_index'].apply(lambda x: x+features_iter)
-    _t3['feature_definition_index'] = _t3['feature_definition_index'].apply(lambda x: x+feature_definitions_iter)
-    _t3['db_id'] = _t3['db_id'].apply(lambda x: x+cell_features_iter)
-
-    # shift indecies so we can merge features
-    _cf = _t3[_cell_features.reset_index().columns].set_index('db_id')
-    _fd = _t3[_feature_definitions.reset_index().columns].drop_duplicates().\
-        set_index('feature_definition_index')
-    _fs = _t3[_features.reset_index().columns].drop_duplicates().\
-        set_index('feature_index')
-
-    # merge our tables
-    _e1.set_data('cell_features',pd.concat([_e1.get_data('cell_features'),_cf]))
-    _e1.set_data('feature_definitions',pd.concat([_e1.get_data('feature_definitions'),_fd]))
-    _e1.set_data('features',pd.concat([_e1.get_data('features'),_fs]))
-    return _e1
-
-
-    #_cdf1 = _e1.cdf(region_group='InFormLineArea',mutually_exclusive_phenotypes=_mutually_exclusive_phenotypes)
-    #_cdf2 = _e2.cdf(region_group='InFormLineArea',mutually_exclusive_phenotypes=_mutually_exclusive_phenotypes)
-    #_cdf, _f = _cdf1.merge_scores(_cdf2)
-    #if _f.shape[0] > 0:
-    #    raise ValueError("Mismatched segmentation of size: "+str(_f.shape[0]))
-    #return _cdf
+    return _e1.import_cell_features(_e2,['FOXP3'])

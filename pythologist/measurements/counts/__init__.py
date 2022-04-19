@@ -140,6 +140,7 @@ class Counts(Measurement):
                      'cumulative_region_area_mm2',
                      'cumulative_count',
                      'cumulative_density_mm2',
+                     'cumulative_cell_area_pixels',
                      'cumulative_area_coverage_percent'
                     ],
                     [
@@ -147,7 +148,8 @@ class Counts(Measurement):
                      x['region_area_mm2'].sum(),
                      x['count'].sum(),
                      np.nan if x['region_area_pixels'].sum() < self.minimum_region_size_pixels else x['count'].sum()/x['region_area_mm2'].sum(),
-                     np.nan if x['region_area_pixels'].sum() < self.minimum_region_size_pixels else x['cell_area_pixels'].sum()/x['region_area_pixels'].sum()
+                     x['cell_area_pixels'].sum(),
+                     np.nan if x['region_area_pixels'].sum() < self.minimum_region_size_pixels else 100*x['cell_area_pixels'].sum()/x['region_area_pixels'].sum()
                     ]
                 )))
             ).reset_index()
@@ -170,6 +172,9 @@ class Counts(Measurement):
             # if we are doing subsets we've lost any relevent reference counts in the subsetting process
             cnts['sample_total_count'] = np.nan
             cnts['population_percent'] = np.nan
+
+        cnts['cumulative_region_area_pixels'] = cnts['cumulative_region_area_pixels'].astype(int)
+        cnts['cumulative_cell_area_pixels'] = cnts['cumulative_cell_area_pixels'].astype(int)
         return cnts
 
     def project_counts(self,subsets=None):
@@ -266,7 +271,7 @@ class Counts(Measurement):
                'cumulative_denominator':x['denominator'].sum(),
                'cumulative_percent':np.nan if x['denominator'].sum()!=x['denominator'].sum() or x['denominator'].sum()<self.minimum_denominator_count else 100*x['numerator'].sum()/x['denominator'].sum(),
                'mean_percent':x['percent'].mean(),
-               'stdev_percent':np.nan if len([y for y in x['percent'] if y==y]) <= 1 else x['percent'].std(ddof=_degrees_of_freedom,skipna=True),
+               'stddev_percent':np.nan if len([y for y in x['percent'] if y==y]) <= 1 else x['percent'].std(ddof=_degrees_of_freedom,skipna=True),
                'stderr_percent':np.nan if len([y for y in x['percent'] if y==y]) <= 1 else sem(x['percent'],ddof=_degrees_of_freedom,nan_policy='omit'),
                #'measured_frame_count':len([y for y in x['percent'] if y==y]),
            }))
@@ -279,6 +284,11 @@ class Counts(Measurement):
         #stc = fp.groupby(self.cdf.sample_columns+['region_label']).sum()[['denominator']]
         #cnts['sample_total_count'] = cnts['sample_total_count'].astype(int)
 
+        # add frame_counts
+        _framecounts=self.measured_regions[['sample_name','frame_id']].\
+            drop_duplicates().groupby(['sample_name']).count()[['frame_id']].\
+            rename(columns={'frame_id':'frame_count'}).reset_index()
+        cnts = cnts.merge(_framecounts,on=['sample_name'])
 
         return cnts
     def project_percentages(self,percentage_logic_list):

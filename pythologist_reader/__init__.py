@@ -139,6 +139,52 @@ class CellFrameGeneric(object):
         """
         return list(self.data_tables.keys())
 
+    def import_cell_features(self,cell_frame,feature_names,name_change_table={}):
+        """
+        Import cell features from one cell_frame into another
+        """
+        
+        _e1 = self.copy()
+        _e2 = cell_frame
+
+        # get the feature tables from FOXP3
+        _features = _e2.get_data('features')
+        _features = _features.loc[_features['feature_label'].isin(feature_names),:]
+        _features_indecies = [x for x in _features.index]
+        _feature_definitions = _e2.get_data('feature_definitions')
+        _feature_definitions = _feature_definitions.loc[_feature_definitions['feature_index'].isin(_features_indecies),:] 
+        _feature_definitions_indecies = [x for x in _feature_definitions.index]
+        _cell_features = _e2.get_data('cell_features')
+        _cell_features = _cell_features.loc[_cell_features['feature_definition_index'].isin(_feature_definitions_indecies),:]
+        _t2 = _features.merge(_feature_definitions,left_index=True,right_on='feature_index').\
+            merge(_cell_features,left_index=True,right_on='feature_definition_index',)
+
+        # get the maximum feature indecies from PD1_PDL1
+        features_iter = _e1.get_data('features').index.max()+1
+        feature_definitions_iter = _e1.get_data('feature_definitions').index.max()+1
+        cell_features_iter = _e1.get_data('cell_features').index.max()+1
+
+        # make a big table
+        _t3 = _t2.copy().reset_index()
+        _t3['feature_index'] = _t3['feature_index'].apply(lambda x: x+features_iter)
+        _t3['feature_definition_index'] = _t3['feature_definition_index'].apply(lambda x: x+feature_definitions_iter)
+        _t3['db_id'] = _t3['db_id'].apply(lambda x: x+cell_features_iter)
+
+        # shift indecies so we can merge features
+        _cf = _t3[_cell_features.reset_index().columns].set_index('db_id')
+        _fd = _t3[_feature_definitions.reset_index().columns].drop_duplicates().\
+            set_index('feature_definition_index')
+        _fs = _t3[_features.reset_index().columns].drop_duplicates().\
+            set_index('feature_index')
+
+         # merge our tables
+        _e1.set_data('cell_features',pd.concat([_e1.get_data('cell_features'),_cf]))
+        _e1.set_data('feature_definitions',pd.concat([_e1.get_data('feature_definitions'),_fd]))
+        _e1.set_data('features',pd.concat([_e1.get_data('features'),_fs]))
+        return _e1
+
+
+
     def set_data(self,table_name,table):
         """
         Set the data table
@@ -437,6 +483,10 @@ class CellFrameGeneric(object):
         them = mytype()
         for x in self.data_tables.keys():
             them._data[x] = self._data[x].copy()
+        them._images = self._images.copy()
+        them.set_processed_image_id(self._processed_image_id)
+        them.frame_name = self.frame_name
+        them._id = self._id
         return them
 
     @property
