@@ -1,7 +1,7 @@
 from pythologist_reader.formats.inform.immunoprofile import CellSampleInFormImmunoProfile
 from pythologist import CellDataFrame, SubsetLogic as SL, PercentageLogic as PL
 import pandas as pd
-import json
+import json, sys
 
 def execute_immunoprofile_extraction(
     path,
