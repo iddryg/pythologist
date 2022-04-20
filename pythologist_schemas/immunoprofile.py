@@ -241,3 +241,34 @@ def execute_immunoprofile_extraction(
         'frame_count_percentages':frame_count_percentages.drop(columns=['project_id','project_name','sample_id','frame_id'])
     }
     return full_report, csi, dfs
+
+
+def report_dict_to_dataframes(report_dict):
+    sample_name = report_dict['sample']
+    count_densities = []
+    count_percentages = []
+    count_areas = []
+    for _row in report_dict['report']:
+        if _row['row_layout']['test'] == 'Count Density': 
+            count_densities.append(pd.Series(_row['output']))
+        if _row['row_layout']['test'] == 'Percent Population': 
+            _row_number = _row['row_layout']['row_number']
+            count_percentages.append(pd.Series(_row['output']))
+        if _row['row_layout']['test'] == 'Population Area': 
+            _row_number = _row['row_layout']['row_number']
+            count_areas.append(pd.Series(_row['output']))
+    count_densities = pd.DataFrame(count_densities)
+    count_densities['biomarker_label'] = _row['row_layout']['biomarker_label']
+    count_densities['row_number'] = _row['row_layout']['row_number']
+    count_densities['test'] = _row['row_layout']['test']
+    count_percentages = pd.DataFrame(count_percentages)
+    count_percentages['biomarker_label'] = _row['row_layout']['biomarker_label']
+    count_percentages['row_number'] = _row['row_layout']['row_number']
+    count_percentages['test'] = _row['row_layout']['test']
+    count_areas = pd.DataFrame(count_areas)
+    count_areas['biomarker_label'] = _row['row_layout']['biomarker_label']
+    count_areas['row_number'] = _row['row_layout']['row_number']
+    count_areas['test'] = _row['row_layout']['test']
+    return count_densities.loc[:,sorted(count_densities.columns)],\
+           count_percentages.loc[:,sorted(count_percentages.columns)],\
+           count_areas.loc[:,sorted(count_areas.columns)]
