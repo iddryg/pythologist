@@ -144,45 +144,57 @@ class CellFrameGeneric(object):
         Import cell features from one cell_frame into another
         """
         
-        _e1 = self.copy()
-        _e2 = cell_frame
 
-        # get the feature tables from FOXP3
-        _features = _e2.get_data('features')
-        _features = _features.loc[_features['feature_label'].isin(feature_names),:]
-        _features_indecies = [x for x in _features.index]
-        _feature_definitions = _e2.get_data('feature_definitions')
-        _feature_definitions = _feature_definitions.loc[_feature_definitions['feature_index'].isin(_features_indecies),:] 
-        _feature_definitions_indecies = [x for x in _feature_definitions.index]
-        _cell_features = _e2.get_data('cell_features')
-        _cell_features = _cell_features.loc[_cell_features['feature_definition_index'].isin(_feature_definitions_indecies),:]
-        _t2 = _features.merge(_feature_definitions,left_index=True,right_on='feature_index').\
-            merge(_cell_features,left_index=True,right_on='feature_definition_index',)
+        def _reassemble_feature_table(cell_frame):
+            _features = cell_frame.get_data('features')
+            _feature_definitions = cell_frame.get_data('feature_definitions')
+            _cell_features = cell_frame.get_data('cell_features')
+            return _features.merge(_feature_definitions,left_index=True,right_on='feature_index',how='left').\
+                merge(_cell_features,left_index=True,right_on='feature_definition_index',how='left')
 
-        # get the maximum feature indecies from PD1_PDL1
-        features_iter = _e1.get_data('features').index.max()+1
-        feature_definitions_iter = _e1.get_data('feature_definitions').index.max()+1
-        cell_features_iter = _e1.get_data('cell_features').index.max()+1
+        _f1 = _reassemble_feature_table(self).\
+             drop(columns = ['feature_index','feature_definition_index'])
+        _f2 = _reassemble_feature_table(cell_frame).\
+            drop(columns = ['feature_index','feature_definition_index'])
+        _f2['feature_label'] = _f2['feature_label'].apply(lambda x: x if x not in name_change_table else name_change_table[x])
 
-        # make a big table
-        _t3 = _t2.copy().reset_index()
-        _t3['feature_index'] = _t3['feature_index'].apply(lambda x: x+features_iter)
-        _t3['feature_definition_index'] = _t3['feature_definition_index'].apply(lambda x: x+feature_definitions_iter)
-        _t3['db_id'] = _t3['db_id'].apply(lambda x: x+cell_features_iter)
+        # filter to feature names we are interested in
+        _f2 = _f2.loc[_f2['feature_label'].isin(feature_names)]
 
-        # shift indecies so we can merge features
-        _cf = _t3[_cell_features.reset_index().columns].set_index('db_id')
-        _fd = _t3[_feature_definitions.reset_index().columns].drop_duplicates().\
-            set_index('feature_definition_index')
-        _fs = _t3[_features.reset_index().columns].drop_duplicates().\
-            set_index('feature_index')
+        # make a new massive table
+        _comb = pd.concat([_f1,_f2]).sort_values(['feature_label','feature_value']).reset_index(drop=True)
 
-         # merge our tables
-        _e1.set_data('cell_features',pd.concat([_e1.get_data('cell_features'),_cf]))
-        _e1.set_data('feature_definitions',pd.concat([_e1.get_data('feature_definitions'),_fd]))
-        _e1.set_data('features',pd.concat([_e1.get_data('features'),_fs]))
-        return _e1
+        # Now reindex the feature table
+        _features = _comb.loc[:,['feature_label','feature_description']].drop_duplicates().\
+            reset_index(drop=True)
+        _features.index.name = 'feature_index'
 
+        # Now reindex feature definitions
+        _feature_definitions = _comb.loc[:,['feature_value_label',
+                                    'feature_value',
+                                    'feature_label']].drop_duplicates().\
+            merge(_features[['feature_label']].reset_index(),on=['feature_label']).\
+            drop(columns=['feature_label']).reset_index(drop=True)
+        _feature_definitions.index.name = 'feature_definition_index'
+
+        _cell_features = _comb.copy().dropna(subset=['cell_index'])
+        _cell_features['cell_index'] = _cell_features['cell_index'].astype(int)
+        _cell_features = _cell_features.\
+            merge(_features[['feature_label']].reset_index(),on=['feature_label']).\
+            drop(columns=['feature_label']).\
+            merge(_feature_definitions[['feature_value','feature_index','feature_value_label']].\
+                  reset_index(),
+                  on = ['feature_value','feature_value_label','feature_index']
+                 ).\
+            drop(columns=['feature_value','feature_value_label','feature_index','feature_description']).\
+            sort_values(['cell_index','feature_definition_index']).\
+            reset_index(drop=True)
+        _cell_features.index.name = 'db_id'
+        output = self.copy()
+        output.set_data('features',_features)
+        output.set_data('feature_definitions',_feature_definitions)
+        output.set_data('cell_features',_cell_features)
+        return output
 
 
     def set_data(self,table_name,table):

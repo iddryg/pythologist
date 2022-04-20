@@ -390,4 +390,6 @@ def _read_path(path=None,frame_name=None,strat_dict=None,steps=76,verbose=False,
     # Make separate dicts for each export
     _e1 = _read_export(path,frame_name,'PD1_PDL1',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing,gimp_repositioned=gimp_repositioned)
     _e2 = _read_export(path,frame_name,'FOXP3',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing,gimp_repositioned=gimp_repositioned)
+    if verbose:
+        sys.stderr.write("combine exports\n")
     return _e1.import_cell_features(_e2,['FOXP3'])
