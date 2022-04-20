@@ -58,14 +58,11 @@ def execute_immunoprofile_extraction(
     regions['Tumor + Invasive Margin'] = cdf.\
         combine_regions(['InnerMargin', 'InnerTumor', 'OuterMargin'],'Tumor + Invasive Margin')
     regions['Invasive Margin'] = cdf.\
-        combine_regions(['InnerMargin', 'OuterMargin'],'Invasive Margin').\
-        drop_regions(['InnerTumor'])
+        combine_regions(['InnerMargin', 'OuterMargin'],'Invasive Margin')
     regions['Tumor'] = cdf.\
-        drop_regions(['InnerMargin', 'OuterMargin']).\
         combine_regions(['InnerTumor'],'Tumor')
     regions['Full Tumor'] = cdf.\
-        combine_regions(['InnerTumor','InnerMargin'],'Full Tumor').\
-        drop_regions(['OuterMargin'])
+        combine_regions(['InnerTumor','InnerMargin'],'Full Tumor')
 
     # Now read through and build the report
     sample_count_densities = []
@@ -102,7 +99,8 @@ def execute_immunoprofile_extraction(
             _cdf = _cdf.threshold(_gate['phenotype'],_gate['label'])
 
         # Get our counts object
-        _counts = _cdf.counts()
+        _measured_regions = _cdf.get_measured_regions().loc[_cdf.get_measured_regions()['region_label']==_region_name]
+        _counts = _cdf.counts(measured_regions=_measured_regions)
     
         # now extract features
         if _report_row['test'] == 'Count Density':
