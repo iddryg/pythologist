@@ -114,8 +114,6 @@ def execute_immunoprofile_extraction(
             frame_count_densities.append(_fcnts)
             _scnts = _scnts\
                 [['sample_name',
-                  'region_label',
-                  'phenotype_label',
                   'mean_density_mm2',
                   'stderr_density_mm2',
                   'stddev_density_mm2',
@@ -126,11 +124,8 @@ def execute_immunoprofile_extraction(
                                 'stderr_density_mm2':'standard_error',
                                 'stddev_density_mm2':'standard_deviation',
                                 'measured_frame_count':'measured_count',
-                                'region_label':'region',
-                                'phenotype_label':'biomarker_label',
                                 'sample_name':'sample'
                                })
-            _scnts['test'] = _report_row['test']
             odata = _scnts.iloc[0].to_dict()
         if _report_row['test'] == 'Percent Population':
             _pop2 = [PL(numerator=SL(phenotypes=_report_row['numerator_phenotypes']),
@@ -146,8 +141,6 @@ def execute_immunoprofile_extraction(
             frame_count_percentages.append(_fpcts)
             _spcts = _spcts\
             [['sample_name',
-              'region_label',
-              'phenotype_label',
               'mean_percent',
               'stderr_percent',
               'stddev_percent',
@@ -163,8 +156,6 @@ def execute_immunoprofile_extraction(
             'stderr_percent':'standard_error_percent',
             'stddev_percent':'standard_deviation_percent',
             'qualified_frame_count':'measured_count',
-            'phenotype_label':'biomarker_label',
-            'region_label':'region',
             'sample_name':'sample'
             })
             _spcts['test'] = _report_row['test']
@@ -184,8 +175,6 @@ def execute_immunoprofile_extraction(
             _sarea['row_number'] = orow['row_number']
             _sarea = _sarea\
                 [['sample_name',
-                  'region_label',
-                  'phenotype_label',
                   'cumulative_area_coverage_percent',
                   'cumulative_region_area_pixels',
                   'cumulative_cell_area_pixels',
@@ -200,11 +189,8 @@ def execute_immunoprofile_extraction(
                 'mean_area_coverage_percent':'mean_coverage_percent',
                 'stderr_area_coverage_percent':'stderr_coverage_percent',
                 'stddev_area_coverage_percent':'stddev_coverage_percent',
-                'phenotype_label':'biomarker_label',
-                'region_label':'region',
                 'sample_name':'sample'
                 })
-            _sarea['test'] = _report_row['test']
             _sarea['mean_coverage_fraction']=_sarea['mean_coverage_percent'].\
                 apply(lambda x: np.nan if x!=x else x/100)
             _sarea['stderr_coverage_fraction']=_sarea['stderr_coverage_percent'].\
