@@ -61,11 +61,16 @@ class Counts(Measurement):
                 df = self.cdf.subset(sl)
                 #df = df.groupby(mergeon).count()[['cell_index']].\
                 #    rename(columns={'cell_index':'count'}).reset_index()
-                df = df.groupby(mergeon).\
+                if df.shape[0] > 0:
+                    df = df.groupby(mergeon).\
                     apply(lambda x: pd.Series(dict(zip(
                         ['count','cell_area_pixels'],
                         [len(x['cell_index']),sum(x['cell_area'])]
                     )))).reset_index()
+                else:
+                    df = self.measured_regions[mergeon]
+                    df.loc[:,'count'] = 0
+                    df.loc[:,'cell_area_pixels'] = 0
                 df = self.measured_regions.merge(df,on=mergeon,how='left').fillna(0)
                 df['phenotype_label'] = sl.label
                 cnts.append(df)
