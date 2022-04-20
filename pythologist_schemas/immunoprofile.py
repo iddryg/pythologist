@@ -158,7 +158,6 @@ def execute_immunoprofile_extraction(
             'qualified_frame_count':'measured_count',
             'sample_name':'sample'
             })
-            _spcts['test'] = _report_row['test']
             _spcts['mean_fraction'] = _spcts['mean_percent'].\
                 apply(lambda x: np.nan if x!=x else x/100)
             _spcts['standard_error_fraction'] = _spcts['standard_error_percent'].\
