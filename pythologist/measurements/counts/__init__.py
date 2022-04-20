@@ -68,7 +68,7 @@ class Counts(Measurement):
                         [len(x['cell_index']),sum(x['cell_area'])]
                     )))).reset_index()
                 else:
-                    df = self.measured_regions[mergeon]
+                    df = self.measured_regions[mergeon].copy()
                     df.loc[:,'count'] = 0
                     df.loc[:,'cell_area_pixels'] = 0
                 df = self.measured_regions.merge(df,on=mergeon,how='left').fillna(0)
