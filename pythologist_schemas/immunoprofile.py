@@ -251,25 +251,25 @@ def report_dict_to_dataframes(report_dict):
     for _row in report_dict['report']:
         if _row['row_layout']['test'] == 'Count Density': 
             _row['output']['region'] = _row['row_layout']['region']
+            _row['output']['biomarker_label'] = _row['row_layout']['biomarker_label']
+            _row['output']['row_number'] = _row['row_layout']['row_number']
+            _row['output']['test'] = _row['row_layout']['test']
             count_densities.append(pd.Series(_row['output']))
         if _row['row_layout']['test'] == 'Percent Population': 
             _row['output']['region'] = _row['row_layout']['region_label']
+            _row['output']['biomarker_label'] = _row['row_layout']['biomarker_label']
+            _row['output']['row_number'] = _row['row_layout']['row_number']
+            _row['output']['test'] = _row['row_layout']['test']
             count_percentages.append(pd.Series(_row['output']))
         if _row['row_layout']['test'] == 'Population Area': 
             _row['output']['region'] = _row['row_layout']['region_label']
+            _row['output']['biomarker_label'] = _row['row_layout']['biomarker_label']
+            _row['output']['row_number'] = _row['row_layout']['row_number']
+            _row['output']['test'] = _row['row_layout']['test']
             count_areas.append(pd.Series(_row['output']))
     count_densities = pd.DataFrame(count_densities)
-    count_densities['biomarker_label'] = _row['row_layout']['biomarker_label']
-    count_densities['row_number'] = _row['row_layout']['row_number']
-    count_densities['test'] = _row['row_layout']['test']
     count_percentages = pd.DataFrame(count_percentages)
-    count_percentages['biomarker_label'] = _row['row_layout']['biomarker_label']
-    count_percentages['row_number'] = _row['row_layout']['row_number']
-    count_percentages['test'] = _row['row_layout']['test']
     count_areas = pd.DataFrame(count_areas)
-    count_areas['biomarker_label'] = _row['row_layout']['biomarker_label']
-    count_areas['row_number'] = _row['row_layout']['row_number']
-    count_areas['test'] = _row['row_layout']['test']
     return count_densities.loc[:,sorted(count_densities.columns)],\
            count_percentages.loc[:,sorted(count_percentages.columns)],\
            count_areas.loc[:,sorted(count_areas.columns)]
