@@ -250,13 +250,13 @@ def report_dict_to_dataframes(report_dict):
     count_areas = []
     for _row in report_dict['report']:
         if _row['row_layout']['test'] == 'Count Density': 
-            _row['region'] = _row['row_layout']['region']
+            _row['output']['region'] = _row['row_layout']['region']
             count_densities.append(pd.Series(_row['output']))
         if _row['row_layout']['test'] == 'Percent Population': 
-            _row['region'] = _row['row_layout']['region_label']
+            _row['output']['region'] = _row['row_layout']['region_label']
             count_percentages.append(pd.Series(_row['output']))
         if _row['row_layout']['test'] == 'Population Area': 
-            _row['region'] = _row['row_layout']['region_label']
+            _row['output']['region'] = _row['row_layout']['region_label']
             count_areas.append(pd.Series(_row['output']))
     count_densities = pd.DataFrame(count_densities)
     count_densities['biomarker_label'] = _row['row_layout']['biomarker_label']
