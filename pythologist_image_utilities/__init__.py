@@ -52,7 +52,7 @@ def binary_image_dilation(np_array,steps=1,border_value=0):
     Returns:
         numpy.array: Image with that has been expanded
     """
-    s = skimage.morphology.disk(steps)
+    s = skimage.morphology.disk(75.64516129032258)
     img = make_binary_image_array(np_array)
     img = binary_dilation(img,iterations=1,border_value=0,structure=np.array(s),brute_force=True).astype(np.uint8)
     return img
