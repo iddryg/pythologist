@@ -47,8 +47,6 @@ def binary_image_dilation(np_array,steps=1):
     Args:
         np_array (numpy.array): a 2d image
         steps (int): number of pixels to expand
-        border_value (int): value at the border of the output array (default: 1)
-        structure (list of lists): structure to dialate to
     Returns:
         numpy.array: Image with that has been expanded
     """
