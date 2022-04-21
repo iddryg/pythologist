@@ -52,7 +52,7 @@ def binary_image_dilation(np_array,steps=1,border_value=1,structure=[[1]]):
         numpy.array: Image with that has been expanded
     """
     img = make_binary_image_array(np_array)
-    img = binary_dilation(img,iterations=steps,border_value=border_value,structure=np.array(structure)).astype(np.uint8)
+    img = binary_dilation(img,iterations=steps,border_value=border_value).astype(np.uint8)
     return img
 
 def median_id_coordinates(np_array,exclude_points=None):
