@@ -39,7 +39,7 @@ def hash_tiff_contents(path):
     return hashlib.sha256(json.dumps(stack).encode('utf-8')).hexdigest()
 
 
-def binary_image_dilation(np_array,steps=1,border_value=1,structure=[[0,1,0],[1,1,1],[0,1,0]]):
+def binary_image_dilation(np_array,steps=1,border_value=1,structure=[[1]]):
     """
     For an input image that gets set to 0 or 1, expand the 1's by the number of steps
 
