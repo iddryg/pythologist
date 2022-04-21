@@ -6,7 +6,7 @@ from scipy.ndimage import binary_dilation, generate_binary_structure
 from sklearn.neighbors import NearestNeighbors
 from scipy.ndimage import gaussian_filter
 from collections import OrderedDict
-from skimage.morophology import disk as skimage_disk
+import skimage.morphology
 #from random import random
 """
 A set of functions to help read / modify images
@@ -52,7 +52,7 @@ def binary_image_dilation(np_array,steps=1,border_value=0,structure=[[0,1,0],[1,
     Returns:
         numpy.array: Image with that has been expanded
     """
-    s = skimage_disk(76)
+    s = skimage.morphology.disk(steps)
     img = make_binary_image_array(np_array)
     img = binary_dilation(img,iterations=1,border_value=0,structure=np.array(s),brute_force=False).astype(np.uint8)
     return img
