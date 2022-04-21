@@ -40,7 +40,7 @@ def hash_tiff_contents(path):
     return hashlib.sha256(json.dumps(stack).encode('utf-8')).hexdigest()
 
 
-def binary_image_dilation(np_array,steps=1,border_value=0,structure=[[0,1,0],[1,1,1],[0,1,0]]):
+def binary_image_dilation(np_array,steps=1,border_value=0):
     """
     For an input image that gets set to 0 or 1, expand the 1's by the number of steps
 
@@ -54,7 +54,7 @@ def binary_image_dilation(np_array,steps=1,border_value=0,structure=[[0,1,0],[1,
     """
     s = skimage.morphology.disk(steps)
     img = make_binary_image_array(np_array)
-    img = binary_dilation(img,iterations=1,border_value=0,structure=np.array(s),brute_force=False).astype(np.uint8)
+    img = binary_dilation(img,iterations=1,border_value=0,structure=np.array(s),brute_force=True).astype(np.uint8)
     return img
 
 def median_id_coordinates(np_array,exclude_points=None):
