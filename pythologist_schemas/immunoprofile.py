@@ -8,8 +8,8 @@ def execute_immunoprofile_extraction(
     sample_name,
     panel_source,
     panel_name,
-    report_source,
     panel_version,
+    report_source,
     report_name,
     report_version,
     microns_per_pixel=0.496,
@@ -21,6 +21,27 @@ def execute_immunoprofile_extraction(
     ):
     """
     Perform the functionality of ipiris
+
+    Args:
+        path (string): A file path to a directory containing the FOXP3 and PD1_PDL1 and (optionally GIMP) directories
+        sample_name (string): The name of the sample
+        panel_source (string): The file path to panel definitions
+        panel_name (string): The name of the panel to use
+        panel_version (string): The version of the panel to use
+        report_source (string): The file path to report definitions
+        report_name (string): The name of the report to use
+        report_version (string): The version of the report to use
+        microns_per_pixel (float): The number to convert between microns and pixels (default: 0.496 for Polaris 20x)
+        invasive_margin_width_microns (float): Size in microns to expand the margin in one direction, radial width (default: 40 microns)
+        invasive_margin_drawn_line_width_pixels (int): Width in pixels of the drawn line if present (default: 10 pixels)
+        processes (int): The number of processes to use >1 will use multiprocessing to do multiple ROIs at once (default: 1)
+        gimp_repositioned (bool): If True, the GIMP files are duplicated into the FOXP3 and PD1_PDL1 folders, if False, expect FOXP3, PD1_PDL1 and GIMP folders (default: False)
+        verbose (bool): Output more run status (default: False)
+    Returns:
+        full_report (dict): The ip-iris style report
+        csi (CellSampleInForm): Pythologist reader sample-level file
+        dfs (dict of pandas dataframes): sample and ROI level reports for count and percentage data
+
     """
     panels = json.loads(open(panel_source,'r').read())
     reports = json.loads(open(report_source,'r').read())
