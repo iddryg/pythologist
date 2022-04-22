@@ -110,6 +110,8 @@ def execute_immunoprofile_extraction(
             _fcnts = _counts.frame_counts(_pop1)
             _scnts['row_number'] = orow['row_number']
             _fcnts['row_number'] = orow['row_number']
+            _scnts['test'] = _report_row['test']
+            _fcnts['test'] = _report_row['test']
             sample_count_densities.append(_scnts)
             frame_count_densities.append(_fcnts)
             _scnts = _scnts\
@@ -137,6 +139,8 @@ def execute_immunoprofile_extraction(
             _fpcts = _counts.frame_percentages(_pop2)
             _spcts['row_number'] = orow['row_number']
             _fpcts['row_number'] = orow['row_number']
+            _spcts['test'] = _report_row['test']
+            _fpcts['test'] = _report_row['test']
             sample_count_percentages.append(_spcts)
             frame_count_percentages.append(_fpcts)
             _spcts = _spcts\
@@ -171,7 +175,13 @@ def execute_immunoprofile_extraction(
             _pop3 = [SL(phenotypes=[_report_row['phenotype']],
                         label=_report_row['biomarker_label'])]
             _sarea = _counts.sample_counts(_pop3)
+            _farea = _counts.frame_counts(_pop3)
             _sarea['row_number'] = orow['row_number']
+            _farea['row_number'] = orow['row_number']
+            _sarea['test'] = _report_row['test']
+            _farea['test'] = _report_row['test']
+            sample_count_densities.append(_sarea)
+            frame_count_densities.append(_farea)
             _sarea = _sarea\
                 [['sample_name',
                   'cumulative_area_coverage_percent',
