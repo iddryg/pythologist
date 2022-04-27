@@ -88,11 +88,13 @@ class Counts(Measurement):
 
         # make sure regions of size zero have counts of np.nan
         if _apply_filter:
-            cnts.loc[cnts['frame_total_count']<self.minimum_denominator_count,['fraction_total_count','population_percent']] = np.nan
+            cnts.loc[cnts['frame_total_count']<self.minimum_denominator_count,['population_percent']] = np.nan
             cnts.loc[cnts['region_area_pixels']<self.minimum_region_size_pixels,['density_mm2']] = np.nan
         # Deal with the percents if we are measuring them
 
         cnts['count'] = cnts['count'].astype(int)
+        cnts['cell_area_pixels'] = cnts['cell_area_pixels'].astype(int)
+        cnts['measured'] = cnts['density_mm2'].apply(lambda x: x==x)
 
         if subsets is not None:
             # if we are doing subsets we've lost any relevent reference counts in the subsetting process
@@ -104,7 +106,7 @@ class Counts(Measurement):
     def sample_counts(self,subsets=None):
         mergeon = self.cdf.sample_columns+['region_label']
         fc = self.measured_regions[self.cdf.frame_columns+['region_label']].drop_duplicates().groupby(mergeon).\
-            count()[['frame_id']].rename(columns={'frame_id':'frame_count'}).\
+            count()[['frame_id']].rename(columns={'frame_id':'region_count'}).\
             reset_index()
 
         # Take one pass through where we apply the minimum pixel count
@@ -119,7 +121,7 @@ class Counts(Measurement):
                      'mean_area_coverage_percent',
                      'stddev_area_coverage_percent',
                      'stderr_area_coverage_percent',
-                     'measured_frame_count'
+                     'measured_count'
                     ],
                     [
                      x['density_mm2'].mean(),
@@ -159,7 +161,7 @@ class Counts(Measurement):
                 )))
             ).reset_index()
         cnts2= cnts2.merge(fc,on=mergeon)
-        cnts = cnts2.merge(cnts1,on=mergeon+['phenotype_label','frame_count'])
+        cnts = cnts2.merge(cnts1,on=mergeon+['phenotype_label','region_count'])
 
 
         # get fractions also
@@ -168,7 +170,7 @@ class Counts(Measurement):
         cnts = cnts.merge(totals,on=mergeon)
         cnts['population_percent'] = cnts.apply(lambda x: np.nan if x['sample_total_count']==0 else 100*x['cumulative_count']/x['sample_total_count'],1)
 
-        cnts['measured_frame_count'] = cnts['measured_frame_count'].astype(int)
+        cnts['measured_count'] = cnts['measured_count'].astype(int)
 
         cnts.loc[cnts['cumulative_region_area_pixels']<self.minimum_region_size_pixels,['cumulative_density_mm2']] = np.nan
         cnts.loc[cnts['sample_total_count']<self.minimum_denominator_count,['population_percent']] = np.nan
@@ -180,6 +182,15 @@ class Counts(Measurement):
 
         cnts['cumulative_region_area_pixels'] = cnts['cumulative_region_area_pixels'].astype(int)
         cnts['cumulative_cell_area_pixels'] = cnts['cumulative_cell_area_pixels'].astype(int)
+        cnts['measured'] = cnts['measured_count'].apply(lambda x: x>0)
+
+        # get the frame counts
+        _fc = self.loc[:,['project_id','project_name','sample_id','sample_name','frame_id']].drop_duplicates().\
+            groupby(['project_id','project_name','sample_id','sample_name']).count()[['frame_id']].\
+            rename(columns={'frame_id':'frame_count'}).reset_index()
+        cnts = cnts.merge(_fc,on=['project_id','project_name','sample_id','sample_name'])
+
+
         return cnts
 
     def project_counts(self,subsets=None):
@@ -224,7 +235,7 @@ class Counts(Measurement):
             combo['phenotype_label'] = entry.label
             results.append(combo)
         df = pd.concat(results)
-        df['qualified_percent'] = df['denominator'].apply(lambda x: x>=self.minimum_denominator_count)
+        df['measured'] = df['denominator'].apply(lambda x: x>=self.minimum_denominator_count)
         return df
     def sample_percentages(self,percentage_logic_list):
         #mergeon = self.cdf.sample_columns+['region_label']
@@ -237,7 +248,7 @@ class Counts(Measurement):
         #fo = self.measured_regions[self.cdf.sample_columns+['region_label']].drop_duplicates()
         # Get sample count
         fc = self.measured_regions[self.cdf.frame_columns+['region_label']].drop_duplicates().groupby(self.cdf.sample_columns+['region_label']).\
-            count()[['frame_id']].rename(columns={'frame_id':'measured_frame_count'}).\
+            count()[['frame_id']].rename(columns={'frame_id':'region_count'}).\
             reset_index()
         #fc = fo.merge(fc,on=self.cdf.sample_columns,how='left').fillna(0)
         fpheno = pd.DataFrame({'phenotype_label':[x.label for x in percentage_logic_list]})
@@ -263,7 +274,7 @@ class Counts(Measurement):
         mfc = mfc.loc[mfc['denominator']>=self.minimum_denominator_count].drop_duplicates().\
             groupby(self.cdf.sample_columns+['region_label','phenotype_label']).count()[['frame_id']].\
             reset_index().\
-            rename(columns={'frame_id':'qualified_frame_count'})
+            rename(columns={'frame_id':'measured_count'})
         #print(fc.columns)
         #print(mfc.columns)
         fc = fc.merge(mfc,on=self.cdf.sample_columns+['region_label','phenotype_label'],how='left').fillna(0)
@@ -282,10 +293,10 @@ class Counts(Measurement):
            }))
            ).reset_index()
         cnts = cnts.merge(fc,on=self.cdf.sample_columns+['region_label','phenotype_label'])
-        cnts['qualified_frame_count'] = cnts['qualified_frame_count'].astype(int)
+        cnts['measured_count'] = cnts['measured_count'].astype(int)
         cnts['cumulative_numerator'] = cnts['cumulative_numerator'].astype(int)
         cnts['cumulative_denominator'] = cnts['cumulative_denominator'].astype(int)
-        cnts['qualified_cumulative_percent'] = cnts['cumulative_denominator'].apply(lambda x: x>=self.minimum_denominator_count)
+        cnts['measured'] = cnts['cumulative_denominator'].apply(lambda x: x>=self.minimum_denominator_count)
         #stc = fp.groupby(self.cdf.sample_columns+['region_label']).sum()[['denominator']]
         #cnts['sample_total_count'] = cnts['sample_total_count'].astype(int)
 
@@ -294,6 +305,8 @@ class Counts(Measurement):
             drop_duplicates().groupby(['sample_name']).count()[['frame_id']].\
             rename(columns={'frame_id':'frame_count'}).reset_index()
         cnts = cnts.merge(_framecounts,on=['sample_name'])
+
+        #cnts = cnts.drop(columns=['measured_region_frame_count'])
 
         return cnts
     def project_percentages(self,percentage_logic_list):

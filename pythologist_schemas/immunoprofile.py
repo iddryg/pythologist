@@ -141,12 +141,12 @@ def execute_immunoprofile_extraction(
                   'stderr_density_mm2',
                   'stddev_density_mm2',
                   'frame_count',
-                  'measured_frame_count',
+                  'measured_count',
                 ]].\
                 rename(columns={'mean_density_mm2':'count_density',
                                 'stderr_density_mm2':'standard_error',
                                 'stddev_density_mm2':'standard_deviation',
-                                'measured_frame_count':'measured_count',
+                                'measured_count':'measured_count',
                                 'sample_name':'sample'
                                })
             odata = _scnts.iloc[0].to_dict()
@@ -173,11 +173,11 @@ def execute_immunoprofile_extraction(
               'cumulative_denominator',
               'cumulative_percent',
               'frame_count',
-              'qualified_frame_count'
+              'measured_count'
              ]].rename(columns={
             'cumulative_numerator':'cumulative_numerator_count',
             'cumulative_denominator':'cumulative_denominator_count',
-            'measured_frame_count':'measured_count',
+            'measured_count':'measured_count',
             'stderr_percent':'standard_error_percent',
             'stddev_percent':'standard_deviation_percent',
             'qualified_frame_count':'measured_count',
@@ -265,11 +265,37 @@ def execute_immunoprofile_extraction(
             'sample_name':sample_name
         }
     }
+
+    # Get a regions dataframe
+    _t1 = cdf.get_measured_regions()
+    _t1 = _t1.loc[_t1['region_label']=='InnerTumor',:].rename(columns={'InnerTumor':'Tumor'})
+
+    _t2 = cdf.get_measured_regions()
+    _t2 = _t2.loc[_t2['region_label'].isin(['InnerTumor','InnerMargin','OuterMargin']),:]
+    _t2['region_label'] = 'Tumor + Invasive Margin'
+    _t2 = _t2.groupby(cdf.frame_columns+['region_label']).sum().reset_index()
+
+    _t3 = cdf.get_measured_regions()
+    _t3 = _t3.loc[_t3['region_label'].isin(['InnerMargin','OuterMargin']),:]
+    _t3['region_label'] = 'Invasive Margin'
+    _t3 = _t3.groupby(cdf.frame_columns+['region_label']).sum().reset_index()
+
+    _t4 = cdf.get_measured_regions()
+    _t4 = _t4.loc[_t4['region_label'].isin(['InnerTumor','InnerMargin']),:]
+    _t4['region_label'] = 'Full Tumor'
+    _t4 = _t4.groupby(cdf.frame_columns+['region_label']).sum().reset_index()
+
+    regions = pd.concat([_t1,_t2,_t3,_t4]).\
+        drop(columns=['project_id','project_name','sample_id','frame_id','region_cell_count'])
+    regions['region_area_mm2'] = regions['region_area_pixels'].apply(lambda x: x*(cdf.microns_per_pixel*cdf.microns_per_pixel)/1000000)
+
+
     dfs = {
         'sample_count_densities':sample_count_densities.drop(columns=['project_id','project_name','sample_id','population_percent','sample_total_count']),
         'sample_count_percentages':sample_count_percentages.drop(columns=['project_id','project_name','sample_id']),
         'frame_count_densities':frame_count_densities.drop(columns=['project_id','project_name','sample_id','frame_id','population_percent','frame_total_count']),
-        'frame_count_percentages':frame_count_percentages.drop(columns=['project_id','project_name','sample_id','frame_id'])
+        'frame_count_percentages':frame_count_percentages.drop(columns=['project_id','project_name','sample_id','frame_id']),
+        'regions':regions
     }
     return full_report, csi, dfs
 

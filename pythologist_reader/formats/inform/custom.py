@@ -106,8 +106,8 @@ class CellSampleInFormCustomMask(CellSampleInForm):
 class CellFrameInFormCustomMask(CellFrameInForm):
     def __init__(self):
         super().__init__()
-        self.data_tables['custom_images'] = {'index':'db_id',
-                 'columns':['custom_label','image_id']}
+        #self.data_tables['custom_images'] = {'index':'db_id',
+        #         'columns':['custom_label','image_id']}
         for x in self.data_tables.keys():
             if x in self._data: continue
             self._data[x] = pd.DataFrame(columns=self.data_tables[x]['columns'])
@@ -117,9 +117,9 @@ class CellFrameInFormCustomMask(CellFrameInForm):
         area_binary = make_binary_image_array(area_binary)
         image_id= uuid4().hex
         self._images[image_id] = area_binary
-        df = pd.DataFrame({'custom_label':['Area'],'image_id':[image_id]})
+        df = pd.DataFrame({'mask_label':['Area'],'image_id':[image_id]})
         df.index.name = 'db_id'
-        self.set_data('custom_images',df)
+        self.set_data('mask_images',df)
 
         processed_image = self.get_image(self.processed_image_id).astype(np.uint8)
         #margin_binary = grown&processed_image
@@ -224,8 +224,8 @@ class CellFrameInFormLineArea(CellFrameInForm):
     def __init__(self):
         super().__init__()
         ### Define extra InForm-specific data tables
-        self.data_tables['custom_images'] = {'index':'db_id',
-                 'columns':['custom_label','image_id']}
+        #self.data_tables['custom_images'] = {'index':'db_id',
+        #         'columns':['custom_label','image_id']}
         for x in self.data_tables.keys():
             if x in self._data: continue
             self._data[x] = pd.DataFrame(columns=self.data_tables[x]['columns'])
@@ -244,9 +244,9 @@ class CellFrameInFormLineArea(CellFrameInForm):
             drawn_binary = make_binary_image_array(drawn_binary)
         else:
             # specialcase of no line
-            df = pd.DataFrame({'custom_label':['Area'],'image_id':[image_id2]})
+            df = pd.DataFrame({'mask_label':['Area'],'image_id':[image_id2]})
             df.index.name = 'db_id'
-            self.set_data('custom_images',df)
+            self.set_data('mask_images',df)
             inner_tumor_binary = full_tumor&processed_image
             inner_margin_binary = zero_binary
             outer_margin_binary = zero_binary
@@ -265,9 +265,9 @@ class CellFrameInFormLineArea(CellFrameInForm):
         image_id1 = uuid4().hex
         self._images[image_id1] = drawn_binary
 
-        df = pd.DataFrame({'custom_label':['Drawn','Area'],'image_id':[image_id1,image_id2]})
+        df = pd.DataFrame({'mask_label':['Drawn','Area'],'image_id':[image_id1,image_id2]})
         df.index.name = 'db_id'
-        self.set_data('custom_images',df)
+        self.set_data('mask_images',df)
 
 
         grown = binary_image_dilation(drawn_binary,steps=steps)
