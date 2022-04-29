@@ -8,7 +8,7 @@ with open(path.join(this_folder,'README.md'),encoding='utf-8') as inf:
 
 setup(
   name='pythologist',
-  version='2.0.0',
+  version='2.1.0',
   test_suite='nose2.collector.collector',
   description='inForm PerkinElmer Reader - Python interface to read outputs of the PerkinElmer inForm software;\
     Pythologist-image-utilities: Functions to assist in working with image files;\
@@ -16,7 +16,7 @@ setup(
   long_description=long_description,
   url='https://github.com/jason-weirather/pythologist',
   author='Jason L Weirather',
-  author_email='jason.weirather@gmail.com',
+  author_email='JasonL_Weirather@dfci.harvard.edu',
   license='Apache License, Version 2.0',
   classifiers=[
     'Development Status :: 3 - Alpha',
