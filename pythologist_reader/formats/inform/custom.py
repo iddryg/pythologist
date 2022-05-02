@@ -60,6 +60,10 @@ class CellSampleInFormCustomMask(CellSampleInForm):
         for file in segs:
             m = re.match('(.*)cell_seg_data.txt$',file)
             score = os.path.join(path,m.group(1)+'score_data.txt') if require_score is True else None
+            if ((not os.path.exists(score)) and (not require_score)):
+                # score is now none
+                #print("set to none")
+                score = None
             #summary = os.path.join(path,m.group(1)+'cell_seg_data_summary.txt')
             binary_seg_maps = os.path.join(path,m.group(1)+'binary_seg_maps.tif')
             component_image = os.path.join(path,m.group(1)+'component_data.tif')
@@ -183,6 +187,10 @@ class CellSampleInFormLineArea(CellSampleInForm):
         for file in segs:
             m = re.match('(.*)cell_seg_data.txt$',file)
             score = os.path.join(path,m.group(1)+'score_data.txt')
+            if ((not os.path.exists(score)) and (not require_score)):
+                # score is now none
+                #print("set to none")
+                score = None
             #summary = os.path.join(path,m.group(1)+'cell_seg_data_summary.txt')
             binary_seg_maps = os.path.join(path,m.group(1)+'binary_seg_maps.tif')
             component_image = os.path.join(path,m.group(1)+'component_data.tif')
