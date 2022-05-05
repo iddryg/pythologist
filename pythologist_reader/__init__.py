@@ -257,7 +257,7 @@ class CellFrameGeneric(object):
         _rgdf = self.get_data('region_groups')
         _region_group_index = _rgdf.index.max()+1
         _rgnew = pd.Series({'region_group':region_group_name,'region_group_description':description},name=_region_group_index)
-        _rgdf = _rgdf.append(_rgnew)
+        _rgdf = _rgdf.concat(_rgnew)
         self.set_data('region_groups',_rgdf)
 
         _region_index_start = self.get_data('regions').index.max()+1
@@ -268,7 +268,7 @@ class CellFrameGeneric(object):
                                 },index=[x for x in range(_region_index_start,_region_index_start+len(labels))])
         regions2.index.name = 'region_index'
         #print(regions2)
-        _regcomb = self.get_data('regions').append(regions2)
+        _regcomb = self.get_data('regions').concat(regions2)
         self.set_data('regions',_regcomb)
         def get_label(x,y,regions_dict):
             for label in regions_dict:
@@ -288,7 +288,7 @@ class CellFrameGeneric(object):
             reset_index().drop(columns=['x','y'])
         recode.index.name = 'db_id'
         # now add the recoded to the current cell_regions
-        recode_comb = self.get_data('cell_regions').append(recode)
+        recode_comb = self.get_data('cell_regions').concat(recode)
         self.set_data('cell_regions',recode_comb)
         return
 
