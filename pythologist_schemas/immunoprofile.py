@@ -47,7 +47,7 @@ def execute_immunoprofile_extraction(
     reports = json.loads(open(report_source,'r').read())
     # read in the data
     csi = CellSampleInFormImmunoProfile()
-
+    csi.sample_name = sample_name
     step_size = round((invasive_margin_width_microns/microns_per_pixel)-(invasive_margin_drawn_line_width_pixels/2))
     if verbose:
         sys.stderr.write("Step size for watershed: "+str(step_size)+"\n")
@@ -62,12 +62,33 @@ def execute_immunoprofile_extraction(
               skip_segmentation_processing=True,
               gimp_repositioned=gimp_repositioned
             )
+    parameters = {
+            'inform_analysis_path':path,
+            'invasive_margin_drawn_line_width_pixels':invasive_margin_drawn_line_width_pixels,
+            'invasive_margin_width_microns':invasive_margin_width_microns,
+            'microns_per_pixel':microns_per_pixel,
+            'panel_name':panel_name,
+            'panel_source':panel_source,
+            'panel_version':panel_version,
+            'report_name':report_name,
+            'report_source':report_source,
+            'report_version':report_version,
+            'sample_name':sample_name
+        }
+    return execute_immunoprofile_extraction_from_pythologist(csi, 
+                                                             panels[panel_name][panel_version],
+                                                             reports[report_name][report_version],
+                                                             parameters
+                                                             )
 
+def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_report,parameters):
     # make the cell dataframe
+    if 'microns_per_pixel' not in parameters:
+        raise ValueError('must have microns_per_pixel in parameters')
     cdf = csi.cdf(region_group='InFormLineArea',
-              mutually_exclusive_phenotypes=panels[panel_name][panel_version]['phenotypes']).\
+              mutually_exclusive_phenotypes=select_panel['phenotypes']).\
     drop_regions(['Undefined','OuterStroma'])#.filter_regions_by_area_pixels()
-    cdf.microns_per_pixel = microns_per_pixel
+    cdf.microns_per_pixel = parameters['microns_per_pixel']
 
     regions = {}
     # Drop everything except the region we are using in each one
@@ -95,7 +116,7 @@ def execute_immunoprofile_extraction(
     # reconstruct the ugly R report
     report = []
 
-    report_format = reports[report_name][report_version]
+    report_format = select_report
     for _row_number, _report_row in enumerate(report_format['report_rows']):
         orow = _report_row.copy()
         orow['row_number'] = _row_number + 1
@@ -245,25 +266,13 @@ def execute_immunoprofile_extraction(
     frame_count_percentages = pd.concat(frame_count_percentages).reset_index(drop=True)
 
     full_report = {
-        'sample':sample_name,
+        'sample':csi.sample_name,
         'report':report,
         'QC':{},
         'meta':{
         
         },
-        'parameters':{
-            'inform_analysis_path':path,
-            'invasive_margin_drawn_line_width_pixels':invasive_margin_drawn_line_width_pixels,
-            'invasive_margin_width_microns':invasive_margin_width_microns,
-            'microns_per_pixel':microns_per_pixel,
-            'panel_name':panel_name,
-            'panel_source':panel_source,
-            'panel_version':panel_version,
-            'report_name':report_name,
-            'report_source':report_source,
-            'report_version':report_version,
-            'sample_name':sample_name
-        }
+        'parameters':parameters
     }
 
     # Get a regions dataframe
