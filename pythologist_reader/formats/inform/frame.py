@@ -221,8 +221,8 @@ class CellFrameInForm(CellFrameGeneric):
                                               'Entire Cell Area (pixels)':'cell_area'})
         _cells['edge_length'] = np.nan #_cells['cell_area'].apply(lambda x: math.ceil(2*math.sqrt(math.pi*float(x))))
         _cells = _cells.set_index('cell_index')
-        _cells['x'] = _cells['x'].astype(int).apply(lambda x: x-1)
-        _cells['y'] = _cells['y'].astype(int).apply(lambda x: x-1)
+        _cells['x'] = _cells['x'].astype(int)
+        _cells['y'] = _cells['y'].astype(int)
         _cells['cell_area'] = _cells['cell_area'].astype(int)
 
         
