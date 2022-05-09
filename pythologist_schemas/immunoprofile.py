@@ -60,6 +60,7 @@ def execute_immunoprofile_extraction(
               steps=step_size,
               processes=processes,
               skip_segmentation_processing=True,
+              skip_component=True,
               gimp_repositioned=gimp_repositioned
             )
     parameters = {
@@ -78,18 +79,22 @@ def execute_immunoprofile_extraction(
     return execute_immunoprofile_extraction_from_pythologist(csi, 
                                                              panels[panel_name][panel_version],
                                                              reports[report_name][report_version],
-                                                             parameters
+                                                             parameters,
+                                                             verbose
                                                              )
 
-def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_report,parameters):
+def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_report,parameters,verbose=False):
     # make the cell dataframe
     if 'microns_per_pixel' not in parameters:
         raise ValueError('must have microns_per_pixel in parameters')
+    if verbose: sys.stderr.write("Extract CellDataFrame for report generation.\n")
     cdf = csi.cdf(region_group='InFormLineArea',
               mutually_exclusive_phenotypes=select_panel['phenotypes']).\
     drop_regions(['Undefined','OuterStroma'])#.filter_regions_by_area_pixels()
     cdf.microns_per_pixel = parameters['microns_per_pixel']
+    if verbose: sys.stderr.write("Completed CellDataFrame for report generation.\n")
 
+    if verbose: sys.stderr.write("Create cell data frames necessary for each region definition.\n")
     regions = {}
     # Drop everything except the region we are using in each one
     #included_margin = []
@@ -106,6 +111,7 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
     regions['Full Tumor'] = cdf.\
         combine_regions(['InnerTumor','InnerMargin'],'Full Tumor')
 
+    if verbose: sys.stderr.write("Completed cell data frames necessary for each region definition.\n")
     # Now read through and build the report
     sample_count_densities = []
     sample_count_percentages = []
@@ -116,8 +122,10 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
     # reconstruct the ugly R report
     report = []
 
+    if verbose: sys.stderr.write("Build report.\n")
     report_format = select_report
     for _row_number, _report_row in enumerate(report_format['report_rows']):
+        if verbose: sys.stderr.write("row "+str(_row_number+1)+"/"+str(len(report_format['report_rows']))+"       \r")
         orow = _report_row.copy()
         orow['row_number'] = _row_number + 1
         if 'phenotype' in orow:
@@ -259,6 +267,7 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
             'output':odata
         }
         report.append(output_set)
+    if verbose: sys.stderr.write("\nCompleted report report rows.\n")
     sample_count_densities = pd.concat(sample_count_densities).reset_index(drop=True)
     sample_count_percentages = pd.concat(sample_count_percentages).reset_index(drop=True)
 
@@ -306,6 +315,7 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
         'frame_count_percentages':frame_count_percentages.drop(columns=['project_id','project_name','sample_id','frame_id']),
         'regions':regions
     }
+    if verbose: sys.stderr.write("Completed all report.\n")
     return full_report, csi, dfs
 
 

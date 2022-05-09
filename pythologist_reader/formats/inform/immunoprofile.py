@@ -33,7 +33,8 @@ class CellProjectInFormImmunoProfile(CellProjectInForm):
                       invasive_margin_drawn_line_width_pixels=10,
                       tumor_stain_name=None,
                       tumor_phenotype_name=None,
-                      skip_segmentation_processing=True
+                      skip_segmentation_processing=True,
+                      skip_component=True,
                       ):
         """
         Read add a sample in as single project folder and add it to the CellProjectInFormImmunoProfile
@@ -248,10 +249,12 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
                             panels = None,
                             verbose=False,
                             steps=76,
+                            skip_component=True,
                             skip_segmentation_processing=True,
                             gimp_repositioned=False,
                             processes=1,
                 ):
+        if verbose: sys.stderr.write("!!!!!! Start reading sample "+str(sample_name)+"\n")
         if sample_name is None: sample_name = path
         if not os.path.isdir(path):
             raise ValueError('Path input must be a directory')
@@ -274,6 +277,7 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
             'steps':steps,
             'verbose':verbose,
             'skip_segmentation_processing':skip_segmentation_processing,
+            'skip_component':skip_component,
             'gimp_repositioned':gimp_repositioned
         }
         frame_args = []
@@ -287,6 +291,8 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
                 cids = [x for x in pool.imap(_read_path_MULTITHREAD,frame_args)]
         else:
             cids = [_read_path_SINGLETHREAD(x) for x in frame_args]
+        if verbose: sys.stderr.write("Finished reading all ROIs\n")
+        if verbose: sys.stderr.write("Create sample level dataframe key\n")
         for i,cid in enumerate(cids):
             frame_id = cid.id
             self._frames[frame_id]=cid
@@ -294,6 +300,7 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
         self._key = pd.DataFrame(frames)
         self._key.index.name = 'db_id'
         self.sample_name = sample_name
+        if verbose: sys.stderr.write("!!! Completed reading sample "+str(sample_name)+"\n")
 
 
 
@@ -327,7 +334,12 @@ def get_strat_dict(panel_name,panel_version,panels):
     return {'PD1_PDL1':s1,'FOXP3':s2}
 
 
-def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,skip_segmentation_processing=True,gimp_repositioned=False):
+def _read_export(path,frame_name,export_name,strat_dict,
+                 steps=76,
+                 verbose=False,
+                 skip_segmentation_processing=True,
+                 skip_component=False,
+                 gimp_repositioned=False):
     if verbose: sys.stderr.write("Processing export: "+str(export_name)+"\n")
     cfi = CellFrameInFormLineArea()
     _export_prefix = os.path.join(path,export_name,frame_name)
@@ -336,12 +348,12 @@ def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,s
         cell_seg_data_file = _export_prefix+'_cell_seg_data.txt',
         score_data_file = _export_prefix+'_score_data.txt',
         binary_seg_image_file = _export_prefix+'_binary_seg_maps.tif',
-        #component_image_file = base_path+'component_data.tif',
         inform_analysis_dict = strat_dict[export_name],
         verbose = verbose,
         require_component = False,
         require_score = True,
         dry_run = False,
+        skip_component=skip_component,
         skip_segmentation_processing=skip_segmentation_processing
     )
     path1 = os.path.join(path,'GIMP',frame_name+'_Invasive_Margin.tif')
@@ -349,6 +361,8 @@ def _read_export(path,frame_name,export_name,strat_dict,steps=76,verbose=False,s
     if gimp_repositioned:
         path1 = os.path.join(path,'FOXP3',frame_name+'_Invasive_Margin.tif')
         path2 = os.path.join(path,'FOXP3',frame_name+'_Tumor.tif')
+    if verbose:
+        sys.stderr.write("starting tumor stroma and margin reading\n")
     cfi.set_line_area(
         path1,
         path2,
@@ -383,13 +397,30 @@ def _read_path_SINGLETHREAD(argdict):
     return v
 
 
-def _read_path(path=None,frame_name=None,strat_dict=None,steps=76,verbose=False,skip_segmentation_processing=True,gimp_repositioned=False):
+def _read_path(path=None,
+               frame_name=None,
+               strat_dict=None,
+               steps=76,
+               verbose=False,
+               skip_component=True,
+               skip_segmentation_processing=True,
+               gimp_repositioned=False):
     #if verbose:
     #    sys.stderr.write("--- running frame: "+str(frame_name)+"\n")
     _mutually_exclusive_phenotypes = ['CD8','TUMOR','OTHER']
     # Make separate dicts for each export
-    _e1 = _read_export(path,frame_name,'PD1_PDL1',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing,gimp_repositioned=gimp_repositioned)
-    _e2 = _read_export(path,frame_name,'FOXP3',strat_dict,steps=steps,verbose=verbose,skip_segmentation_processing=skip_segmentation_processing,gimp_repositioned=gimp_repositioned)
+    _e1 = _read_export(path,frame_name,'PD1_PDL1',strat_dict,
+                       steps=steps,
+                       verbose=verbose,
+                       skip_component=skip_component,
+                       skip_segmentation_processing=skip_segmentation_processing,
+                       gimp_repositioned=gimp_repositioned)
+    _e2 = _read_export(path,frame_name,'FOXP3',strat_dict,
+                       steps=steps,
+                       verbose=verbose,
+                       skip_component=skip_component,
+                       skip_segmentation_processing=skip_segmentation_processing,
+                       gimp_repositioned=gimp_repositioned)
     if verbose:
         sys.stderr.write("combine exports\n")
     return _e1.import_cell_features(_e2,['FOXP3'])

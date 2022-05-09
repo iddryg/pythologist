@@ -62,6 +62,7 @@ class CellProjectInForm(CellProjectGeneric):
                        verbose=False,
                        require_component=True,
                        require_score=True,
+                       skip_component=False,
                        skip_segmentation_processing=False,
                        microns_per_pixel=None,
                        inform_analysis_dict=None,
@@ -102,8 +103,10 @@ class CellProjectInForm(CellProjectGeneric):
             else: sname  = s.split(os.sep)[sample_name_index]
             sid = self.add_sample_path(s,sample_name=sname,
                                          inform_analysis_dict=inform_analysis_dict,
-                                         verbose=verbose,require_component=require_component,
+                                         verbose=verbose,
+                                         require_component=require_component,
                                          require_score=require_score,
+                                         skip_component=skip_component,
                                          skip_segmentation_processing=skip_segmentation_processing,
                                          dry_run=dry_run,
                                          **kwargs)
@@ -116,6 +119,7 @@ class CellProjectInForm(CellProjectGeneric):
                              verbose=False,
                              require_component=True,
                              require_score=True,
+                             skip_component=False,
                              skip_segmentation_processing=False,
                              dry_run=False,
                              **kwargs):
@@ -200,6 +204,7 @@ class CellSampleInForm(CellSampleGeneric):
                        verbose=False,
                        require_component=True,
                        require_score=True,
+                       skip_component=False,
                        skip_segmentation_processing=False,
                        inform_analysis_dict=None,
                        dry_run=False,
@@ -259,6 +264,7 @@ class CellSampleInForm(CellSampleGeneric):
                          verbose=verbose,
                          require_component=require_component,
                          require_score=require_score,
+                         skip_component=skip_component,
                          skip_segmentation_processing=skip_segmentation_processing,
                          dry_run=dry_run
                          )

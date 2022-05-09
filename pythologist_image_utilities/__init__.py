@@ -135,9 +135,17 @@ def make_binary_image_array(np_array):
     Returns:
         numpy.array: an array that is 1 where something (anything) existed vs 0 where there was nothing
     """
-    np_array = np.nan_to_num(np_array)
-    if len(np_array.shape) == 2: return np.array([[1 if y > 0 else 0 for y in x] for x in np_array])
-    return np.array([[1 if np.nanmax([z for z in y]) > 0 else 0 for y in x] for x in np_array]).astype(np.int8)
+    if len(np_array.shape) < 2:
+        raise ValueError("need at least a 2 dimensional image.")
+    if len(np_array.shape) == 2:
+        # If the image is grayscale or boolean just go by zero nonzero
+        return (np_array!=0).astype(np.int8)
+    output = np.zeros(np_array.shape[0:2]).astype(np.int8)
+    for i in range(0,np_array.shape[2]):
+        # for rgb or rgba lets use boolean logic to do the same
+        _temp = (np_array[:,:,i]!=0).astype(np.int8)
+        output = output|_temp
+    return output
 
 
 def read_tiff_stack(filename):

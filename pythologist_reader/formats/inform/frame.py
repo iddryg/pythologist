@@ -69,6 +69,7 @@ class CellFrameInForm(CellFrameGeneric):
                  inform_analysis_dict=None,
                  require_component=True,
                  require_score=True,
+                 skip_component=False,
                  skip_segmentation_processing=False,
                  dry_run=False,
                  ):
@@ -117,7 +118,6 @@ class CellFrameInForm(CellFrameGeneric):
         # Read images first because the tissue region tables need to be filled in so we can attribute a tissue region to data
         if self.verbose: sys.stderr.write("Reading image data.\n")
         self._read_images(binary_seg_image_file,
-                   require_component=require_component,
                    skip_segmentation_processing=skip_segmentation_processing)
         if self.verbose: sys.stderr.write("Finished reading image data.\n")
 
@@ -145,15 +145,15 @@ class CellFrameInForm(CellFrameGeneric):
                         threshold_analysis,
                         mutually_exclusive_analysis,
                         channel_abbreviations,
-                        require_component=require_component,
-                        require_score=require_score,
-                        skip_segmentation_processing=skip_segmentation_processing)
+                        require_score=require_score)
 
         # Now we've read in whatever we've got fromt he binary seg image
-        if (not dry_run and require_component) or (not require_component and component_image_file and os.path.isfile(component_image_file)): 
+        if (not dry_run and not skip_component and require_component) or (not require_component and component_image_file and os.path.isfile(component_image_file) and not skip_component): 
             if self.verbose: sys.stderr.write("Reading component images.\n")
             self._read_component_image(component_image_file)
             if self.verbose: sys.stderr.write("Finished reading component images.\n")
+        else:
+            if self.verbose: sys.stderr.write("Skipping reading component images.\n")
 
         return
 
@@ -200,8 +200,7 @@ class CellFrameInForm(CellFrameGeneric):
                         mutually_exclusive_analysis,
                         channel_abbreviations,
                         require_component=True,
-                        require_score=True,
-                        skip_segmentation_processing=False):
+                        require_score=True):
         """ Read in the image data from a inForm
 
         :param cell_seg_data_file:
@@ -489,7 +488,6 @@ class CellFrameInForm(CellFrameGeneric):
 
     ### Lets work with image files now
     def _read_images(self,binary_seg_image_file,
-                          require_component=True,
                           skip_segmentation_processing=False):
         # Start with the binary seg image file because if it has a processed image area,
         # that will be applied to all other masks and we can get that segmentation right away
