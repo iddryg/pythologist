@@ -1,7 +1,7 @@
 import os, re, sys, h5py
-from pythologist_reader.formats.inform.frame import CellFrameInForm
-from pythologist_reader import CellSampleGeneric, CellProjectGeneric
-from pythologist_reader.qc import QCTestGeneric, QC, Result
+from pythologist.reader.formats.inform.frame import CellFrameInForm
+from pythologist.reader import CellSampleGeneric, CellProjectGeneric
+from pythologist.reader.qc import QCTestGeneric, QC, Result
 from uuid import uuid4
 import pandas as pd
 

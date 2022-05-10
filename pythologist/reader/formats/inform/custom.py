@@ -1,6 +1,6 @@
-from pythologist_reader.formats.inform.frame import CellFrameInForm
-from pythologist_reader.formats.inform.sets import CellSampleInForm, CellProjectInForm
-from pythologist_image_utilities import read_tiff_stack, make_binary_image_array, binary_image_dilation
+from pythologist.reader.formats.inform.frame import CellFrameInForm
+from pythologist.reader.formats.inform.sets import CellSampleInForm, CellProjectInForm
+from pythologist.image_utilities import read_tiff_stack, make_binary_image_array, binary_image_dilation
 from uuid import uuid4
 import pandas as pd
 import numpy as np

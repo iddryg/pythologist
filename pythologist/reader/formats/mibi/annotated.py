@@ -1,5 +1,5 @@
-from pythologist_reader import CellFrameGeneric, CellSampleGeneric, CellProjectGeneric
-from pythologist_image_utilities import read_tiff_stack, make_binary_image_array, image_edges, binary_image_dilation
+from pythologist.reader import CellFrameGeneric, CellSampleGeneric, CellProjectGeneric
+from pythologist.image_utilities import read_tiff_stack, make_binary_image_array, image_edges, binary_image_dilation
 import sys, json
 from uuid import uuid4
 import pandas as pd

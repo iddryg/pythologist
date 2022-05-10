@@ -1,12 +1,12 @@
-from pythologist_reader.formats.inform.frame import CellFrameInForm, preliminary_threshold_read
-from pythologist_reader.formats.inform.sets import CellSampleInForm, CellProjectInForm
-from pythologist_reader.formats.inform.custom import CellFrameInFormLineArea, CellFrameInFormCustomMask
+from pythologist.reader.formats.inform.frame import CellFrameInForm, preliminary_threshold_read
+from pythologist.reader.formats.inform.sets import CellSampleInForm, CellProjectInForm
+from pythologist.reader.formats.inform.custom import CellFrameInFormLineArea, CellFrameInFormCustomMask
 import os, re, sys, json
 from tempfile import mkdtemp
 from glob import glob
 from shutil import copytree, copy, rmtree
 import pandas as pd
-from pythologist_image_utilities import read_tiff_stack, make_binary_image_array, binary_image_dilation
+from pythologist.image_utilities import read_tiff_stack, make_binary_image_array, binary_image_dilation
 from uuid import uuid4
 from multiprocessing import Pool
 

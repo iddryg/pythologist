@@ -22,7 +22,7 @@ h. Make sure that the required images for each annotation strategy are present
 """
 import os, re, time, stat, hashlib, logging
 from importlib_resources import files
-from pythologist_schemas import get_validator
+from pythologist.schemas import get_validator
 
 # Lets preload our validators for relevent schemas as globals
 project_schema_validator = get_validator(files('schema_data.inputs.platforms.InForm').joinpath('project.json'))

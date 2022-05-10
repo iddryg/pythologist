@@ -13,7 +13,7 @@ from openpyxl.styles import NamedStyle, Font, Border, Side, PatternFill
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from importlib_resources import files
-from pythologist_schemas import get_validator
+from pythologist.schemas import get_validator
 
 highlight = NamedStyle(name="highlight")
 highlight.font = Font(bold=True)

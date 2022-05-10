@@ -1,5 +1,7 @@
 from pythologist.reader.formats.inform.immunoprofile import CellSampleInFormImmunoProfile
 from pythologist import CellDataFrame, SubsetLogic as SL, PercentageLogic as PL
+from importlib.metadata import version 
+from uuid import uuid4
 import pandas as pd
 import json, sys
 
@@ -115,7 +117,6 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
     # Now read through and build the report
     sample_count_densities = []
     sample_count_percentages = []
-
     frame_count_densities = []
     frame_count_percentages = []
 
@@ -124,149 +125,20 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
 
     if verbose: sys.stderr.write("Build report.\n")
     report_format = select_report
+
+    all_outputs = []
+    all_inputs = [_row_number, _report_row, regions for _row_number, _report_row in enumerate(report_format['report_rows'])]
     for _row_number, _report_row in enumerate(report_format['report_rows']):
         if verbose: sys.stderr.write("row "+str(_row_number+1)+"/"+str(len(report_format['report_rows']))+"       \r")
-        orow = _report_row.copy()
-        orow['row_number'] = _row_number + 1
-        if 'phenotype' in orow:
-            del orow['phenotype']
-        del orow['preprocessing']
-        if 'denominator_phenotypes' in orow:
-            del orow['denominator_phenotypes']
-        if 'numerator_phenotypes' in orow:
-            del orow['numerator_phenotypes']
-        #print(orow)
+        o = get_report_row_entry(_row_number,_report_row, regions)
+        all_outputs.append(o)
 
-        _region_name = _report_row['region_label'] if 'region_label' in\
-                   _report_row else _report_row['region']
-        _cdf = regions[_region_name].copy()
-        # do collapse preprocessing if we need to combine phenotypes
-        for _collapse in _report_row['preprocessing']['collapse_phenotypes']:
-            _cdf = _cdf.collapse_phenotypes(_collapse['inputs'],
-                                        _collapse['output'])
-        # do gating preprocessing
-        for _gate in _report_row['preprocessing']['gates']:
-            _cdf = _cdf.threshold(_gate['phenotype'],_gate['label'])
-
-        # Get our counts object
-        _measured_regions = _cdf.get_measured_regions().loc[_cdf.get_measured_regions()['region_label']==_region_name]
-        _counts = _cdf.counts(measured_regions=_measured_regions)
-    
-        # now extract features
-        if _report_row['test'] == 'Count Density':
-            _pop1 = [SL(phenotypes=[_report_row['phenotype']],
-                       label=_report_row['biomarker_label'])]
-            _scnts = _counts.sample_counts(_pop1)
-            _fcnts = _counts.frame_counts(_pop1)
-            _scnts['row_number'] = orow['row_number']
-            _fcnts['row_number'] = orow['row_number']
-            _scnts['test'] = _report_row['test']
-            _fcnts['test'] = _report_row['test']
-            sample_count_densities.append(_scnts)
-            frame_count_densities.append(_fcnts)
-            _scnts = _scnts\
-                [['sample_name',
-                  'mean_density_mm2',
-                  'stderr_density_mm2',
-                  'stddev_density_mm2',
-                  'frame_count',
-                  'measured_count',
-                ]].\
-                rename(columns={'mean_density_mm2':'count_density',
-                                'stderr_density_mm2':'standard_error',
-                                'stddev_density_mm2':'standard_deviation',
-                                'measured_count':'measured_count',
-                                'sample_name':'sample'
-                               })
-            odata = _scnts.iloc[0].to_dict()
-        if _report_row['test'] == 'Percent Population':
-            _pop2 = [PL(numerator=SL(phenotypes=_report_row['numerator_phenotypes']),
-                        denominator=SL(phenotypes=_report_row['denominator_phenotypes']),
-                        label = _report_row['biomarker_label']
-                       )
-                    ]
-            _spcts = _counts.sample_percentages(_pop2)
-            _fpcts = _counts.frame_percentages(_pop2)
-            _spcts['row_number'] = orow['row_number']
-            _fpcts['row_number'] = orow['row_number']
-            _spcts['test'] = _report_row['test']
-            _fpcts['test'] = _report_row['test']
-            sample_count_percentages.append(_spcts)
-            frame_count_percentages.append(_fpcts)
-            _spcts = _spcts\
-            [['sample_name',
-              'mean_percent',
-              'stderr_percent',
-              'stddev_percent',
-              'cumulative_numerator',
-              'cumulative_denominator',
-              'cumulative_percent',
-              'frame_count',
-              'measured_count'
-             ]].rename(columns={
-            'cumulative_numerator':'cumulative_numerator_count',
-            'cumulative_denominator':'cumulative_denominator_count',
-            'measured_count':'measured_count',
-            'stderr_percent':'standard_error_percent',
-            'stddev_percent':'standard_deviation_percent',
-            'qualified_frame_count':'measured_count',
-            'sample_name':'sample'
-            })
-            _spcts['mean_fraction'] = _spcts['mean_percent'].\
-                apply(lambda x: np.nan if x!=x else x/100)
-            _spcts['standard_error_fraction'] = _spcts['standard_error_percent'].\
-                apply(lambda x: np.nan if x!=x else x/100)
-            _spcts['standard_deviation_fraction'] = _spcts['standard_deviation_percent'].\
-                apply(lambda x: np.nan if x!=x else x/100)
-            _spcts['cumulative_fraction'] = _spcts['cumulative_percent'].\
-                apply(lambda x: np.nan if x!=x else x/100)
-            odata = _spcts.iloc[0].to_dict()
-        if _report_row['test'] == 'Population Area':
-            _pop3 = [SL(phenotypes=[_report_row['phenotype']],
-                        label=_report_row['biomarker_label'])]
-            _sarea = _counts.sample_counts(_pop3)
-            _farea = _counts.frame_counts(_pop3)
-            _sarea['row_number'] = orow['row_number']
-            _farea['row_number'] = orow['row_number']
-            _sarea['test'] = _report_row['test']
-            _farea['test'] = _report_row['test']
-            sample_count_densities.append(_sarea)
-            frame_count_densities.append(_farea)
-            _sarea = _sarea\
-                [['sample_name',
-                  'cumulative_area_coverage_percent',
-                  'cumulative_region_area_pixels',
-                  'cumulative_cell_area_pixels',
-                  'frame_count',
-                  'mean_area_coverage_percent',
-                  'stderr_area_coverage_percent',
-                  'stddev_area_coverage_percent'
-                 ]].rename(columns={
-                'cumulative_cell_area_pixels':'area',
-                'cumulative_region_area_pixels':'total_area',
-                'cumulative_area_coverage_percent':'cumulative_coverage_percent',
-                'mean_area_coverage_percent':'mean_coverage_percent',
-                'stderr_area_coverage_percent':'stderr_coverage_percent',
-                'stddev_area_coverage_percent':'stddev_coverage_percent',
-                'sample_name':'sample'
-                })
-            _sarea['mean_coverage_fraction']=_sarea['mean_coverage_percent'].\
-                apply(lambda x: np.nan if x!=x else x/100)
-            _sarea['stderr_coverage_fraction']=_sarea['stderr_coverage_percent'].\
-                apply(lambda x: np.nan if x!=x else x/100)
-            _sarea['stddev_coverage_fraction']=_sarea['stddev_coverage_percent'].\
-                apply(lambda x: np.nan if x!=x else x/100)
-            _sarea['cumulative_coverage_fraction']=_sarea['cumulative_coverage_percent'].\
-                apply(lambda x: np.nan if x!=x else x/100)
-            odata = _sarea.iloc[0].to_dict()
-            # if you're in this then change region
-            orow['region_label'] = orow['region']
-            del orow['region']
-        output_set = {
-            'row_layout':orow,
-            'output':odata
-        }
+    for output_set, df_dict in all_outputs:
         report.append(output_set)
+        sample_count_densities+=df_dict['sample_count_densities']
+        frame_count_densities+=df_dict['frame_count_densities']
+        sample_count_percentages+=df_dict['sample_count_percentages']
+        frame_count_percentages+=df_dict['frame_count_percentages']
     if verbose: sys.stderr.write("\nCompleted report report rows.\n")
     sample_count_densities = pd.concat(sample_count_densities).reset_index(drop=True)
     sample_count_percentages = pd.concat(sample_count_percentages).reset_index(drop=True)
@@ -279,7 +151,9 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
         'report':report,
         'QC':{},
         'meta':{
-        
+            'package':'pythologist',
+            'version':version('pythologist'),
+            'execution_id':str(uuid4())
         },
         'parameters':parameters
     }
@@ -318,6 +192,158 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
     if verbose: sys.stderr.write("Completed all report.\n")
     return full_report, csi, dfs
 
+
+def get_report_row_entry(_row_number,_report_row,regions):
+        orow = _report_row.copy()
+        orow['row_number'] = _row_number + 1
+        if 'phenotype' in orow:
+            del orow['phenotype']
+        del orow['preprocessing']
+        if 'denominator_phenotypes' in orow:
+            del orow['denominator_phenotypes']
+        if 'numerator_phenotypes' in orow:
+            del orow['numerator_phenotypes']
+        #print(orow)
+
+        _region_name = _report_row['region_label'] if 'region_label' in\
+                   _report_row else _report_row['region']
+        _cdf = regions[_region_name].copy()
+        # do collapse preprocessing if we need to combine phenotypes
+        for _collapse in _report_row['preprocessing']['collapse_phenotypes']:
+            _cdf = _cdf.collapse_phenotypes(_collapse['inputs'],
+                                        _collapse['output'])
+        # do gating preprocessing
+        for _gate in _report_row['preprocessing']['gates']:
+            _cdf = _cdf.threshold(_gate['phenotype'],_gate['label'])
+
+        # Get our counts object
+        _measured_regions = _cdf.get_measured_regions().loc[_cdf.get_measured_regions()['region_label']==_region_name]
+        _counts = _cdf.counts(measured_regions=_measured_regions)
+    
+
+        row_sample_count_densities = []
+        row_frame_count_densities = []
+        row_sample_count_percentages = []
+        row_frame_count_percentages = []
+        # now extract features
+        if _report_row['test'] == 'Count Density':
+            _pop1 = [SL(phenotypes=[_report_row['phenotype']],
+                       label=_report_row['biomarker_label'])]
+            _scnts = _counts.sample_counts(_pop1)
+            _fcnts = _counts.frame_counts(_pop1)
+            _scnts['row_number'] = orow['row_number']
+            _fcnts['row_number'] = orow['row_number']
+            _scnts['test'] = _report_row['test']
+            _fcnts['test'] = _report_row['test']
+            row_sample_count_densities= [_scnts.copy()]
+            row_frame_count_densities = [_fcnts.copy()]
+            _scnts = _scnts\
+                [['sample_name',
+                  'mean_density_mm2',
+                  'stderr_density_mm2',
+                  'stddev_density_mm2',
+                  'frame_count',
+                  'measured_count',
+                ]].\
+                rename(columns={'mean_density_mm2':'count_density',
+                                'stderr_density_mm2':'standard_error',
+                                'stddev_density_mm2':'standard_deviation',
+                                'measured_count':'measured_count',
+                                'sample_name':'sample'
+                               })
+            odata = _scnts.iloc[0].to_dict()
+        elif _report_row['test'] == 'Percent Population':
+            _pop2 = [PL(numerator=SL(phenotypes=_report_row['numerator_phenotypes']),
+                        denominator=SL(phenotypes=_report_row['denominator_phenotypes']),
+                        label = _report_row['biomarker_label']
+                       )
+                    ]
+            _spcts = _counts.sample_percentages(_pop2)
+            _fpcts = _counts.frame_percentages(_pop2)
+            _spcts['row_number'] = orow['row_number']
+            _fpcts['row_number'] = orow['row_number']
+            _spcts['test'] = _report_row['test']
+            _fpcts['test'] = _report_row['test']
+
+            row_sample_count_percentages = [_spcts.copy()]
+            row_frame_count_percentages = [_fpcts.copy()]
+            _spcts = _spcts\
+            [['sample_name',
+              'mean_percent',
+              'stderr_percent',
+              'stddev_percent',
+              'cumulative_numerator',
+              'cumulative_denominator',
+              'cumulative_percent',
+              'frame_count',
+              'measured_count'
+             ]].rename(columns={
+            'cumulative_numerator':'cumulative_numerator_count',
+            'cumulative_denominator':'cumulative_denominator_count',
+            'measured_count':'measured_count',
+            'stderr_percent':'standard_error_percent',
+            'stddev_percent':'standard_deviation_percent',
+            'qualified_frame_count':'measured_count',
+            'sample_name':'sample'
+            })
+            _spcts['mean_fraction'] = _spcts['mean_percent'].\
+                apply(lambda x: np.nan if x!=x else x/100)
+            _spcts['standard_error_fraction'] = _spcts['standard_error_percent'].\
+                apply(lambda x: np.nan if x!=x else x/100)
+            _spcts['standard_deviation_fraction'] = _spcts['standard_deviation_percent'].\
+                apply(lambda x: np.nan if x!=x else x/100)
+            _spcts['cumulative_fraction'] = _spcts['cumulative_percent'].\
+                apply(lambda x: np.nan if x!=x else x/100)
+            odata = _spcts.iloc[0].to_dict()
+        elif _report_row['test'] == 'Population Area':
+            _pop3 = [SL(phenotypes=[_report_row['phenotype']],
+                        label=_report_row['biomarker_label'])]
+            _sarea = _counts.sample_counts(_pop3)
+            _farea = _counts.frame_counts(_pop3)
+            _sarea['row_number'] = orow['row_number']
+            _farea['row_number'] = orow['row_number']
+            _sarea['test'] = _report_row['test']
+            _farea['test'] = _report_row['test']
+            row_sample_count_densities = [_sarea.copy()]
+            row_frame_count_densities = [_farea.copy()]
+            _sarea = _sarea\
+                [['sample_name',
+                  'cumulative_area_coverage_percent',
+                  'cumulative_region_area_pixels',
+                  'cumulative_cell_area_pixels',
+                  'frame_count',
+                  'mean_area_coverage_percent',
+                  'stderr_area_coverage_percent',
+                  'stddev_area_coverage_percent'
+                 ]].rename(columns={
+                'cumulative_cell_area_pixels':'area',
+                'cumulative_region_area_pixels':'total_area',
+                'cumulative_area_coverage_percent':'cumulative_coverage_percent',
+                'mean_area_coverage_percent':'mean_coverage_percent',
+                'stderr_area_coverage_percent':'stderr_coverage_percent',
+                'stddev_area_coverage_percent':'stddev_coverage_percent',
+                'sample_name':'sample'
+                })
+            _sarea['mean_coverage_fraction']=_sarea['mean_coverage_percent'].\
+                apply(lambda x: np.nan if x!=x else x/100)
+            _sarea['stderr_coverage_fraction']=_sarea['stderr_coverage_percent'].\
+                apply(lambda x: np.nan if x!=x else x/100)
+            _sarea['stddev_coverage_fraction']=_sarea['stddev_coverage_percent'].\
+                apply(lambda x: np.nan if x!=x else x/100)
+            _sarea['cumulative_coverage_fraction']=_sarea['cumulative_coverage_percent'].\
+                apply(lambda x: np.nan if x!=x else x/100)
+            odata = _sarea.iloc[0].to_dict()
+            # if you're in this then change region
+            orow['region_label'] = orow['region']
+            del orow['region']
+        output_set = {
+            'row_layout':orow,
+            'output':odata
+        }
+        return output_set, {'sample_count_densities':row_sample_count_densities,
+                            'frame_count_densities':row_frame_count_densities,
+                            'sample_count_percentages':row_sample_count_percentages,
+                            'frame_count_percentages':row_frame_count_percentages}
 
 def report_dict_to_dataframes(report_dict):
     sample_name = report_dict['sample']

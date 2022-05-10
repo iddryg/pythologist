@@ -50,7 +50,8 @@ setup(
                     'plotnine',
                     'IPython',
                     'umap',
-                    'tables'
+                    'tables',
+                    'importlib-metadata >= 1.0 ; python_version < "3.8"'
                     ], 
   extras_require = {
         'test':  ["pythologist-test-images"]

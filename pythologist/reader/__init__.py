@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 import h5py, os, json, sys, shutil
 from uuid import uuid4
-from pythologist_image_utilities import map_image_ids
-from pythologist_reader.qc import QC
+from pythologist.image_utilities import map_image_ids
+from pythologist.reader.qc import QC
 from pythologist import CellDataFrame
 from tempfile import SpooledTemporaryFile
 

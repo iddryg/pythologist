@@ -2,9 +2,9 @@ import os, re, json, sys, math
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
-from pythologist_reader import CellFrameGeneric
+from pythologist.reader import CellFrameGeneric
 from uuid import uuid4
-from pythologist_image_utilities import read_tiff_stack, map_image_ids, \
+from pythologist.image_utilities import read_tiff_stack, map_image_ids, \
                                         image_edges, watershed_image, \
                                         median_id_coordinates
 from skimage.segmentation import flood_fill, flood

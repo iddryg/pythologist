@@ -1,7 +1,7 @@
 
-from pythologist_reader.formats.inform.sets import CellSampleInForm, CellProjectInForm
-from pythologist_reader.formats.inform.custom import CellSampleInFormCustomMask, CellProjectInFormCustomMask
-from pythologist_reader.formats.inform.custom import CellSampleInFormLineArea, CellProjectInFormLineArea
+from pythologist.reader.formats.inform.sets import CellSampleInForm, CellProjectInForm
+from pythologist.reader.formats.inform.custom import CellSampleInFormCustomMask, CellProjectInFormCustomMask
+from pythologist.reader.formats.inform.custom import CellSampleInFormLineArea, CellProjectInFormLineArea
 import os
 from tempfile import NamedTemporaryFile
 def read_standard_format_project(path,

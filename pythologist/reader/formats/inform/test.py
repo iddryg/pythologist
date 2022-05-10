@@ -2,8 +2,8 @@
 import unittest, os, shutil
 from tempfile import mkdtemp, gettempdir
 
-from pythologist_reader.formats.inform.frame import CellFrameInForm
-from pythologist_reader.formats.inform.sets import CellSampleInForm, CellProjectInForm
+from pythologist.reader.formats.inform.frame import CellFrameInForm
+from pythologist.reader.formats.inform.sets import CellSampleInForm, CellProjectInForm
 
 class InFormFrameTest(unittest.TestCase):
     @classmethod
