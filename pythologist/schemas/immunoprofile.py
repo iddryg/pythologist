@@ -1,6 +1,7 @@
 from pythologist.reader.formats.inform.immunoprofile import CellSampleInFormImmunoProfile
 from pythologist import CellDataFrame, SubsetLogic as SL, PercentageLogic as PL
 from importlib.metadata import version 
+from multiprocessing import Pool
 from uuid import uuid4
 import pandas as pd
 import json, sys
@@ -82,10 +83,11 @@ def execute_immunoprofile_extraction(
                                                              panels[panel_name][panel_version],
                                                              reports[report_name][report_version],
                                                              parameters,
+                                                             processes,
                                                              verbose
                                                              )
 
-def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_report,parameters,verbose=False):
+def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_report,parameters,processes,verbose=False):
     # make the cell dataframe
     if 'microns_per_pixel' not in parameters:
         raise ValueError('must have microns_per_pixel in parameters')
@@ -127,11 +129,18 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
     report_format = select_report
 
     all_outputs = []
-    all_inputs = [_row_number, _report_row, regions for _row_number, _report_row in enumerate(report_format['report_rows'])]
-    for _row_number, _report_row in enumerate(report_format['report_rows']):
-        if verbose: sys.stderr.write("row "+str(_row_number+1)+"/"+str(len(report_format['report_rows']))+"       \r")
-        o = get_report_row_entry(_row_number,_report_row, regions)
-        all_outputs.append(o)
+    all_inputs = [(_row_number, _report_row, regions) for _row_number, _report_row in enumerate(report_format['report_rows'])]
+
+    if processes==1:
+        all_outputs = [x for x in map(get_report_row_entry_PACKED,all_inputs)]
+    else:
+        pool = Pool(processes)
+        all_outputs = [x for x in pool.imap(get_report_row_entry_PACKED,all_inputs)]
+
+    #or _row_number, _report_row in enumerate(report_format['report_rows']):
+    #    if verbose: sys.stderr.write("row "+str(_row_number+1)+"/"+str(len(report_format['report_rows']))+"       \r")
+    #    o = get_report_row_entry(_row_number,_report_row, regions)
+    #    all_outputs.append(o)
 
     for output_set, df_dict in all_outputs:
         report.append(output_set)
@@ -139,7 +148,7 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
         frame_count_densities+=df_dict['frame_count_densities']
         sample_count_percentages+=df_dict['sample_count_percentages']
         frame_count_percentages+=df_dict['frame_count_percentages']
-    if verbose: sys.stderr.write("\nCompleted report report rows.\n")
+    if verbose: sys.stderr.write("Completed report report rows.\n")
     sample_count_densities = pd.concat(sample_count_densities).reset_index(drop=True)
     sample_count_percentages = pd.concat(sample_count_percentages).reset_index(drop=True)
 
@@ -192,6 +201,8 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
     if verbose: sys.stderr.write("Completed all report.\n")
     return full_report, csi, dfs
 
+def get_report_row_entry_PACKED(input_list):
+    return get_report_row_entry(*input_list)
 
 def get_report_row_entry(_row_number,_report_row,regions):
         orow = _report_row.copy()
