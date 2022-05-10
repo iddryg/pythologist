@@ -1,4 +1,4 @@
-from pythologist_reader.formats.inform.immunoprofile import CellSampleInFormImmunoProfile
+from pythologist.reader.formats.inform.immunoprofile import CellSampleInFormImmunoProfile
 from pythologist import CellDataFrame, SubsetLogic as SL, PercentageLogic as PL
 import pandas as pd
 import json, sys
