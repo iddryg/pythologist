@@ -1,6 +1,9 @@
 from pythologist.reader.formats.inform.immunoprofile import CellSampleInFormImmunoProfile
 from pythologist import CellDataFrame, SubsetLogic as SL, PercentageLogic as PL
-from importlib.metadata import version 
+try:
+    from importlib.metadata import version 
+except ModuleNotFoundError:
+    from importlib_metadata import version
 from multiprocessing import Pool
 from uuid import uuid4
 import pandas as pd
