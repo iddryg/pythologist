@@ -3,7 +3,7 @@ The CLI tool for validating the setup of templates, and the staging of files.
 
 """
 import argparse, os, json, sys, hashlib
-from importlib_resources import files
+from importlib.resources import files
 from pythologist.schemas.template import excel_to_json
 from pythologist.schemas.platforms.InForm.files import injest_project, injest_sample
 from pythologist.schemas.report import convert_report_definition_to_report

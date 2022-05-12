@@ -25,7 +25,7 @@ setup(
     'License :: OSI Approved :: Apache Software License'
   ],
   keywords='bioinformatics',
-  packages=['pythologist'],
+  packages=find_packages(include=['pythologist','pythologist.*']),
   package_data={
     'pythologist':[
       'schema_data/*.json',
@@ -44,12 +44,7 @@ setup(
                     'tifffile>=2019.7.26',
                     'sklearn',
                     'jsonschema',
-                    'importlib_resources',
-                    'XlsxWriter',
                     'openpyxl',
-                    'plotnine',
-                    'IPython',
-                    'umap',
                     'tables',
                     'importlib-metadata >= 1.0 ; python_version < "3.8"'
                     ], 

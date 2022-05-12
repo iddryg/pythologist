@@ -3,7 +3,7 @@
 Input is a json prepared by the staging tool.
 """
 
-from importlib_resources import files
+from importlib.resources import files
 from pythologist.schemas import get_validator
 from pythologist.reader.formats.inform import read_standard_format_sample_to_project
 from pythologist import CellDataFrame, SubsetLogic as SL, PercentageLogic as PL

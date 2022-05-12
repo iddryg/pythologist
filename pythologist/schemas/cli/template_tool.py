@@ -12,7 +12,7 @@ import json
 from openpyxl.styles import NamedStyle, Font, Border, Side, PatternFill
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
-from importlib_resources import files
+from importlib.resources import files
 from pythologist.schemas import get_validator
 
 highlight = NamedStyle(name="highlight")
