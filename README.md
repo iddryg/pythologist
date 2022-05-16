@@ -69,7 +69,7 @@ This will start jupyter lab on port 8888 as your user and group.
 
 Any of the test data examples should work fine in this environment.
 
-# Installation of the latest version
+# Installation of the latest version 
 
 ## The pip install is not up-to-date with the current version of the package.  
 

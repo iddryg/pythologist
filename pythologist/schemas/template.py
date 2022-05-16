@@ -1,6 +1,6 @@
 from openpyxl import Workbook, load_workbook
 #from importlib_resources import files
-from pythologist_schemas import get_validator
+from pythologist.schemas import get_validator
 
 def excel_to_json(excel_template_path,
                   json_schema_path,

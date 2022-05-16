@@ -25,42 +25,38 @@ setup(
     'License :: OSI Approved :: Apache Software License'
   ],
   keywords='bioinformatics',
-  packages=['pythologist',
-            'pythologist_reader',
-            'pythologist_image_utilities',
-           'pythologist_schemas',
-            'schema_data',
-            'schema_data.inputs',
-            'schema_data.inputs.platforms.InForm'],
+  packages=find_packages(include=['pythologist','pythologist.*']),
+  package_data={
+    'pythologist':[
+      'schema_data/*.json',
+      'schema_data/inputs/*.json',
+      'schema_data/inputs/platforms/InForm/*.json'
+    ]
+  },
   install_requires=['pandas>=1.2.2',
                     'numpy',
                     'scipy',
                     'h5py',
                     'imageio',
-                    'Pillow',
                     'xmltodict', 
                     'scikit-image>=0.16.2',
                     'imagecodecs',
                     'tifffile>=2019.7.26',
                     'sklearn',
                     'jsonschema',
-                    'importlib_resources',
-                    'XlsxWriter',
                     'openpyxl',
-                    'plotnine',
-                    'IPython',
-                    'umap',
-                    'tables'
+                    'tables',
+                    'importlib-metadata >= 1.0 ; python_version < "3.8"'
                     ], 
   extras_require = {
         'test':  ["pythologist-test-images"]
   },
   include_package_data = True,
   entry_points = {
-    'console_scripts':['pythologist-stage=pythologist_schemas.cli.stage_tool:cli',
-                       'pythologist-templates=pythologist_schemas.cli.template_tool:cli',
-                       'pythologist-run=pythologist_schemas.cli.run_tool:cli',
-                       'pythologist-report=pythologist_schemas.cli.report_tool:cli'
+    'console_scripts':['pythologist-stage=pythologist.schemas.cli.stage_tool:cli',
+                       'pythologist-templates=pythologist.schemas.cli.template_tool:cli',
+                       'pythologist-run=pythologist.schemas.cli.run_tool:cli',
+                       'pythologist-report=pythologist.schemas.cli.report_tool:cli'
                       ]
   },
 )

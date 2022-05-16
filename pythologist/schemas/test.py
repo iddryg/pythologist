@@ -1,5 +1,5 @@
 import unittest, os, json,sys
-from pythologist_schemas import get_validator
+from pythologist.schemas import get_validator
 
 class TestValidSchemas(unittest.TestCase):
     pass

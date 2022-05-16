@@ -3,8 +3,8 @@
 Input is an output_json prepared by the run tool.
 """
 
-from importlib_resources import files
-from pythologist_schemas import get_validator
+from importlib.resources import files
+from pythologist.schemas import get_validator
 import logging, argparse, json
 import pandas as pd
 from collections import OrderedDict

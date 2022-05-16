@@ -1,6 +1,6 @@
-from pythologist_reader.formats.inform.frame import CellFrameInForm
-from pythologist_reader.formats.inform.sets import CellSampleInForm, CellProjectInForm
-from pythologist_image_utilities import read_tiff_stack, make_binary_image_array, binary_image_dilation
+from pythologist.reader.formats.inform.frame import CellFrameInForm
+from pythologist.reader.formats.inform.sets import CellSampleInForm, CellProjectInForm
+from pythologist.image_utilities import read_tiff_stack, make_binary_image_array, binary_image_dilation
 from uuid import uuid4
 import pandas as pd
 import numpy as np
@@ -60,6 +60,10 @@ class CellSampleInFormCustomMask(CellSampleInForm):
         for file in segs:
             m = re.match('(.*)cell_seg_data.txt$',file)
             score = os.path.join(path,m.group(1)+'score_data.txt') if require_score is True else None
+            if ((not os.path.exists(score)) and (not require_score)):
+                # score is now none
+                #print("set to none")
+                score = None
             #summary = os.path.join(path,m.group(1)+'cell_seg_data_summary.txt')
             binary_seg_maps = os.path.join(path,m.group(1)+'binary_seg_maps.tif')
             component_image = os.path.join(path,m.group(1)+'component_data.tif')
@@ -183,6 +187,10 @@ class CellSampleInFormLineArea(CellSampleInForm):
         for file in segs:
             m = re.match('(.*)cell_seg_data.txt$',file)
             score = os.path.join(path,m.group(1)+'score_data.txt')
+            if ((not os.path.exists(score)) and (not require_score)):
+                # score is now none
+                #print("set to none")
+                score = None
             #summary = os.path.join(path,m.group(1)+'cell_seg_data_summary.txt')
             binary_seg_maps = os.path.join(path,m.group(1)+'binary_seg_maps.tif')
             component_image = os.path.join(path,m.group(1)+'component_data.tif')
@@ -230,23 +238,43 @@ class CellFrameInFormLineArea(CellFrameInForm):
             if x in self._data: continue
             self._data[x] = pd.DataFrame(columns=self.data_tables[x]['columns'])
             self._data[x].index.name = self.data_tables[x]['index']
-    def set_line_area(self,line_image,area_image,steps=20,verbose=False):
+    def set_line_area(self,line_image,area_image,steps=-1,verbose=False):
+        if steps <0:
+            raise ValueError("Steps must be set and must be greater than or equal to zero")
+        if verbose:
+            sys.stderr.write("Initialize numpy arrays\n")
         processed_image = self.get_image(self.processed_image_id).astype(np.uint8)
         zero_binary = processed_image&(~processed_image)
         drawn_binary = np.zeros(self.shape)
+        if verbose:
+            sys.stderr.write("Done initializing numpy arrays\n")
+        image_id2= uuid4().hex
+        if verbose:
+            sys.stderr.write("Reading tumor image\n")
         area_binary = read_tiff_stack(area_image)[0]['raw_image']
+        if verbose:
+            sys.stderr.write("Binarizing tumor image\n")
         area_binary = make_binary_image_array(area_binary)
         full_tumor = area_binary&processed_image
-        image_id2= uuid4().hex
+        if verbose:
+            sys.stderr.write("Done reading tumor image\n")
         self._images[image_id2] = area_binary
         if line_image is not None and os.path.exists(line_image):
+            if verbose:
+                sys.stderr.write("Reading line image\n")
             drawn_binary = read_tiff_stack(line_image)[0]['raw_image']
+            if verbose:
+                sys.stderr.write("Binarizing tumor image\n")
             drawn_binary = make_binary_image_array(drawn_binary)
+            if verbose:
+                sys.stderr.write("Done reading line image\n")
         else:
             # specialcase of no line
             df = pd.DataFrame({'mask_label':['Area'],'image_id':[image_id2]})
             df.index.name = 'db_id'
             self.set_data('mask_images',df)
+            if verbose:
+                sys.stderr.write("Determine region masks for tumor only\n")
             inner_tumor_binary = full_tumor&processed_image
             inner_margin_binary = zero_binary
             outer_margin_binary = zero_binary
@@ -260,7 +288,11 @@ class CellFrameInFormLineArea(CellFrameInForm):
              'OuterStroma':outer_stroma_binary,
              'Undefined':undefined_binary
             }
+            if verbose:
+                sys.stderr.write("Setting regions\n")
             self.set_regions('InFormLineArea',d,description="Tumor stroma interface set from a mask and optional drawn line.")
+            if verbose:
+                sys.stderr.write("Regions are set\n")
             return d
         image_id1 = uuid4().hex
         self._images[image_id1] = drawn_binary
@@ -269,8 +301,11 @@ class CellFrameInFormLineArea(CellFrameInForm):
         df.index.name = 'db_id'
         self.set_data('mask_images',df)
 
-
+        if verbose:
+            sys.stderr.write("Execute binary dialation for steps="+str(steps)+" pixels\n")
         grown = binary_image_dilation(drawn_binary,steps=steps)
+        if verbose:
+            sys.stderr.write("Determine region masks for margin and tumor\n")
         margin_binary = grown&processed_image
         inner_tumor_binary = (full_tumor&(~margin_binary))&processed_image
         inner_margin_binary = (full_tumor&(margin_binary))&processed_image
@@ -284,6 +319,10 @@ class CellFrameInFormLineArea(CellFrameInForm):
              'OuterStroma':outer_stroma_binary,
              'Undefined':undefined_binary
             }
+        if verbose:
+            sys.stderr.write("Setting regions\n")
         self.set_regions('InFormLineArea',d,description="Tumor stroma interface set from a mask and optional drawn line.")
+        if verbose:
+            sys.stderr.write("Regions are set\n")
         return d
 

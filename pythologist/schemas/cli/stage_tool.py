@@ -3,13 +3,13 @@ The CLI tool for validating the setup of templates, and the staging of files.
 
 """
 import argparse, os, json, sys, hashlib
-from importlib_resources import files
-from pythologist_schemas.template import excel_to_json
-from pythologist_schemas.platforms.InForm.files import injest_project, injest_sample
-from pythologist_schemas.report import convert_report_definition_to_report
-from pythologist_reader.formats.inform.custom import CellFrameInFormLineArea, CellFrameInFormCustomMask
-from pythologist_reader.formats.inform.frame import CellFrameInForm
-from pythologist_image_utilities import hash_tiff_contents
+from importlib.resources import files
+from pythologist.schemas.template import excel_to_json
+from pythologist.schemas.platforms.InForm.files import injest_project, injest_sample
+from pythologist.schemas.report import convert_report_definition_to_report
+from pythologist.reader.formats.inform.custom import CellFrameInFormLineArea, CellFrameInFormCustomMask
+from pythologist.reader.formats.inform.frame import CellFrameInForm
+from pythologist.image_utilities import hash_tiff_contents
 import pandas as pd
 import logging
 

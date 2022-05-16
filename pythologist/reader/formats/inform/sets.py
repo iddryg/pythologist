@@ -1,7 +1,7 @@
 import os, re, sys, h5py
-from pythologist_reader.formats.inform.frame import CellFrameInForm
-from pythologist_reader import CellSampleGeneric, CellProjectGeneric
-from pythologist_reader.qc import QCTestGeneric, QC, Result
+from pythologist.reader.formats.inform.frame import CellFrameInForm
+from pythologist.reader import CellSampleGeneric, CellProjectGeneric
+from pythologist.reader.qc import QCTestGeneric, QC, Result
 from uuid import uuid4
 import pandas as pd
 
@@ -62,6 +62,7 @@ class CellProjectInForm(CellProjectGeneric):
                        verbose=False,
                        require_component=True,
                        require_score=True,
+                       skip_component=False,
                        skip_segmentation_processing=False,
                        microns_per_pixel=None,
                        inform_analysis_dict=None,
@@ -102,8 +103,10 @@ class CellProjectInForm(CellProjectGeneric):
             else: sname  = s.split(os.sep)[sample_name_index]
             sid = self.add_sample_path(s,sample_name=sname,
                                          inform_analysis_dict=inform_analysis_dict,
-                                         verbose=verbose,require_component=require_component,
+                                         verbose=verbose,
+                                         require_component=require_component,
                                          require_score=require_score,
+                                         skip_component=skip_component,
                                          skip_segmentation_processing=skip_segmentation_processing,
                                          dry_run=dry_run,
                                          **kwargs)
@@ -116,6 +119,7 @@ class CellProjectInForm(CellProjectGeneric):
                              verbose=False,
                              require_component=True,
                              require_score=True,
+                             skip_component=False,
                              skip_segmentation_processing=False,
                              dry_run=False,
                              **kwargs):
@@ -200,6 +204,7 @@ class CellSampleInForm(CellSampleGeneric):
                        verbose=False,
                        require_component=True,
                        require_score=True,
+                       skip_component=False,
                        skip_segmentation_processing=False,
                        inform_analysis_dict=None,
                        dry_run=False,
@@ -213,7 +218,7 @@ class CellSampleInForm(CellSampleGeneric):
             sample_name_index (int): where in the directory chain is the foldername that is the sample name if not set use full path.  -1 is last directory
             channel_abbreviations (dict): dictionary of shortcuts to translate to simpler channel names
             verbose (bool): if true print extra details
-            require (bool): if true (default), require that channel componenet image be present
+            require_component (bool): if true (default), require that channel componenet image be present
             require_score (bool): if true (default), require that score file be present
             skip_segmentation_processing (bool): if false (default), it will store the cellmap and edgemap images, if true, it will skip these steps to save time but downstream applications will not be able to generate the cell-cell contact measurements or segmentation images.
             microns_per_pixel (float): conversion factor
@@ -231,6 +236,10 @@ class CellSampleInForm(CellSampleGeneric):
         for file in segs:
             m = re.match('(.*)cell_seg_data.txt$',file)
             score = os.path.join(path,m.group(1)+'score_data.txt')
+            if ((not os.path.exists(score)) and (not require_score)):
+                # score is now none
+                #print("set to none")
+                score = None
             #summary = os.path.join(path,m.group(1)+'cell_seg_data_summary.txt')
             binary_seg_maps = os.path.join(path,m.group(1)+'binary_seg_maps.tif')
             component_image = os.path.join(path,m.group(1)+'component_data.tif')
@@ -255,6 +264,7 @@ class CellSampleInForm(CellSampleGeneric):
                          verbose=verbose,
                          require_component=require_component,
                          require_score=require_score,
+                         skip_component=skip_component,
                          skip_segmentation_processing=skip_segmentation_processing,
                          dry_run=dry_run
                          )

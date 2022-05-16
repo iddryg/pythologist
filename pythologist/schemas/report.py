@@ -1,6 +1,6 @@
 import json
-from importlib_resources import files
-from pythologist_schemas import get_validator
+from importlib.resources import files
+from pythologist.schemas import get_validator
 
 report_definition_schema_validator = get_validator(files('schema_data.inputs').joinpath('report_definition.json'))
 report_schema_validator = get_validator(files('schema_data.inputs').joinpath('report.json'))

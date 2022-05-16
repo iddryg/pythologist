@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 import h5py, os, json, sys, shutil
 from uuid import uuid4
-from pythologist_image_utilities import map_image_ids
-from pythologist_reader.qc import QC
+from pythologist.image_utilities import map_image_ids
+from pythologist.reader.qc import QC
 from pythologist import CellDataFrame
 from tempfile import SpooledTemporaryFile
 
@@ -573,7 +573,6 @@ class CellFrameGeneric(object):
         temp1['phenotype_label'] = 'TOTAL'
         temp1['phenotype_calls'] = temp1['phenotype_label'].apply(lambda x: {'TOTAL':1})
 
-
         _fdt = self.get_data('feature_definitions')
         _fdt['feature_tuple'] = _fdt.apply(lambda x: tuple([x['feature_value'],x['feature_value_label']]),1)
         _fgt = _fdt.groupby('feature_index').apply(lambda x: set(x['feature_tuple']))
@@ -594,7 +593,7 @@ class CellFrameGeneric(object):
                     list(x)
                 ))
             ,1).reset_index().rename(columns={0:'channel_values'}).set_index('cell_index')
-            temp1 = temp1.merge(temp4,left_index=True,right_index=True)
+            temp1 = temp1.merge(temp4,left_on='cell_index',right_index=True)
         else:
             temp1['channel_values'] = np.nan
         #return temp1

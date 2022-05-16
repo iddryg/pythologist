@@ -1,6 +1,11 @@
-from pythologist_reader.formats.inform.immunoprofile import CellSampleInFormImmunoProfile
+from pythologist.reader.formats.inform.immunoprofile import CellSampleInFormImmunoProfile
 from pythologist import CellDataFrame, SubsetLogic as SL, PercentageLogic as PL
-import numpy as np
+try:
+    from importlib.metadata import version 
+except ModuleNotFoundError:
+    from importlib_metadata import version
+from multiprocessing import Pool
+from uuid import uuid4
 import pandas as pd
 import json, sys
 
@@ -48,7 +53,7 @@ def execute_immunoprofile_extraction(
     reports = json.loads(open(report_source,'r').read())
     # read in the data
     csi = CellSampleInFormImmunoProfile()
-
+    csi.sample_name = sample_name
     step_size = round((invasive_margin_width_microns/microns_per_pixel)-(invasive_margin_drawn_line_width_pixels/2))
     if verbose:
         sys.stderr.write("Step size for watershed: "+str(step_size)+"\n")
@@ -61,15 +66,42 @@ def execute_immunoprofile_extraction(
               steps=step_size,
               processes=processes,
               skip_segmentation_processing=True,
+              skip_component=True,
               gimp_repositioned=gimp_repositioned
             )
+    parameters = {
+            'inform_analysis_path':path,
+            'invasive_margin_drawn_line_width_pixels':invasive_margin_drawn_line_width_pixels,
+            'invasive_margin_width_microns':invasive_margin_width_microns,
+            'microns_per_pixel':microns_per_pixel,
+            'panel_name':panel_name,
+            'panel_source':panel_source,
+            'panel_version':panel_version,
+            'report_name':report_name,
+            'report_source':report_source,
+            'report_version':report_version,
+            'sample_name':sample_name
+        }
+    return execute_immunoprofile_extraction_from_pythologist(csi, 
+                                                             panels[panel_name][panel_version],
+                                                             reports[report_name][report_version],
+                                                             parameters,
+                                                             processes,
+                                                             verbose
+                                                             )
 
+def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_report,parameters,processes,verbose=False):
     # make the cell dataframe
+    if 'microns_per_pixel' not in parameters:
+        raise ValueError('must have microns_per_pixel in parameters')
+    if verbose: sys.stderr.write("Extract CellDataFrame for report generation.\n")
     cdf = csi.cdf(region_group='InFormLineArea',
-              mutually_exclusive_phenotypes=panels[panel_name][panel_version]['phenotypes']).\
+              mutually_exclusive_phenotypes=select_panel['phenotypes']).\
     drop_regions(['Undefined','OuterStroma'])#.filter_regions_by_area_pixels()
-    cdf.microns_per_pixel = microns_per_pixel
+    cdf.microns_per_pixel = parameters['microns_per_pixel']
+    if verbose: sys.stderr.write("Completed CellDataFrame for report generation.\n")
 
+    if verbose: sys.stderr.write("Create cell data frames necessary for each region definition.\n")
     regions = {}
     # Drop everything except the region we are using in each one
     #included_margin = []
@@ -86,18 +118,96 @@ def execute_immunoprofile_extraction(
     regions['Full Tumor'] = cdf.\
         combine_regions(['InnerTumor','InnerMargin'],'Full Tumor')
 
+    if verbose: sys.stderr.write("Completed cell data frames necessary for each region definition.\n")
     # Now read through and build the report
     sample_count_densities = []
     sample_count_percentages = []
-
     frame_count_densities = []
     frame_count_percentages = []
 
     # reconstruct the ugly R report
     report = []
 
-    report_format = reports[report_name][report_version]
-    for _row_number, _report_row in enumerate(report_format['report_rows']):
+    if verbose: sys.stderr.write("Build report.\n")
+    report_format = select_report
+
+    all_outputs = []
+    all_inputs = [(_row_number, _report_row, regions) for _row_number, _report_row in enumerate(report_format['report_rows'])]
+
+    if processes==1:
+        all_outputs = [x for x in map(get_report_row_entry_PACKED,all_inputs)]
+    else:
+        pool = Pool(processes)
+        all_outputs = [x for x in pool.imap(get_report_row_entry_PACKED,all_inputs)]
+
+    #or _row_number, _report_row in enumerate(report_format['report_rows']):
+    #    if verbose: sys.stderr.write("row "+str(_row_number+1)+"/"+str(len(report_format['report_rows']))+"       \r")
+    #    o = get_report_row_entry(_row_number,_report_row, regions)
+    #    all_outputs.append(o)
+
+    for output_set, df_dict in all_outputs:
+        report.append(output_set)
+        sample_count_densities+=df_dict['sample_count_densities']
+        frame_count_densities+=df_dict['frame_count_densities']
+        sample_count_percentages+=df_dict['sample_count_percentages']
+        frame_count_percentages+=df_dict['frame_count_percentages']
+    if verbose: sys.stderr.write("Completed report report rows.\n")
+    sample_count_densities = pd.concat(sample_count_densities).reset_index(drop=True)
+    sample_count_percentages = pd.concat(sample_count_percentages).reset_index(drop=True)
+
+    frame_count_densities = pd.concat(frame_count_densities).reset_index(drop=True)
+    frame_count_percentages = pd.concat(frame_count_percentages).reset_index(drop=True)
+
+    full_report = {
+        'sample':csi.sample_name,
+        'report':report,
+        'QC':{},
+        'meta':{
+            'package':'pythologist',
+            'version':version('pythologist'),
+            'execution_id':str(uuid4())
+        },
+        'parameters':parameters
+    }
+
+    # Get a regions dataframe
+    _t1 = cdf.get_measured_regions()
+    _t1 = _t1.loc[_t1['region_label']=='InnerTumor',:].rename(columns={'InnerTumor':'Tumor'})
+
+    _t2 = cdf.get_measured_regions()
+    _t2 = _t2.loc[_t2['region_label'].isin(['InnerTumor','InnerMargin','OuterMargin']),:]
+    _t2['region_label'] = 'Tumor + Invasive Margin'
+    _t2 = _t2.groupby(cdf.frame_columns+['region_label']).sum().reset_index()
+
+    _t3 = cdf.get_measured_regions()
+    _t3 = _t3.loc[_t3['region_label'].isin(['InnerMargin','OuterMargin']),:]
+    _t3['region_label'] = 'Invasive Margin'
+    _t3 = _t3.groupby(cdf.frame_columns+['region_label']).sum().reset_index()
+
+    _t4 = cdf.get_measured_regions()
+    _t4 = _t4.loc[_t4['region_label'].isin(['InnerTumor','InnerMargin']),:]
+    _t4['region_label'] = 'Full Tumor'
+    _t4 = _t4.groupby(cdf.frame_columns+['region_label']).sum().reset_index()
+
+    regions = pd.concat([_t1,_t2,_t3,_t4]).\
+        drop(columns=['project_id','project_name','sample_id','frame_id','region_cell_count'])
+    regions['region_area_mm2'] = regions['region_area_pixels'].apply(lambda x: x*(cdf.microns_per_pixel*cdf.microns_per_pixel)/1000000)
+
+
+    dfs = {
+        'sample_count_densities':sample_count_densities.drop(columns=['project_id','project_name','sample_id','population_percent','sample_total_count']),
+        'sample_count_percentages':sample_count_percentages.drop(columns=['project_id','project_name','sample_id']),
+        'frame_count_densities':frame_count_densities.drop(columns=['project_id','project_name','sample_id','frame_id','population_percent','frame_total_count']),
+        'frame_count_percentages':frame_count_percentages.drop(columns=['project_id','project_name','sample_id','frame_id']),
+        'regions':regions
+    }
+    if verbose: sys.stderr.write("Completed all report.\n")
+    return full_report, csi, dfs
+
+def get_report_row_entry_PACKED(input_list):
+    return get_report_row_entry(*input_list)
+
+def get_report_row_entry(_row_number,_report_row,regions):
         orow = _report_row.copy()
         orow['row_number'] = _row_number + 1
         if 'phenotype' in orow:
@@ -124,6 +234,11 @@ def execute_immunoprofile_extraction(
         _measured_regions = _cdf.get_measured_regions().loc[_cdf.get_measured_regions()['region_label']==_region_name]
         _counts = _cdf.counts(measured_regions=_measured_regions)
     
+
+        row_sample_count_densities = []
+        row_frame_count_densities = []
+        row_sample_count_percentages = []
+        row_frame_count_percentages = []
         # now extract features
         if _report_row['test'] == 'Count Density':
             _pop1 = [SL(phenotypes=[_report_row['phenotype']],
@@ -134,8 +249,8 @@ def execute_immunoprofile_extraction(
             _fcnts['row_number'] = orow['row_number']
             _scnts['test'] = _report_row['test']
             _fcnts['test'] = _report_row['test']
-            sample_count_densities.append(_scnts)
-            frame_count_densities.append(_fcnts)
+            row_sample_count_densities= [_scnts.copy()]
+            row_frame_count_densities = [_fcnts.copy()]
             _scnts = _scnts\
                 [['sample_name',
                   'mean_density_mm2',
@@ -151,7 +266,7 @@ def execute_immunoprofile_extraction(
                                 'sample_name':'sample'
                                })
             odata = _scnts.iloc[0].to_dict()
-        if _report_row['test'] == 'Percent Population':
+        elif _report_row['test'] == 'Percent Population':
             _pop2 = [PL(numerator=SL(phenotypes=_report_row['numerator_phenotypes']),
                         denominator=SL(phenotypes=_report_row['denominator_phenotypes']),
                         label = _report_row['biomarker_label']
@@ -163,8 +278,9 @@ def execute_immunoprofile_extraction(
             _fpcts['row_number'] = orow['row_number']
             _spcts['test'] = _report_row['test']
             _fpcts['test'] = _report_row['test']
-            sample_count_percentages.append(_spcts)
-            frame_count_percentages.append(_fpcts)
+
+            row_sample_count_percentages = [_spcts.copy()]
+            row_frame_count_percentages = [_fpcts.copy()]
             _spcts = _spcts\
             [['sample_name',
               'mean_percent',
@@ -193,7 +309,7 @@ def execute_immunoprofile_extraction(
             _spcts['cumulative_fraction'] = _spcts['cumulative_percent'].\
                 apply(lambda x: np.nan if x!=x else x/100)
             odata = _spcts.iloc[0].to_dict()
-        if _report_row['test'] == 'Population Area':
+        elif _report_row['test'] == 'Population Area':
             _pop3 = [SL(phenotypes=[_report_row['phenotype']],
                         label=_report_row['biomarker_label'])]
             _sarea = _counts.sample_counts(_pop3)
@@ -202,8 +318,8 @@ def execute_immunoprofile_extraction(
             _farea['row_number'] = orow['row_number']
             _sarea['test'] = _report_row['test']
             _farea['test'] = _report_row['test']
-            sample_count_densities.append(_sarea)
-            frame_count_densities.append(_farea)
+            row_sample_count_densities = [_sarea.copy()]
+            row_frame_count_densities = [_farea.copy()]
             _sarea = _sarea\
                 [['sample_name',
                   'cumulative_area_coverage_percent',
@@ -238,68 +354,10 @@ def execute_immunoprofile_extraction(
             'row_layout':orow,
             'output':odata
         }
-        report.append(output_set)
-    sample_count_densities = pd.concat(sample_count_densities).reset_index(drop=True)
-    sample_count_percentages = pd.concat(sample_count_percentages).reset_index(drop=True)
-
-    frame_count_densities = pd.concat(frame_count_densities).reset_index(drop=True)
-    frame_count_percentages = pd.concat(frame_count_percentages).reset_index(drop=True)
-
-    full_report = {
-        'sample':sample_name,
-        'report':report,
-        'QC':{},
-        'meta':{
-        
-        },
-        'parameters':{
-            'inform_analysis_path':path,
-            'invasive_margin_drawn_line_width_pixels':invasive_margin_drawn_line_width_pixels,
-            'invasive_margin_width_microns':invasive_margin_width_microns,
-            'microns_per_pixel':microns_per_pixel,
-            'panel_name':panel_name,
-            'panel_source':panel_source,
-            'panel_version':panel_version,
-            'report_name':report_name,
-            'report_source':report_source,
-            'report_version':report_version,
-            'sample_name':sample_name
-        }
-    }
-
-    # Get a regions dataframe
-    _t1 = cdf.get_measured_regions()
-    _t1 = _t1.loc[_t1['region_label']=='InnerTumor',:].rename(columns={'InnerTumor':'Tumor'})
-
-    _t2 = cdf.get_measured_regions()
-    _t2 = _t2.loc[_t2['region_label'].isin(['InnerTumor','InnerMargin','OuterMargin']),:]
-    _t2['region_label'] = 'Tumor + Invasive Margin'
-    _t2 = _t2.groupby(cdf.frame_columns+['region_label']).sum().reset_index()
-
-    _t3 = cdf.get_measured_regions()
-    _t3 = _t3.loc[_t3['region_label'].isin(['InnerMargin','OuterMargin']),:]
-    _t3['region_label'] = 'Invasive Margin'
-    _t3 = _t3.groupby(cdf.frame_columns+['region_label']).sum().reset_index()
-
-    _t4 = cdf.get_measured_regions()
-    _t4 = _t4.loc[_t4['region_label'].isin(['InnerTumor','InnerMargin']),:]
-    _t4['region_label'] = 'Full Tumor'
-    _t4 = _t4.groupby(cdf.frame_columns+['region_label']).sum().reset_index()
-
-    regions = pd.concat([_t1,_t2,_t3,_t4]).\
-        drop(columns=['project_id','project_name','sample_id','frame_id','region_cell_count'])
-    regions['region_area_mm2'] = regions['region_area_pixels'].apply(lambda x: x*(cdf.microns_per_pixel*cdf.microns_per_pixel)/1000000)
-
-
-    dfs = {
-        'sample_count_densities':sample_count_densities.drop(columns=['project_id','project_name','sample_id','population_percent','sample_total_count']),
-        'sample_count_percentages':sample_count_percentages.drop(columns=['project_id','project_name','sample_id']),
-        'frame_count_densities':frame_count_densities.drop(columns=['project_id','project_name','sample_id','frame_id','population_percent','frame_total_count']),
-        'frame_count_percentages':frame_count_percentages.drop(columns=['project_id','project_name','sample_id','frame_id']),
-        'regions':regions
-    }
-    return full_report, csi, dfs
-
+        return output_set, {'sample_count_densities':row_sample_count_densities,
+                            'frame_count_densities':row_frame_count_densities,
+                            'sample_count_percentages':row_sample_count_percentages,
+                            'frame_count_percentages':row_frame_count_percentages}
 
 def report_dict_to_dataframes(report_dict):
     sample_name = report_dict['sample']
