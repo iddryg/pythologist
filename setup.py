@@ -46,7 +46,8 @@ setup(
                     'jsonschema',
                     'openpyxl',
                     'tables',
-                    'importlib-metadata >= 1.0 ; python_version < "3.8"'
+                    'importlib-metadata >= 1.0 ; python_version < "3.8"',
+                    'opencv-python'
                     ], 
   extras_require = {
         'test':  ["pythologist-test-images"]

@@ -7,6 +7,7 @@ except ModuleNotFoundError:
 from multiprocessing import Pool
 from uuid import uuid4
 import pandas as pd
+import numpy as np
 import json, sys
 
 def execute_immunoprofile_extraction(

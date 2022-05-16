@@ -7,6 +7,7 @@ from sklearn.neighbors import NearestNeighbors
 from scipy.ndimage import gaussian_filter
 from collections import OrderedDict
 import skimage.morphology
+from cv2 import dilate
 #from random import random
 """
 A set of functions to help read / modify images
@@ -52,7 +53,8 @@ def binary_image_dilation(np_array,steps=1):
     """
     s = skimage.morphology.disk(steps)
     img = make_binary_image_array(np_array)
-    img = binary_dilation(img,iterations=1,border_value=0,structure=np.array(s),brute_force=False).astype(np.uint8)
+    #img = binary_dilation(img,iterations=1,border_value=0,structure=np.array(s),brute_force=True).astype(np.uint8)
+    img = dilate(img.astype(np.uint8),s.astype(np.uint8))
     return img
 
 def median_id_coordinates(np_array,exclude_points=None):
