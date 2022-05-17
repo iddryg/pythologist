@@ -336,7 +336,7 @@ class CellFrameInForm(CellFrameGeneric):
             #print("composed")
             #print(_t)
 
-            _t['feature_value'] = _t.apply(lambda x: 1 if x['value']>=x['threshold_value'] else 0,1)
+            _t['feature_value'] = _t.apply(lambda x: 1 if x['value']>x['threshold_value'] else 0,1)
             _t = _t.loc[:,['cell_index','feature_label','feature_value']]
             _t = _t.loc[_t['feature_label'].isin([x for x in threshold_analysis.values()]),:]
             _flabs = _t['feature_label'].unique()
