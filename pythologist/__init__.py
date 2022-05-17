@@ -10,6 +10,8 @@ from pythologist.measurements.spatial.cartesian import Cartesian
 from pythologist.interface import SegmentationImages, phenotypes_to_regions as interface_phenotypes_to_regions, fetch_single_segmentation_image_bytes, fetch_single_region_image_bytes
 from pythologist.qc import QC
 from itertools import chain
+from pythologist._version import __version__
+
 
 class CellDataSeries(pd.Series):
     @property

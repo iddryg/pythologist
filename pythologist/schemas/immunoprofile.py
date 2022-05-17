@@ -1,14 +1,11 @@
 from pythologist.reader.formats.inform.immunoprofile import CellSampleInFormImmunoProfile
 from pythologist import CellDataFrame, SubsetLogic as SL, PercentageLogic as PL
-try:
-    from importlib.metadata import version 
-except ModuleNotFoundError:
-    from importlib_metadata import version
 from multiprocessing import Pool
 from uuid import uuid4
 import pandas as pd
 import numpy as np
 import json, sys
+from pythologist import __version__
 
 def execute_immunoprofile_extraction(
     path,
@@ -165,7 +162,7 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
         'QC':{},
         'meta':{
             'package':'pythologist',
-            'version':version('pythologist'),
+            'version':__version__,
             'execution_id':str(uuid4())
         },
         'parameters':parameters
