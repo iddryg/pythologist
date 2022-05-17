@@ -6,6 +6,7 @@ from pythologist.image_utilities import map_image_ids
 from pythologist.reader.qc import QC
 from pythologist import CellDataFrame
 from tempfile import SpooledTemporaryFile
+from pythologist import __version__
 
 """
 These are classes to help deal with cell-level image data
@@ -38,6 +39,7 @@ class CellFrameGeneric(object):
         self._processed_image_id = None
         self._images = {}                      # Database of Images
         self._id = uuid4().hex
+        self._version = __version__
         self.frame_name = None
         self.data_tables = {
         'cells':{'index':'cell_index',            
@@ -99,6 +101,13 @@ class CellFrameGeneric(object):
         for x in self.data_tables.keys(): 
             self._data[x] = pd.DataFrame(columns=self.data_tables[x]['columns'])
             self._data[x].index.name = self.data_tables[x]['index']
+    @property
+    def version(self):
+        """
+        Returns the pythologist version
+        """
+        return self._version
+    
     @property
     def id(self):
         """
@@ -320,6 +329,7 @@ class CellFrameGeneric(object):
             self._images[image_name] = np.array(subgroup['images'][image_name])
         self.frame_name = subgroup['meta'].attrs['frame_name']
         self._id = subgroup['meta'].attrs['id']
+        self._version = subgroup['meta'].attrs['version']
         self.set_processed_image_id(subgroup['meta'].attrs['processed_image_id'])
         return
 
@@ -344,6 +354,7 @@ class CellFrameGeneric(object):
         dset.attrs['frame_name'] = self.frame_name
         dset.attrs['processed_image_id'] = self.processed_image_id
         dset.attrs['id'] = self._id
+        dset.attrs['version'] = self.version
         f.close()
 
     def cell_map(self):
@@ -499,6 +510,7 @@ class CellFrameGeneric(object):
         them.set_processed_image_id(self._processed_image_id)
         them.frame_name = self.frame_name
         them._id = self._id
+        them._version = self._version
         return them
 
     @property
@@ -697,8 +709,16 @@ class CellSampleGeneric(object):
         self._frames = {}
         self._key = None
         self._id = uuid4().hex
+        self._version = __version__
         self.sample_name = np.nan
         return
+    @property
+    def version(self):
+        """
+        Return the pythologist version
+        """
+        return self._version
+    
 
     @property
     def id(self):
@@ -762,6 +782,7 @@ class CellSampleGeneric(object):
         dset = f.create_dataset(location+'/meta', (100,), dtype=h5py.special_dtype(vlen=str))
         dset.attrs['sample_name'] = self.sample_name
         dset.attrs['id'] = self._id
+        dset.attrs['version'] = self.version
         if location+'/frames' in f:
             del f[location+'/frames']
         f.create_group(location+'/frames')
@@ -782,6 +803,7 @@ class CellSampleGeneric(object):
         for x in location:
             subgroup = subgroup[x]
         self._id = subgroup['meta'].attrs['id']
+        self._version = subgroup['meta'].attrs['version']
         self.sample_name = subgroup['meta'].attrs['sample_name']
         frame_ids = [x for x in subgroup['frames']]
         for frame_id in frame_ids:
@@ -890,6 +912,7 @@ class CellProjectGeneric(object):
             dset.attrs['project_name'] = np.nan
             dset.attrs['microns_per_pixel'] = np.nan
             dset.attrs['id'] = uuid4().hex
+            dset.attrs['version'] = __version__
             f.close()
         return
 
@@ -964,6 +987,16 @@ class CellProjectGeneric(object):
         """
         f = h5py.File(self.h5path,'r')
         name = f['meta'].attrs['id']
+        f.close()
+        return name
+
+    @property
+    def version(self):
+        """
+        Returns pythologist version the project was created under
+        """
+        f = h5py.File(self.h5path,'r')
+        name = f['meta'].attrs['version']
         f.close()
         return name
 

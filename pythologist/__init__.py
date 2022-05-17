@@ -32,7 +32,7 @@ class CellDataFrame(pd.DataFrame):
         microns_per_pixel (float): conversion factor that gets saved along with the dataframe once its set.  (20x vectra is a 0.496)
         db (CellProject): a storage class that has all the image and mask data
     """
-    _metadata = ['_microns_per_pixel','_db'] # for extending dataframe to include this property
+    _metadata = ['_microns_per_pixel','_db','_version'] # for extending dataframe to include this property
     @property
     def _constructor(self):
         return CellDataFrame
@@ -48,6 +48,7 @@ class CellDataFrame(pd.DataFrame):
     def __init__(self,*args,**kw):
         kwcopy = kw.copy()
         super(CellDataFrame,self).__init__(*args,**kwcopy)
+        self._version = __version__
 
     def copy(self,*args,**kw):
         """
@@ -59,6 +60,7 @@ class CellDataFrame(pd.DataFrame):
             if col_name in self.columns:
                 output[col_name] = [x if not isinstance(x,dict) else x.copy() for x in self[col_name]]
         output.microns_per_pixel = self.microns_per_pixel
+        output._version = self.version
         output.db = self.db
         return output
 
@@ -127,6 +129,7 @@ class CellDataFrame(pd.DataFrame):
         pd.DataFrame(self.serialize()).to_hdf(path,key,mode=mode,format='table',complib='zlib',complevel=9)
         f = h5py.File(path,'r+')
         f[key].attrs["microns_per_pixel"] = float(self.microns_per_pixel) if self.microns_per_pixel is not None else np.nan
+        f[key].attrs["version"] = self.version
         f.close()
     def frame_region_generator(cdf):
         """
@@ -279,6 +282,8 @@ class CellDataFrame(pd.DataFrame):
         f = h5py.File(path,'r')
         mpp = f[key].attrs["microns_per_pixel"]
         if not np.isnan(mpp): df.microns_per_pixel = mpp
+        _version  = f[key].attrs["version"]
+        if not np.isnan(_version): df.version = _version
         f.close()
         return df
 
@@ -297,6 +302,11 @@ class CellDataFrame(pd.DataFrame):
         df['neighbors'] = df['neighbors'].apply(lambda x: json.dumps(x))
         df['frame_shape'] = df['frame_shape'].apply(lambda x: json.dumps(x))
         return df
+
+    @property
+    def version(self):
+        if not hasattr(self,'_version'): return None
+        return self._version    
 
     @property
     def microns_per_pixel(self):
