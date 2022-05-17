@@ -368,19 +368,23 @@ def phenotypes_to_regions(cdf,path=None,
     cdf2.db = output
     cdf2.microns_per_pixel = cdf.microns_per_pixel
     return cdf2, output
-def get_region_images(cdf,output_path,colors,background_color='#000000',overwrite=False,format='png',verbose=False):
+def get_region_images(cdf,region_group,output_path,colors,background_color='#000000',overwrite=False,format='png',verbose=False):
     def hex_to_rgb(h):
         h = h.lstrip('#')
         v =  tuple(list(int(h[i:i+2], 16) for i in (0, 2, 4))+[255])
         return [x/255 for x in v]
 
-    def write_regions(frame,basedir,colors,background_color,format):
+    def write_regions(region_group,frame,basedir,colors,background_color,format):
         rshape = frame.get_data('regions').iloc[0]['image_id']
         rshape = frame.get_image(rshape).shape
         start = np.zeros(list(rshape)+[4])
         start[:,:]=hex_to_rgb(background_color)
         fname = frame.frame_name
-        for i,r in frame.get_data('regions').iterrows():
+        fdata0 = frame.get_data('region_groups')
+        fdata0 = fdata0.loc[fdata0['region_group']==region_group,:].reset_index()['region_group_index'].iloc[0]
+        fdata = frame.get_data('regions')
+        fdata = fdata.loc[fdata['region_group_index']==fdata0,:]
+        for i,r in fdata.iterrows():
             col = colors[r['region_label']]
             img = frame.get_image(r['image_id'])
             start[img==1]= hex_to_rgb(col)
@@ -403,7 +407,7 @@ def get_region_images(cdf,output_path,colors,background_color='#000000',overwrit
                 os.makedirs(basedir)
             frames = samples.loc[samples['sample_id']==sid]
             for fid in frames['frame_id'].unique():
-                write_regions(s.get_frame(fid),basedir,colors,background_color,format)
+                write_regions(region_group,s.get_frame(fid),basedir,colors,background_color,format)
 
 def fetch_single_segmentation_image_bytes(self,schema,background=(0,0,0,255),tempdir=None):
     if self['frame_name'].unique().shape[0]!=1: raise ValueError("must be only one frame name")
@@ -417,11 +421,11 @@ def fetch_single_segmentation_image_bytes(self,schema,background=(0,0,0,255),tem
                 #print(fname[-3:])
                 return open(os.path.join(base,fname),'rb').read()
 
-def fetch_single_region_image_bytes(self,colors,background='#000000',tempdir=None,verbose=False):
+def fetch_single_region_image_bytes(self,region_group,colors,background='#000000',tempdir=None,verbose=False):
     if self['frame_name'].unique().shape[0]!=1: raise ValueError("must be only one frame name")
     if self['frame_id'].unique().shape[0]!=1: raise ValueError("must be only one frame id")
     with TemporaryDirectory(dir=tempdir) as td:
-        outfile = get_region_images(self,td,colors,background_color=background,overwrite=True,format='png',verbose=verbose)
+        outfile = get_region_images(self,region_group,td,colors,background_color=background,overwrite=True,format='png',verbose=verbose)
         for base, dirs, files in os.walk(td):
             for fname in files:
                 return open(os.path.join(base,fname),'rb').read()
