@@ -389,6 +389,9 @@ def report_dict_to_dataframes(report_dict):
            count_areas.loc[:,sorted(count_areas.columns)]
 
 def concatonate_dfs(list_of_dfs):
+    """
+    Take a list of report dictionaries of dataframes "dfs" and concate them into a single dfs
+    """
     output = {}
     names = ['sample_count_densities',
              'sample_count_percentages',
@@ -409,6 +412,9 @@ def concatonate_dfs(list_of_dfs):
 def create_lab_report(dfs,
                       output_excel_path
                      ):
+    """
+    Take a single dictionary of dataframe outputs and create a lab report
+    """
     lfsc = dfs['sample_count_densities'].copy()
     lfsp = dfs['sample_count_percentages'].copy()
     lffc = dfs['frame_count_densities'].copy()
