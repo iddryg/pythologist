@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import json, sys
 from pythologist import __version__
+from datetime import date
 
 def execute_immunoprofile_extraction(
     path,
@@ -479,6 +480,9 @@ def create_lab_report(dfs,
     mtfp = _t.set_index(['sample_name','region_label','phenotype_label',])[['frame_index','percent']].\
         pivot(columns=['frame_index'])
 
+    meta = pd.DataFrame({'Pythologist version':[pythologist_version],
+                         'Date generated':[date.today().strftime('%Y-%m-%d')]}).T
+
     with pd.ExcelWriter(output_excel_path) as writer:  
         lfsc.to_excel(writer, sheet_name='lf_sample_count_densities',index=False)
         lfsp.to_excel(writer, sheet_name='lf_frame_count_densities',index=False)
@@ -491,3 +495,4 @@ def create_lab_report(dfs,
         mtfc.to_excel(writer, sheet_name='mat_frame_count_densities')
         mtfa.to_excel(writer, sheet_name='mat_frame_population_areas')
         mtfp.to_excel(writer, sheet_name='mat_frame_count_percentages')
+        meta.to_excel(writer, sheet_name='meta',header=False)
