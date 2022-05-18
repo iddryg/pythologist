@@ -480,7 +480,7 @@ def create_lab_report(dfs,
     mtfp = _t.set_index(['sample_name','region_label','phenotype_label',])[['frame_index','percent']].\
         pivot(columns=['frame_index'])
 
-    meta = pd.DataFrame({'Pythologist version':[pythologist_version],
+    meta = pd.DataFrame({'Pythologist version':[__version__],
                          'Date generated':[date.today().strftime('%Y-%m-%d')]}).T
 
     with pd.ExcelWriter(output_excel_path) as writer:  
