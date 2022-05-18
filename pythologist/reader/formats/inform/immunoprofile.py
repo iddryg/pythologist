@@ -289,6 +289,8 @@ class CellSampleInFormImmunoProfile(CellSampleInForm):
         if processes>1:
             with Pool(processes=processes) as pool:
                 cids = [x for x in pool.imap(_read_path_MULTITHREAD,frame_args)]
+                pool.join()
+                pool.close()
         else:
             cids = [_read_path_SINGLETHREAD(x) for x in frame_args]
         if verbose: sys.stderr.write("Finished reading all ROIs\n")

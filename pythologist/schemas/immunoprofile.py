@@ -137,6 +137,8 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
     else:
         pool = Pool(processes)
         all_outputs = [x for x in pool.imap(get_report_row_entry_PACKED,all_inputs)]
+        pool.close()
+        pool.join()
 
     #or _row_number, _report_row in enumerate(report_format['report_rows']):
     #    if verbose: sys.stderr.write("row "+str(_row_number+1)+"/"+str(len(report_format['report_rows']))+"       \r")
