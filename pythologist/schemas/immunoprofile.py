@@ -387,3 +387,99 @@ def report_dict_to_dataframes(report_dict):
     return count_densities.loc[:,sorted(count_densities.columns)],\
            count_percentages.loc[:,sorted(count_percentages.columns)],\
            count_areas.loc[:,sorted(count_areas.columns)]
+
+def concatonate_dfs(list_of_dfs):
+    output = {}
+    names = ['sample_count_densities',
+             'sample_count_percentages',
+             'frame_count_densities',
+             'frame_count_percentages',
+             'regions'
+            ]
+    for name in names:
+        output[name] = []
+    for dfs in list_of_dfs:
+        for name in names:
+            output[name].append(dfs[name])
+    for name in names:
+        output[name] = pd.concat(output[name])
+    return output
+
+
+def create_lab_report(dfs,
+                      output_excel_path
+                     ):
+    lfsc = dfs['sample_count_densities'].copy()
+    lfsp = dfs['sample_count_percentages'].copy()
+    lffc = dfs['frame_count_densities'].copy()
+    lffp = dfs['frame_count_percentages'].copy()
+    lfrg = dfs['regions'].copy()
+    
+    # Do Count Density for Samples
+    _t = lfsc.loc[lfsc['test']=='Count Density'].\
+        set_index(['region_label','sample_name','frame_count','measured_count'])[['phenotype_label','mean_density_mm2','stderr_density_mm2']].\
+        pivot(columns='phenotype_label')
+    mtsc = _t.swaplevel(i=0,j=1,axis=1).sort_index(axis=1)
+
+    # Do Cell Area for Samples
+    _t = lfsc.loc[lfsc['test']=='Population Area'].\
+    set_index(['region_label','sample_name','frame_count','measured_count'])[['phenotype_label','cumulative_area_coverage_percent']].\
+        pivot(columns='phenotype_label')
+    mtsa = _t.swaplevel(i=0,j=1,axis=1).sort_index(axis=1)
+    
+    # Do Cell Percentages for Samples
+    _t = lfsp.loc[lfsp['test']=='Percent Population'].set_index(['sample_name','frame_count'])[['phenotype_label','region_label','mean_percent','stderr_percent','measured_count']].\
+        pivot(columns=['phenotype_label','region_label'])
+    mtsp = _t.swaplevel(i=0,j=2,axis=1).sort_index(axis=1).reindex(['mean_percent','stderr_percent','measured_count'],axis=1,level=2)
+    
+    # Do Count Density for ROIs
+    _t = lffc.loc[lffc['test']=='Count Density'].copy()
+    _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
+        groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
+            [i for i in range(x['frame_name'].shape[0])],
+            [y for y in sorted(x['frame_name'])]
+    ))))
+    _tindex.columns.name = 'frame_index'
+    _tindex = _tindex.stack().reset_index().rename(columns={0:'frame_name'})
+    _t = _t.merge(_tindex,on=['sample_name','frame_name'])
+    mtfc = _t.set_index(['region_label','sample_name','phenotype_label',])[['frame_index','density_mm2']].\
+        pivot(columns=['frame_index'])
+    
+    # Do Population Areas for ROIs
+    _t = lffc.loc[lffc['test']=='Population Area'].copy()
+    _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
+        groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
+            [i for i in range(x['frame_name'].shape[0])],
+            [y for y in sorted(x['frame_name'])]
+    ))))
+    _tindex.columns.name = 'frame_index'
+    _tindex = _tindex.stack().reset_index().rename(columns={0:'frame_name'})
+    _t = _t.merge(_tindex,on=['sample_name','frame_name'])
+    mtfa = _t.set_index(['region_label','sample_name','phenotype_label',])[['frame_index','area_coverage_percent']].\
+        pivot(columns=['frame_index'])
+    
+    # Do Cell percents for ROIs
+    _t = lffp.loc[lffp['test']=='Percent Population'].copy()
+    _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
+        groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
+            [i for i in range(x['frame_name'].shape[0])],
+            [y for y in sorted(x['frame_name'])]
+    ))))
+    _tindex.columns.name = 'frame_index'
+    _tindex = _tindex.stack().reset_index().rename(columns={0:'frame_name'})
+    _t = _t.merge(_tindex,on=['sample_name','frame_name'])
+    mtfp = _t.set_index(['sample_name','region_label','phenotype_label',])[['frame_index','percent']].\
+        pivot(columns=['frame_index'])
+
+    with pd.ExcelWriter(output_excel_path) as writer:  
+        lfsc.to_excel(writer, sheet_name='lf_sample_count_densities',index=False)
+        lfsp.to_excel(writer, sheet_name='lf_frame_count_densities',index=False)
+        lffc.to_excel(writer, sheet_name='lf_sample_count_percentages',index=False)
+        lffp.to_excel(writer, sheet_name='lf_frame_count_percentages',index=False)
+        lfrg.to_excel(writer, sheet_name='lf_regions',index=False)
+        mtsc.to_excel(writer, sheet_name='mat_sample_count_densities')
+        mtsa.to_excel(writer, sheet_name='mat_sample_population_areas')
+        mtsp.to_excel(writer, sheet_name='mat_sample_count_percentages')
+        mtfc.to_excel(writer, sheet_name='mat_frame_count_densities')
+        mtfa.to_excel(writer, sheet_name='mat_frame_population_areas')
+        mtfp.to_excel(writer, sheet_name='mat_frame_count_percentages')
