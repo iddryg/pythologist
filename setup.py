@@ -47,7 +47,7 @@ setup(
                     'openpyxl',
                     'tables',
                     'importlib-metadata >= 1.0 ; python_version < "3.8"',
-                    'opencv-python'
+                    'opencv-python-headless'
                     ], 
   extras_require = {
         'test':  ["pythologist-test-images"]
