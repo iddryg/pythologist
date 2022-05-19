@@ -512,7 +512,14 @@ def create_lab_report(dfs,
         pivot(columns=['frame_index'])
     
     meta = pd.DataFrame({'Pythologist version':[__version__],
-                         'Date generated':[date.today().strftime('%Y-%m-%d')]}).T
+                         'Date generated':[date.today().strftime('%Y-%m-%d')],
+                         'Pythologist panel name':panel_name,
+                         'Pythologist panel version':panel_version,
+                         'Report name':report_name,
+                         'Report version':report_version,
+                         'Microns per pixel':microns_per_pixel,
+                         'Invasive margin width (microns)':invasive_margin_width_microns
+                         }).T
 
     with pd.ExcelWriter(output_excel_path) as writer:  
         lfsc.to_excel(writer, sheet_name='lf_sample_count_densities',index=False)
