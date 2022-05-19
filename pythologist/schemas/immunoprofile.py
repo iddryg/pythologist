@@ -202,16 +202,8 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
         'frame_count_percentages':frame_count_percentages.drop(columns=['project_id','project_name','sample_id','frame_id']),
         'regions':regions
     }
-    meta = {
-        'panel_name':panel_name,
-        'panel_version':panel_version,
-        'report_name':report_name,
-        'report_version':report_version,
-        'microns_per_pixel':microns_per_pixel,
-        'invasive_margin_width_microns':invasive_margin_width_microns
-    }
     if verbose: sys.stderr.write("Completed all report.\n")
-    return full_report, csi, dfs, meta
+    return full_report, csi, dfs
 
 def get_report_row_entry_PACKED(input_list):
     return get_report_row_entry(*input_list)
