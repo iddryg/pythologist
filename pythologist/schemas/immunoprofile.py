@@ -202,8 +202,16 @@ def execute_immunoprofile_extraction_from_pythologist(csi,select_panel,select_re
         'frame_count_percentages':frame_count_percentages.drop(columns=['project_id','project_name','sample_id','frame_id']),
         'regions':regions
     }
+    meta = {
+        'panel_name':panel_name,
+        'panel_version':panel_version,
+        'report_name':report_name,
+        'report_version':report_version,
+        'microns_per_pixel':microns_per_pixel,
+        'invasive_margin_width_microns':invasive_margin_width_microns
+    }
     if verbose: sys.stderr.write("Completed all report.\n")
-    return full_report, csi, dfs
+    return full_report, csi, dfs, meta
 
 def get_report_row_entry_PACKED(input_list):
     return get_report_row_entry(*input_list)
@@ -414,7 +422,8 @@ def concatonate_dfs(list_of_dfs):
 
 def create_lab_report(dfs,
                       output_excel_path,
-                      biomarker_renaming={'CD8+;PD-1+':'CD8+PD-1+'}
+                      biomarker_renaming={'CD8+;PD-1+':'CD8+PD-1+'},
+                      generation_meta={}
                      ):
     """
     Take a single dictionary of dataframe outputs and create a lab report
@@ -511,15 +520,16 @@ def create_lab_report(dfs,
     mtfp = _t.set_index(['sample_name','region_label','phenotype_label',])[['frame_index','percent']].\
         pivot(columns=['frame_index'])
     
-    meta = pd.DataFrame({'Pythologist version':[__version__],
-                         'Date generated':[date.today().strftime('%Y-%m-%d')],
-                         'Pythologist panel name':panel_name,
-                         'Pythologist panel version':panel_version,
-                         'Report name':report_name,
-                         'Report version':report_version,
-                         'Microns per pixel':microns_per_pixel,
-                         'Invasive margin width (microns)':invasive_margin_width_microns
-                         }).T
+    mdict = {'Pythologist version':[__version__],
+             'Date generated':[date.today().strftime('%Y-%m-%d')],
+             'Pythologist panel name':None if 'panel_name' not in generation_meta else generation_meta['panel_name'],
+             'Pythologist panel version':None if 'panel_version' not in generation_meta else generation_meta['panel_version'],
+             'Report name':None if 'report_name' not in generation_meta else generation_meta['report_name'],
+             'Report version':None if 'report_version' not in generation_meta else generation_meta['report_version'],
+             'Microns per pixel':None if 'microns_per_pixel' not in generation_meta else generation_meta['microns_per_pixel'],
+             'Invasive margin width (microns)':None if 'invasive_margin_width_microns' not in generation_meta else generation_meta['invasive_margin_width_microns']
+            }
+    meta = pd.DataFrame(mdict).T
 
     with pd.ExcelWriter(output_excel_path) as writer:  
         lfsc.to_excel(writer, sheet_name='lf_sample_count_densities',index=False)
