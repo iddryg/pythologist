@@ -413,7 +413,8 @@ def concatonate_dfs(list_of_dfs):
 
 
 def create_lab_report(dfs,
-                      output_excel_path
+                      output_excel_path,
+                      biomarker_renaming={'CD8+;PD-1+':'CD8+PD-1+'}
                      ):
     """
     Take a single dictionary of dataframe outputs and create a lab report
@@ -423,6 +424,12 @@ def create_lab_report(dfs,
     lffc = dfs['frame_count_densities'].copy()
     lffp = dfs['frame_count_percentages'].copy()
     lfrg = dfs['regions'].copy()
+    
+    # permit changes in biomarker names
+    lfsc['phenotype_label'] = lfsc['phenotype_label'].apply(lambda x: x if x not in biomarker_renaming else biomarker_renaming[x])
+    lfsp['phenotype_label'] = lfsp['phenotype_label'].apply(lambda x: x if x not in biomarker_renaming else biomarker_renaming[x])
+    lffc['phenotype_label'] = lffc['phenotype_label'].apply(lambda x: x if x not in biomarker_renaming else biomarker_renaming[x])
+    lffp['phenotype_label'] = lffp['phenotype_label'].apply(lambda x: x if x not in biomarker_renaming else biomarker_renaming[x])
     
     # Do Count Density for Samples
     _t = lfsc.loc[lfsc['test']=='Count Density'].\
@@ -443,44 +450,68 @@ def create_lab_report(dfs,
     
     # Do Count Density for ROIs
     _t = lffc.loc[lffc['test']=='Count Density'].copy()
-    _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
-        groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
-            [i for i in range(x['frame_name'].shape[0])],
-            [y for y in sorted(x['frame_name'])]
-    ))))
-    _tindex.columns.name = 'frame_index'
-    _tindex = _tindex.stack().reset_index().rename(columns={0:'frame_name'})
+    _tindex = pd.DataFrame()
+    if _t['sample_name'].unique().shape[0] == 1:
+        _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
+            groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
+                [i for i in range(x['frame_name'].shape[0])],
+                [y for y in sorted(x['frame_name'])]
+        ))))
+        _tindex.columns.name = 'frame_index'
+        _tindex = _tindex.stack().reset_index().rename(columns={0:'frame_name'})
+    else:
+        _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
+            groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
+                [i for i in range(x['frame_name'].shape[0])],
+                [y for y in sorted(x['frame_name'])]
+            )))).reset_index().rename(columns={'level_1':'frame_index',0:'frame_name'})
     _t = _t.merge(_tindex,on=['sample_name','frame_name'])
     mtfc = _t.set_index(['region_label','sample_name','phenotype_label',])[['frame_index','density_mm2']].\
         pivot(columns=['frame_index'])
     
     # Do Population Areas for ROIs
     _t = lffc.loc[lffc['test']=='Population Area'].copy()
-    _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
-        groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
-            [i for i in range(x['frame_name'].shape[0])],
-            [y for y in sorted(x['frame_name'])]
-    ))))
-    _tindex.columns.name = 'frame_index'
-    _tindex = _tindex.stack().reset_index().rename(columns={0:'frame_name'})
+    _tindex = pd.DataFrame()
+    if _t['sample_name'].unique().shape[0] == 1:
+        _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
+            groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
+                [i for i in range(x['frame_name'].shape[0])],
+                [y for y in sorted(x['frame_name'])]
+        ))))
+        _tindex.columns.name = 'frame_index'
+        _tindex = _tindex.stack().reset_index().rename(columns={0:'frame_name'})
+    else:
+        _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
+            groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
+                [i for i in range(x['frame_name'].shape[0])],
+                [y for y in sorted(x['frame_name'])]
+            )))).reset_index().rename(columns={'level_1':'frame_index',0:'frame_name'})
     _t = _t.merge(_tindex,on=['sample_name','frame_name'])
     mtfa = _t.set_index(['region_label','sample_name','phenotype_label',])[['frame_index','area_coverage_percent']].\
         pivot(columns=['frame_index'])
     
     # Do Cell percents for ROIs
     _t = lffp.loc[lffp['test']=='Percent Population'].copy()
-    _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
-        groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
-            [i for i in range(x['frame_name'].shape[0])],
-            [y for y in sorted(x['frame_name'])]
-    ))))
-    _tindex.columns.name = 'frame_index'
-    _tindex = _tindex.stack().reset_index().rename(columns={0:'frame_name'})
+    _tindex = pd.DataFrame()
+    if _t['sample_name'].unique().shape[0] == 1:
+        _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
+            groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
+                [i for i in range(x['frame_name'].shape[0])],
+                [y for y in sorted(x['frame_name'])]
+        ))))
+        _tindex.columns.name = 'frame_index'
+        _tindex = _tindex.stack().reset_index().rename(columns={0:'frame_name'})
+    else:
+        _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
+            groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
+                [i for i in range(x['frame_name'].shape[0])],
+                [y for y in sorted(x['frame_name'])]
+            )))).reset_index().rename(columns={'level_1':'frame_index',0:'frame_name'})
     _t = _t.merge(_tindex,on=['sample_name','frame_name'])
     mtfp = _t.set_index(['sample_name','region_label','phenotype_label',])[['frame_index','percent']].\
         pivot(columns=['frame_index'])
-
-    meta = pd.DataFrame({'Pythologist version':[__version__],
+    
+    meta = pd.DataFrame({'Pythologist version':[pythologist_version],
                          'Date generated':[date.today().strftime('%Y-%m-%d')]}).T
 
     with pd.ExcelWriter(output_excel_path) as writer:  
