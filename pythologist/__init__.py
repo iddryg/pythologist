@@ -283,7 +283,7 @@ class CellDataFrame(pd.DataFrame):
         mpp = f[key].attrs["microns_per_pixel"]
         if not np.isnan(mpp): df.microns_per_pixel = mpp
         _version  = None if 'version' not in f[key].attrs else f[key].attrs["version"]
-        if not np.isnan(_version): df.version = _version
+        df.version = _version
         f.close()
         return df
 
