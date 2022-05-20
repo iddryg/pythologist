@@ -519,7 +519,7 @@ def create_lab_report(dfs,
              'Report name':None if 'report_name' not in generation_meta else generation_meta['report_name'],
              'Report version':None if 'report_version' not in generation_meta else generation_meta['report_version'],
              'Microns per pixel':None if 'microns_per_pixel' not in generation_meta else generation_meta['microns_per_pixel'],
-             'Invasive margin width (microns)':None if 'invasive_margin_width_microns' not in generation_meta else generation_meta['invasive_margin_width_microns']
+             'Invasive margin width from center of margin (microns)':None if 'invasive_margin_width_microns' not in generation_meta else generation_meta['invasive_margin_width_microns']
             }
     meta = pd.DataFrame(mdict).T
 
