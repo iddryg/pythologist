@@ -282,8 +282,7 @@ class CellDataFrame(pd.DataFrame):
         f = h5py.File(path,'r')
         mpp = f[key].attrs["microns_per_pixel"]
         if not np.isnan(mpp): df.microns_per_pixel = mpp
-        _version  = None if 'version' not in f[key].attrs else f[key].attrs["version"]
-        df.version = _version
+        df._version  = None if 'version' not in f[key].attrs else f[key].attrs["version"]
         f.close()
         return df
 
