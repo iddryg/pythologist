@@ -11,6 +11,7 @@ workflow:
 package:
   stage: package
   script:
+    - sleep 100000000000000000000
     - pip install twine
     - python setup.py sdist bdist_wheel
     - TWINE_PASSWORD=${CI_PYPI_DEPLOY_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PYPI_PROJECT_ID}/packages/pypi dist/*
