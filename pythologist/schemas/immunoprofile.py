@@ -525,8 +525,8 @@ def create_lab_report(dfs,
 
     with pd.ExcelWriter(output_excel_path) as writer:  
         lfsc.to_excel(writer, sheet_name='lf_sample_count_densities',index=False)
-        lfsp.to_excel(writer, sheet_name='lf_frame_count_densities',index=False)
-        lffc.to_excel(writer, sheet_name='lf_sample_count_percentages',index=False)
+        lfsp.to_excel(writer, sheet_name='lf_sample_count_percentages',index=False)
+        lffc.to_excel(writer, sheet_name='lf_frame_count_densities',index=False)
         lffp.to_excel(writer, sheet_name='lf_frame_count_percentages',index=False)
         lfrg.to_excel(writer, sheet_name='lf_regions',index=False)
         mtsc.to_excel(writer, sheet_name='mat_sample_count_densities')
