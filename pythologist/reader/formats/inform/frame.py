@@ -253,7 +253,7 @@ class CellFrameInForm(CellFrameGeneric):
             _observed_phenotypes = set([x for x in _sub['Phenotype']])
             _unaccounted_phenotypes = _observed_phenotypes - _valid_phenotypes
             if len(_unaccounted_phenotypes) > 0:
-                raise ValueError("Observed phenotypes: "+str(_unaccounted_phenotypes)+" that are not defined in mutually exclusive phenotype strategy: "+_strategy_label)
+                raise ValueError("Observed phenotypes: "+str(_unaccounted_phenotypes)+" that are not defined in mutually exclusive phenotype strategy: "+_strategy_label+" which allows phenotypes: "+str(_valid_phenotypes))
             for _assigned, _label in mutually_exclusive_analysis[_strategy_label].items():
                 me_feature_definition.append([_label,'+',1])
                 me_feature_definition.append([_label,'-',0])
