@@ -93,25 +93,29 @@ class CellFrameInForm(CellFrameGeneric):
                 _output[_d['inform_channel_label']] = _d['label']
             return _output
         def _parse_mutually_exclusive(inform_analysis_dict):
-            # return a tuple keyed dictionary
+            # return a strategy keyed set of valid phenotype labels
+            # return a tuple keyed dictionary for the analysis
             _output = {}
+            _expected = {}
             for _strategy_dict in inform_analysis_dict['mutually_exclusive_phenotype_strategies']:
                 _strategy_label = "NO_LABEL_SET" if 'strategy_label' not in _strategy_dict else _strategy_dict['strategy_label']
                 _strategy = _strategy_dict['phenotype_list']
                 # iterating over each strategy
                 _output[_strategy_label] = {}
+                _expected[_strategy_label] = set()
                 for _pheno in _strategy:
+                    _expected[_strategy_label].add(_pheno['assigned_label'])
                     if 'keep' not in _pheno:
                         _pheno['keep'] = True
                     if _pheno['keep'] is False: continue
                     _output[_strategy_label][_pheno['assigned_label']] = \
                         _pheno['assigned_label'] if 'label' not in _pheno else _pheno['label']
-            return _output
+            return _expected, _output
        
 
         if self.verbose: sys.stderr.write("Reading analysis parameters.\n")
         threshold_analysis = _parse_threshold(inform_analysis_dict)
-        mutually_exclusive_analysis = _parse_mutually_exclusive(inform_analysis_dict)
+        expected_mutually_exclusive_analysis, mutually_exclusive_analysis = _parse_mutually_exclusive(inform_analysis_dict)
         channel_abbreviations = dict([(x['inform_channel_label'],x['label']) for x in inform_analysis_dict['channels']])
 
 
@@ -144,6 +148,7 @@ class CellFrameInForm(CellFrameGeneric):
                         score_data_file,
                         threshold_analysis,
                         mutually_exclusive_analysis,
+                        expected_mutually_exclusive_analysis,
                         channel_abbreviations,
                         require_score=require_score)
 
@@ -198,6 +203,7 @@ class CellFrameInForm(CellFrameGeneric):
                         score_data_file,
                         threshold_analysis,
                         mutually_exclusive_analysis,
+                        expected_mutually_exclusive_analysis,
                         channel_abbreviations,
                         require_component=True,
                         require_score=True):
@@ -249,7 +255,7 @@ class CellFrameInForm(CellFrameGeneric):
             if _strategy_label not in mutually_exclusive_analysis:
                 raise ValueError("Missing expected phenotype strategy label "+str(_strategy_label)+" from among "+str(sorted([x for x in mutually_exclusive_analysis.keys()])))
             # check to see if we have invalid phenotypes in our phenotype column
-            _valid_phenotypes = set([x[0] for x in mutually_exclusive_analysis[_strategy_label].items()])
+            _valid_phenotypes = expected_mutually_exclusive_analysis[_strategy_label]
             _observed_phenotypes = set([x for x in _sub['Phenotype']])
             _unaccounted_phenotypes = _observed_phenotypes - _valid_phenotypes
             if len(_unaccounted_phenotypes) > 0:
