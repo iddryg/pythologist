@@ -248,6 +248,12 @@ class CellFrameInForm(CellFrameGeneric):
             # we are only keeping a subset within these
             if _strategy_label not in mutually_exclusive_analysis:
                 raise ValueError("Missing expected phenotype strategy label "+str(_strategy_label)+" from among "+str(sorted([x for x in mutually_exclusive_analysis.keys()])))
+            # check to see if we have invalid phenotypes in our phenotype column
+            _valid_phenotypes = set([x[0] for x in mutually_exclusive_analysis[_strategy_label].items()])
+            _observed_phenotypes = set([x for x in _sub['Phenotype']])
+            _unaccounted_phenotypes = _observed_phenotypes - _valid_phenotypes
+            if len(_unaccounted_phenotypes) > 0:
+                raise ValueError("Observed phenotypes: "+str(_unaccounted_phenotypes)+" that are not defined in mutually exclusive phenotype strategy: "+_strategy_label)
             for _assigned, _label in mutually_exclusive_analysis[_strategy_label].items():
                 me_feature_definition.append([_label,'+',1])
                 me_feature_definition.append([_label,'-',0])
