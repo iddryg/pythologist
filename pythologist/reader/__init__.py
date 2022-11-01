@@ -617,15 +617,32 @@ class CellFrameGeneric(object):
 
         # Get neighbor data .. may not be available for all cells
         #    Set a default of a null frame and only try and set if there are some neighbors present
-        neighbors = pd.DataFrame(index=self.get_data('cells').index,columns=['neighbors'])
+        neighbors = pd.DataFrame(index=self.get_data('cells').index)
+        #neighbors.index.name='cell_index'
+        neighbors = neighbors.reset_index()
         if self.interaction_map().shape[0] > 0:
-            neighbors = self.interaction_map().groupby('cell_index').\
-                apply(lambda x:
-                    dict(zip(
-                        x['neighbor_cell_index'].astype(int),x['pixel_count'].astype(int)
-                    ))
-                ).reset_index().rename(columns={0:'neighbors'}).set_index('cell_index')
+            #neighbors = self.interaction_map().groupby('cell_index').\
+            #    apply(lambda x:
+            #        dict(zip(
+            #            x['neighbor_cell_index'].astype(int),x['pixel_count'].astype(int)
+            #        ))
+            #    ).reset_index().rename(columns={0:'neighbors'}).set_index('cell_index')
+            neighbors2 = pd.DataFrame(self.get_data('cell_interactions').groupby('cell_index').\
+                apply(lambda x: dict(zip(x['neighbor_cell_index'],x['pixel_count'])))).\
+                rename(columns={0:'neighbors'}).reset_index()
+            neighbors = neighbors.merge(neighbors2,on='cell_index',how='left').\
+                set_index('cell_index')
+            neighbors['neighbors'] = neighbors['neighbors'].\
+                apply(lambda x: {} if x!=x else x)
+        else:
+            neighbors['neighbors'] = 1
+            neighbors['neighbors'] = neighbors.apply(lambda x: np.nan,1)
+            neighbors = neighbors.set_index('cell_index')
+        #print("neighbors:")
+        #print(neighbors)
 
+        #print("temp1")
+        #print(temp1)
         # only do edges if we have them by setting a null value for default
         edge_length = pd.DataFrame(index=self.get_data('cells').index,columns=['edge_length'])
         if self.edge_map() is not None:
@@ -639,15 +656,17 @@ class CellFrameGeneric(object):
                 rename(columns={'x':'cell_area'})
             cell_area['cell_area'] = cell_area['cell_area'].astype(int)
 
-        temp5 = cell_area.merge(edge_length,left_index=True,right_index=True).merge(neighbors,left_index=True,right_index=True,how='left')
-        temp5.loc[temp5['neighbors'].isna(),'neighbors'] = temp5.loc[temp5['neighbors'].isna(),'neighbors'].apply(lambda x: {}) # these are ones we actuall have measured
-
+        temp5 = cell_area.merge(edge_length,left_index=True,right_index=True).\
+            merge(neighbors,left_index=True,right_index=True,how='left')
+        #temp5.loc[temp5['neighbors'].isna(),'neighbors'] = temp5.loc[temp5['neighbors'].isna(),'neighbors'].apply(lambda x: {}) # these are ones we actuall have measured
+        #print("temp5")
+        #print(temp5)
         # If we DO have cell_map, merge in
         if self.cell_map() is not None:
-            temp1 = temp1.drop(columns=['cell_area','edge_length']).merge(temp5,left_index=True,right_index=True,how='left')
+            temp1 = temp1.drop(columns=['cell_area','edge_length']).merge(temp5,left_on='cell_index',right_index=True,how='left')
         else:
-            temp1 = temp1.merge(temp5.drop(columns=['cell_area','edge_length']),left_index=True,right_index=True,how='left')
-        temp1.loc[temp1['neighbors'].isna(),'neighbors'] = np.nan # These we were not able to measure
+            temp1 = temp1.merge(temp5.drop(columns=['cell_area','edge_length']),left_on='cell_index',right_index=True,how='left')
+        #temp1.loc[temp1['neighbors'].isna(),'neighbors'] = np.nan # These we were not able to measure
 
 
         temp1['frame_name'] = self.frame_name
