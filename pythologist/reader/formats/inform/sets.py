@@ -248,10 +248,10 @@ class CellSampleInForm(CellSampleGeneric):
             frame = m.group(1).rstrip('_')
             data = os.path.join(path,file)
 
-            if not os.path.exists(score) and require_score:
+            if require_score and not os.path.exists(score):
                 raise ValueError('Missing score file '+score)
-            elif not os.path.exists(score):
-                score = None
+            #elif not os.path.exists(score):
+            #    score = None
             if verbose: sys.stderr.write('Acquiring frame '+data+"\n")
             cid = self.create_cell_frame_class()
             cid.read_raw(frame_name = frame,
