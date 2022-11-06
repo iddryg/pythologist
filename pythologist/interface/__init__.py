@@ -314,7 +314,7 @@ def _extract_regionization_features(cpi,cdf,sample_id,frame_id):
         set_index('cell_index')
     label_dict = label_df.loc[~label_df['phenotype_label'].isna(),'phenotype_label'].to_dict()
     return processed_image, segmentation_image,label_dict
-def phenotypes_to_regions(cdf,path=None,
+def phenotypes_to_regions(cdf,region_group_name,path=None,
                           gaussian_sigma=66,
                           gaussian_truncate=4,
                           gaussian_mode='reflect',
@@ -349,7 +349,7 @@ def phenotypes_to_regions(cdf,path=None,
                 layer = np.zeros(processed_image.shape)
                 layer[np.where(new_region==i)] = 1
                 regions[region] = layer.astype(np.int8)
-            frame_cpi.set_regions(regions,
+            frame_cpi.set_regions(region_group_name,regions,
                           use_processed_region=True,
                           unset_label='undefined',
                           verbose=verbose)

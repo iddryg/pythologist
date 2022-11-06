@@ -902,6 +902,7 @@ class CellDataFrame(pd.DataFrame):
         Create a new Project where regions are replaced to be based on regions defined as phenotypes
 
         Args:
+            region_group_name (str): Name of the region group
             path (str): Location to store a new hdf5 file containing a database update with new region images
             gaussian_sigma (float): the sigma parameter to the gaussian_filter function that says how much to 'blur'
             overwrite (bool): if True allows you to overwrite the path default (False)
