@@ -357,7 +357,7 @@ def phenotypes_to_regions(cdf,region_group_name,path=None,
     output.set_id(cdf.iloc[0]['project_id'])
     if verbose: 
         sys.stderr.write("generate the output dataframe\n")
-    _temp = output.cdf
+    _temp = output.cdf(region_group=region_group_name)
     _temp = _temp[['sample_id','frame_id','region_label','regions','cell_index']].rename(columns={'region_label':'temp1','regions':'temp2'})
     cdf2 = cdf.merge(_temp,on=['sample_id','frame_id','cell_index'])
     cdf2['region_label'] = cdf2['temp1']
