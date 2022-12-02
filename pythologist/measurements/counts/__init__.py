@@ -80,7 +80,7 @@ class Counts(Measurement):
             (x['region_area_pixels']/1000000)*(self.microns_per_pixel*self.microns_per_pixel),1)
         cnts['density_mm2'] = cnts.apply(lambda x: np.nan if x['region_area_mm2'] == 0 else x['count']/x['region_area_mm2'],1)
 
-        totals = cnts.groupby(mergeon).sum()[['count']].\
+        totals = cnts.groupby(mergeon).sum(numeric_only=True)[['count']].\
             rename(columns={'count':'frame_total_count'}).reset_index()
         cnts = cnts.merge(totals,on=mergeon)
         cnts['population_percent'] = cnts.apply(lambda x: np.nan if x['frame_total_count']==0 else 100*x['count']/x['frame_total_count'],1)
@@ -165,7 +165,7 @@ class Counts(Measurement):
 
 
         # get fractions also
-        totals = cnts.groupby(mergeon).sum()[['cumulative_count']].\
+        totals = cnts.groupby(mergeon).sum(numeric_only=True)[['cumulative_count']].\
             rename(columns={'cumulative_count':'sample_total_count'}).reset_index()
         cnts = cnts.merge(totals,on=mergeon)
         cnts['population_percent'] = cnts.apply(lambda x: np.nan if x['sample_total_count']==0 else 100*x['cumulative_count']/x['sample_total_count'],1)

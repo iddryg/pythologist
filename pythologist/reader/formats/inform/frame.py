@@ -422,7 +422,7 @@ class CellFrameInForm(CellFrameGeneric):
                 ))
             _rt.index.name = 'region_index'
             _rt['region_label'] = _rt['region_label'].astype(str)
-            _rt['region_size'] = _rt['region_size'].astype(int)
+            _rt['region_size'] = _rt['region_size'].astype(np.int64)
             _rt['image_id'] = _rt['image_id'].astype(str)
             self.set_data('regions',_rt)
             return _region_index
@@ -579,7 +579,7 @@ class CellFrameInForm(CellFrameGeneric):
 
 
             temp['region_label'] = temp['region_label'].astype(str)
-            temp['region_size'] = temp['region_size'].astype(int)
+            temp['region_size'] = temp['region_size'].astype(np.int64)
             temp['image_id'] = temp['image_id'].astype(str)
 
 
@@ -687,7 +687,7 @@ class CellFrameInForm(CellFrameGeneric):
         df['region_group_index'] = 0
 
         df['region_label'] = df['region_label'].astype(str)
-        df['region_size'] = df['region_size'].astype(int)
+        df['region_size'] = df['region_size'].astype(np.int64)
         df['image_id'] = df['image_id'].astype(str)
 
         self.set_data('regions',df[['region_group_index','region_label','image_id','region_size']])
