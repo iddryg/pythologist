@@ -461,11 +461,18 @@ def create_lab_report(dfs,
         _tindex.columns.name = 'frame_index'
         _tindex = _tindex.stack().reset_index().rename(columns={0:'frame_name'})
     else:
+        #_tindex = _t[['sample_name','frame_name']].drop_duplicates().\
+        #    groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
+        #        [i for i in range(x['frame_name'].shape[0])],
+        #        [y for y in sorted(x['frame_name'])]
+        #    )))).reset_index().rename(columns={'level_1':'frame_index',0:'frame_name'})
+
         _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
-            groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
-                [i for i in range(x['frame_name'].shape[0])],
-                [y for y in sorted(x['frame_name'])]
-            )))).reset_index().rename(columns={'level_1':'frame_index',0:'frame_name'})
+            groupby(['sample_name']).apply(lambda x: 
+            pd.DataFrame({'frame_index':[i for i in range(x['frame_name'].shape[0])]},
+                     index=[y for y in sorted(x['frame_name'])])).reset_index().rename(columns={'level_1':'frame_name'})
+
+
     _t = _t.merge(_tindex,on=['sample_name','frame_name'])
     mtfc = _t.set_index(['region_label','sample_name','phenotype_label',])[['frame_index','density_mm2']].\
         pivot(columns=['frame_index'])
@@ -482,11 +489,17 @@ def create_lab_report(dfs,
         _tindex.columns.name = 'frame_index'
         _tindex = _tindex.stack().reset_index().rename(columns={0:'frame_name'})
     else:
+        #_tindex = _t[['sample_name','frame_name']].drop_duplicates().\
+        #    groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
+        #        [i for i in range(x['frame_name'].shape[0])],
+        #        [y for y in sorted(x['frame_name'])]
+        #    )))).reset_index().rename(columns={'level_1':'frame_index',0:'frame_name'})
+
         _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
-            groupby(['sample_name']).apply(lambda x: pd.Series(dict(zip(
-                [i for i in range(x['frame_name'].shape[0])],
-                [y for y in sorted(x['frame_name'])]
-            )))).reset_index().rename(columns={'level_1':'frame_index',0:'frame_name'})
+            groupby(['sample_name']).apply(lambda x: 
+            pd.DataFrame({'frame_index':[i for i in range(x['frame_name'].shape[0])]},
+                     index=[y for y in sorted(x['frame_name'])])).reset_index().rename(columns={'level_1':'frame_name'})
+
     _t = _t.merge(_tindex,on=['sample_name','frame_name'])
     mtfa = _t.set_index(['region_label','sample_name','phenotype_label',])[['frame_index','area_coverage_percent']].\
         pivot(columns=['frame_index'])
@@ -508,6 +521,12 @@ def create_lab_report(dfs,
                 [i for i in range(x['frame_name'].shape[0])],
                 [y for y in sorted(x['frame_name'])]
             )))).reset_index().rename(columns={'level_1':'frame_index',0:'frame_name'})
+
+        _tindex = _t[['sample_name','frame_name']].drop_duplicates().\
+            groupby(['sample_name']).apply(lambda x: 
+            pd.DataFrame({'frame_index':[i for i in range(x['frame_name'].shape[0])]},
+                     index=[y for y in sorted(x['frame_name'])])).reset_index().rename(columns={'level_1':'frame_name'})
+
     _t = _t.merge(_tindex,on=['sample_name','frame_name'])
     mtfp = _t.set_index(['sample_name','region_label','phenotype_label',])[['frame_index','percent']].\
         pivot(columns=['frame_index'])
