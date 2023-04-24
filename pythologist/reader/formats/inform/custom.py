@@ -20,6 +20,7 @@ class CellProjectInFormCustomMask(CellProjectInForm):
             path (str): location of the project directory
             project_name (str): name of the project
             sample_name_index (int): where in the directory chain is the foldername that is the sample name if not set use full path.  -1 is last directory
+            inform_analysis_dict (dict): dictionary of shortcuts to translate to simpler channel names
             channel_abbreviations (dict): dictionary of shortcuts to translate to simpler channel names
             verbose (bool): if true print extra details
             require (bool): if true (default), require that channel componenet image be present
@@ -38,6 +39,7 @@ class CellSampleInFormCustomMask(CellSampleInForm):
     def create_cell_frame_class(self):
         return CellFrameInFormCustomMask()
     def read_path(self,path,sample_name=None,
+                            inform_analysis_dict=None,
                             channel_abbreviations=None,
                             verbose=False,require_component=True,
                             require_score=True,
@@ -81,10 +83,11 @@ class CellSampleInFormCustomMask(CellSampleInForm):
             cid.read_raw(frame_name = frame,
                          cell_seg_data_file=data,
                          score_data_file=score,
-                         tissue_seg_data_file=tissue_seg_data,
+                         inform_analysis_dict=inform_analysis_dict,
+                         #tissue_seg_data_file=tissue_seg_data,
                          binary_seg_image_file=binary_seg_maps,
                          component_image_file=component_image,
-                         channel_abbreviations=channel_abbreviations,
+                         #channel_abbreviations=channel_abbreviations,
                          verbose=verbose,
                          require_component=require_component,
                          skip_segmentation_processing=skip_segmentation_processing,
