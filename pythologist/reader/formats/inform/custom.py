@@ -61,7 +61,7 @@ class CellSampleInFormCustomMask(CellSampleInForm):
         frames = []
         for file in segs:
             m = re.match('(.*)cell_seg_data.txt$',file)
-            score = os.path.join(path,m.group(1)+'score_data.txt') if require_score is True else None
+            score = os.path.join(path,m.group(1)+'score_data.txt')
             if ((not os.path.exists(score)) and (not require_score)):
                 # score is now none
                 #print("set to none")
