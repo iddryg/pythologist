@@ -22,7 +22,8 @@ def execute_immunoprofile_extraction(
     invasive_margin_drawn_line_width_pixels = 10,
     processes = 1,
     gimp_repositioned = False,
-    verbose=False
+    verbose=False,
+    skip_segmentation_processing=True
     ):
     """
     Perform the functionality of ipiris
@@ -64,7 +65,7 @@ def execute_immunoprofile_extraction(
               verbose=verbose,
               steps=step_size,
               processes=processes,
-              skip_segmentation_processing=True,
+              skip_segmentation_processing=skip_segmentation_processing,
               skip_component=True,
               gimp_repositioned=gimp_repositioned
             )
