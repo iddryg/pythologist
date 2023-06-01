@@ -128,7 +128,7 @@ class NearestNeighbors(Measurement):
             return df
         _rnks = nn.sort_values(['project_id','sample_id','frame_id','region_label','cell_index','neighbor_distance_px']).\
             reset_index(drop=True).\
-            groupby(['project_id','sample_id','frame_id','region_label','cell_index']).\
+            groupby(['project_id','sample_id','frame_id','region_label','cell_index'],group_keys=False).\
             apply(lambda x: 
                 _add_index(x)
                 ).drop(columns='neighbor_distance_px')
