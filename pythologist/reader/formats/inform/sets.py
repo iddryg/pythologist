@@ -92,7 +92,7 @@ class CellProjectInForm(CellProjectGeneric):
         abspath = os.path.abspath(path)
         if not os.path.isdir(abspath): raise ValueError("Error project path must be a directory")
         sample_dirs = set()
-        for root, dirs, files in os.walk(abspath):
+        for root, dirs, files in os.walk(abspath,followlinks=True):
             files = [f for f in files if not f[0] == '.']
             dirs[:] = [d for d in dirs if not d[0] == '.']
             if len(dirs) > 0: continue

@@ -581,6 +581,8 @@ class CellFrameInForm(CellFrameGeneric):
             temp['region_label'] = temp['region_label'].astype(str)
             temp['region_size'] = temp['region_size'].astype(np.int64)
             temp['image_id'] = temp['image_id'].astype(str)
+            
+            temp.index = temp.index.astype(int)
 
 
             self.set_data('regions',temp)
@@ -589,6 +591,7 @@ class CellFrameInForm(CellFrameGeneric):
                                            'region_group_description':'The complete processed image from InForm.',
                                            'region_group_index':0})).T.\
                                            set_index('region_group_index')
+            _gdf.index = _gdf.index.astype(int)
             self.set_data('region_groups',_gdf)
 
 
