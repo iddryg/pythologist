@@ -606,6 +606,7 @@ class CellFrameGeneric(object):
         _fdt = _fdt.loc[_fdt['feature_index'].isin(_binary_feature_index),:].copy().drop(columns=['feature_tuple'])
         _fdt = self.get_data('features').merge(_fdt,left_index=True,right_on='feature_index').drop(columns=['feature_description'])
         _ft = _fdt.merge(self.get_data('cell_features'),left_index=True,right_on='feature_definition_index')
+        #print(_ft)
         _df = _ft.pivot(index='cell_index',columns='feature_label',values='feature_value').fillna(0).astype(int).\
             apply(lambda x: dict(zip(x.index,x)),1).reset_index().rename(columns={0:'scored_calls'})
 

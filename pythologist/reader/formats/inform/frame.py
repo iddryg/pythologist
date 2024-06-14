@@ -306,7 +306,7 @@ class CellFrameInForm(CellFrameGeneric):
         # Define features #2 - get all threshold features we are keeping
         t_features = pd.DataFrame()
         if score_data_file is not None: 
-            _thresholds = preliminary_threshold_read(score_data_file, 
+            is_ordinal, _thresholds = preliminary_threshold_read(score_data_file, 
                                                  self.get_data('measurement_statistics'), 
                                                  self.get_data('measurement_features'), 
                                                  self.get_data('measurement_channels'), 
@@ -345,23 +345,33 @@ class CellFrameInForm(CellFrameGeneric):
                        merge(_thresholds,on=['statistic_index','measurement_feature_index','channel_index','region_index']).\
                        merge(mc,left_on='channel_index',right_index=True).drop(columns=['channel_label','image_id']).\
                        rename(columns={'channel_abbreviation':'feature_label'})
-            #print("composed")
-            #print(_t)
+            print("composed:")
+            print(_t)
+            print("threshold_analysis:")
+            print(threshold_analysis)
+            _t['feature_label'] = _t['gate_label'] # Blunt fix for origin
+ 
 
             _t['feature_value'] = _t.apply(lambda x: 1 if x['value']>x['threshold_value'] else 0,1)
             _t = _t.loc[:,['cell_index','feature_label','feature_value']]
-            _t = _t.loc[_t['feature_label'].isin([x for x in threshold_analysis.values()]),:]
+            if not is_ordinal:
+                _t = _t.loc[_t['feature_label'].isin([x for x in threshold_analysis.values()]),:]
             _flabs = _t['feature_label'].unique()
             for _k,_v in threshold_analysis.items():
-                if _v not in _flabs: raise ValueError("Missing threshold feature "+str(_v))
+                if not is_ordinal and _v not in _flabs: raise ValueError("Missing threshold feature "+str(_v))
             t_features = _t.copy()#.drop_duplicates()
 
         t_feature_definition = []
         t_feature_basics = []
-        for _k,_v in threshold_analysis.items():
-            t_feature_definition.append([_v,'+',1])
-            t_feature_definition.append([_v,'-',0])
-            t_feature_basics.append([_v,'InForm threshold analysis'])
+        #for _k,_v in threshold_analysis.items():
+        #    t_feature_definition.append([_v,'+',1])
+        #    t_feature_definition.append([_v,'-',0])
+        #    t_feature_basics.append([_v,'InForm threshold analysis'])
+
+        for i,r in _thresholds.iterrows():
+            t_feature_definition.append([r['gate_label'],'+',1])
+            t_feature_definition.append([r['gate_label'],'-',0])
+            t_feature_basics.append([r['gate_label'],'InForm threshold analysis'])
 
         features = pd.DataFrame(me_feature_basics+t_feature_basics,columns=['feature_label','feature_description'])
         features.index.name = 'feature_index'
@@ -912,19 +922,31 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
         _score_data.index.name = 'gate_index'
         _mystats = measurement_statistics
         _score_data['statistic_index'] = _mystats[_mystats['statistic_label']=='Mean'].iloc[0].name
+
+        # Rename 'feature_label' to 'measurement_feature_label' in _score_data
+        _score_data = _score_data.rename(columns={'feature_label': 'measurement_feature_label'})
+
+        # Debugging: Print the columns of the DataFrames before merging
+        print("_score_data columns:", _score_data.columns)
+        print("measurement_features columns:", measurement_features.columns)
+        print("measurement_channels columns:", measurement_channels.columns)
+        print("regions columns:", regions.columns)
+
+
         _thresholds = _score_data.merge(measurement_features.reset_index(),on='measurement_feature_label').\
                                   merge(measurement_channels[['channel_label','channel_abbreviation']].reset_index(),on='channel_label').\
                                   merge(regions[['region_label']].reset_index(),on='region_label').\
-                                  drop(columns=['feature_label','channel_label','region_label'])
+                                  drop(columns=['channel_label','region_label'])
         _thresholds['gate_label'] = _thresholds.apply(lambda x:
                 x['channel_abbreviation']+' '+threshold_dict[x['_temp_ordinal']]
             ,1)
         _thresholds = _thresholds.drop(columns=['channel_abbreviation','_temp_ordinal'])
         _thresholds.index.name = 'gate_index'
+        print(_thresholds)
         return _thresholds
 
     if is_ordinal:
-        raise ValueError("Ordinal processing is not yet tested.")
+        #raise ValueError("Ordinal processing is not yet tested.")
         _thresholds = _parse_ordinal(_score_data,measurement_statistics,measurement_features,measurement_channels,regions)
     else:
         _thresholds = _parse_binary(_score_data,measurement_statistics,measurement_features,measurement_channels,regions)
@@ -934,7 +956,7 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
     ##_thresholds.loc[:,'region_index'] = np.nan
 
     # adding in the drop duplicates to hopefully fix an issue for with multiple tissues
-    return _thresholds.drop_duplicates()
+    return is_ordinal, _thresholds.drop_duplicates()
 
 
 
