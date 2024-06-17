@@ -345,12 +345,15 @@ class CellFrameInForm(CellFrameGeneric):
                        merge(_thresholds,on=['statistic_index','measurement_feature_index','channel_index','region_index']).\
                        merge(mc,left_on='channel_index',right_index=True).drop(columns=['channel_label','image_id']).\
                        rename(columns={'channel_abbreviation':'feature_label'})
-            print("composed:")
-            print(_t)
-            print("threshold_analysis:")
-            print(threshold_analysis)
-            _t['feature_label'] = _t['gate_label'] # Blunt fix for origin
- 
+            #print("composed:")
+            #print(_t)
+            #print("threshold_analysis:")
+            #print(threshold_analysis)
+            if 'gate_label' in _t:
+                _t['feature_label'] = _t['gate_label'] # Blunt fix for origin
+            else:
+                _t['gate_label'] = _t['feature_label'] # Making a blunt fix into an ugly fix for basic non-ordinal
+                _thresholds['gate_label'] = _t['feature_label']
 
             _t['feature_value'] = _t.apply(lambda x: 1 if x['value']>x['threshold_value'] else 0,1)
             _t = _t.loc[:,['cell_index','feature_label','feature_value']]

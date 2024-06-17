@@ -62,6 +62,7 @@ class Contacts(Measurement):
         cnts['fraction'] = cnts.apply(lambda x: np.nan if x['contact_total']==0 else x['contact_count']/x['contact_total'],1)
         cnts['percent'] = cnts.apply(lambda x: np.nan if x['contact_total']==0 else 100*x['contact_count']/x['contact_total'],1)
         return cnts
+
     def sample_counts(self):
         mergeon = self.cdf.sample_columns+['region_label','phenotype_label','neighbor_phenotype_label']
         fc = self.measured_regions[self.cdf.frame_columns].\
@@ -91,16 +92,20 @@ class Contacts(Measurement):
                     ]
                 )))
             ).reset_index()
+        #print(cnts)
         cnts = cnts.merge(fc,on=self.cdf.sample_columns)
         cnts['cumulative_contact_count'] = cnts['cumulative_contact_count'].astype(int)
         cnts['measured_frame_count'] = cnts['measured_frame_count'].astype(int)
         cnts['cumulative_region_area_pixels'] = cnts['cumulative_region_area_pixels'].astype(int)
-        _tot = cnts[mergeon+['cumulative_contact_count']].groupby(self.cdf.sample_columns+['region_label','phenotype_label']).sum().\
+        #return cnts[mergeon+['cumulative_contact_count']].groupby(self.cdf.sample_columns+['region_label','phenotype_label']).sum()[['cumulative_contact_count']]
+        #return cnts
+        _tot = cnts[mergeon+['cumulative_contact_count']].groupby(self.cdf.sample_columns+['region_label','phenotype_label']).sum()[['cumulative_contact_count']].\
             rename(columns={'cumulative_contact_count':'cumulative_contact_total'}).reset_index()
         cnts = cnts.merge(_tot,on=self.cdf.sample_columns+['region_label','phenotype_label'])
         cnts['cumulative_fraction'] = cnts.apply(lambda x: np.nan if x['cumulative_contact_total']==0 else x['cumulative_contact_count']/x['cumulative_contact_total'],1)
         cnts['cumulative_percent'] = cnts.apply(lambda x: np.nan if x['cumulative_contact_total']==0 else 100*x['cumulative_contact_count']/x['cumulative_contact_total'],1)
         return cnts
+
     def threshold(self,phenotype,contact_label=None):
         if contact_label is None: contact_label = phenotype+'/contact'
         def _add_score(d,value,label):
