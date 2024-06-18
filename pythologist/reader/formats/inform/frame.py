@@ -345,10 +345,6 @@ class CellFrameInForm(CellFrameGeneric):
                        merge(_thresholds,on=['statistic_index','measurement_feature_index','channel_index','region_index']).\
                        merge(mc,left_on='channel_index',right_index=True).drop(columns=['channel_label','image_id']).\
                        rename(columns={'channel_abbreviation':'feature_label'})
-            #print("composed:")
-            #print(_t)
-            #print("threshold_analysis:")
-            #print(threshold_analysis)
             if 'gate_label' in _t:
                 _t['feature_label'] = _t['gate_label'] # Blunt fix for origin
             else:
@@ -930,10 +926,6 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
         _score_data = _score_data.rename(columns={'feature_label': 'measurement_feature_label'})
 
         # Debugging: Print the columns of the DataFrames before merging
-        print("_score_data columns:", _score_data.columns)
-        print("measurement_features columns:", measurement_features.columns)
-        print("measurement_channels columns:", measurement_channels.columns)
-        print("regions columns:", regions.columns)
 
 
         _thresholds = _score_data.merge(measurement_features.reset_index(),on='measurement_feature_label').\
