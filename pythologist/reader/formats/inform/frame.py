@@ -937,7 +937,6 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
             ,1)
         _thresholds = _thresholds.drop(columns=['channel_abbreviation','_temp_ordinal'])
         _thresholds.index.name = 'gate_index'
-        print(_thresholds)
         return _thresholds
 
     if is_ordinal:
