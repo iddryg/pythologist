@@ -387,9 +387,21 @@ class NearestNeighbors(Measurement):
                     sys.stderr.write(str(ix+1)+"/"+str(tot)+"\r")
                 if cell_indecies is not None and cell_group not in cell_indecies: continue
                 reference_cell = block_idx.loc[cell_group]
-                output_cdf = df.loc[cell_group].reset_index(drop=True)
+                output_cdf = df.loc[cell_group,:].reset_index(drop=True)
                 if output_cdf.shape[0] < min_neighbors: continue
+                if isinstance(output_cdf,pd.Series): continue
                 # lets add the reference cell to the scored calls
+                #print('========================')
+                #print(output_cdf.shape)
+                #print('reference_cell:')
+                #print(reference_cell)
+                #print('cell_group:')
+                #print(cell_group)
+                #print('two rows of output_cdf:')
+                #print(output_cdf.head(n=2))
+                #if isinstance(output_cdf,pd.Series):
+                #    print("fixing a bad frame")
+                #    output_cdf = pd.DataFrame([output_cdf],columns=reference_cell.index)
                 #print(output_cdf.columns)
                 #print(cell_group)
                 #print(type(cell_group))
