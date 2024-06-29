@@ -313,7 +313,6 @@ class CellFrameInForm(CellFrameGeneric):
                                                  self.get_data('regions'))
             if self.verbose: sys.stderr.write("Finished reading score.\n")
             #self.set_data('thresholds',_thresholds)
-
             ### Take a greedy thresholds
             #_thresholds = self.get_data('thresholds').groupby(['channel_index']).first().\
             #    reset_index()
@@ -350,6 +349,9 @@ class CellFrameInForm(CellFrameGeneric):
             else:
                 _t['gate_label'] = _t['feature_label'] # Making a blunt fix into an ugly fix for basic non-ordinal
                 _thresholds['gate_label'] = _t['feature_label']
+
+            #print(_thresholds)
+
 
             _t['feature_value'] = _t.apply(lambda x: 1 if x['value']>x['threshold_value'] else 0,1)
             _t = _t.loc[:,['cell_index','feature_label','feature_value']]
@@ -886,7 +888,6 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
             # The above formats are the only known to exist in current exports
             raise ValueError("unknown score format")
 
-
         _score_data.index.name = 'gate_index'
         _score_data = _score_data.reset_index('gate_index')
 
@@ -900,7 +901,6 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
         # _thresholds['feature_label'] = _thresholds['channel_abbreviation']
         _thresholds = _thresholds.drop(columns=['channel_abbreviation'])
         _thresholds = _thresholds.set_index('gate_index')
-
 
         return _thresholds
 
@@ -945,7 +945,6 @@ def preliminary_threshold_read(score_data_file, measurement_statistics, measurem
     else:
         _thresholds = _parse_binary(_score_data,measurement_statistics,measurement_features,measurement_channels,regions)
 
-        
     ## At this moment we don't support a different threshold for each region so we will set a nonsense value for the region index... since this threshold NOT be applied by region
     ##_thresholds.loc[:,'region_index'] = np.nan
 
