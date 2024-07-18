@@ -369,10 +369,11 @@ class CellFrameInForm(CellFrameGeneric):
         #    t_feature_definition.append([_v,'-',0])
         #    t_feature_basics.append([_v,'InForm threshold analysis'])
 
-        for i,r in _thresholds.iterrows():
-            t_feature_definition.append([r['gate_label'],'+',1])
-            t_feature_definition.append([r['gate_label'],'-',0])
-            t_feature_basics.append([r['gate_label'],'InForm threshold analysis'])
+        if score_data_file is not None:
+            for i,r in _thresholds.iterrows():
+                t_feature_definition.append([r['gate_label'],'+',1])
+                t_feature_definition.append([r['gate_label'],'-',0])
+                t_feature_basics.append([r['gate_label'],'InForm threshold analysis'])
 
         features = pd.DataFrame(me_feature_basics+t_feature_basics,columns=['feature_label','feature_description'])
         features.index.name = 'feature_index'

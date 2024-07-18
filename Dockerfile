@@ -40,7 +40,8 @@ RUN pip3 install pandas \
     && pip3 install scikit-image \
     && pip3 install imagecodecs \
     && pip3 install jsonschema \
-    && pip3 install opencv-python-headless
+    && pip3 install opencv-python-headless \
+    && pip3 install pythologist-test-images
 
 ARG user=jupyter_user
 ARG user_id=999
