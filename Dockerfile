@@ -1,77 +1,93 @@
 # An Image development environment
-#     docker build -t cio_image_lab:20181129 --build-arg user=USERNAME --build-arg group=GROUPNAME --build-arg user_id=USERID --build-arg group_id=GROUPID .
-FROM ubuntu:20.04
+#     docker build -t cio_image_lab:latest --build-arg user=USERNAME --build-arg group=GROUPNAME --build-arg user_id=USERID --build-arg group_id=GROUPID .
+FROM ubuntu:24.04
+
+# Install essential packages
 RUN apt-get update \
     && apt-get upgrade -y \
     && DEBIAN_FRONTEND='noninteractive' apt-get install -y \
                python3-pip \
+               python3-venv \
                python3-dev \
                nano \
                wget \
                git \
                r-base \
-    && apt-get autoremove \
-    && apt-get clean
+               build-essential \
+               sudo \
+               libhdf5-dev \
+    && apt-get autoremove -y \
+    && apt-get clean -y
 
-RUN apt-get update \
- && DEBIAN_FRONTEND='noninteractive' \
- && apt-get install -y --no-install-recommends apt-utils \
-                                               build-essential \
-                                               sudo \
-                                               git \
-                                               libhdf5-serial-dev \
- && apt-get autoremove \
- && apt-get clean
+# Create and activate a virtual environment
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
+# Upgrade pip and setuptools inside the virtual environment
+RUN pip install --upgrade pip setuptools
 
-RUN pip3 install --upgrade pip \
-    &&  pip3 install --upgrade setuptools
+# Install Python packages inside the virtual environment
+RUN pip install pandas==2.2.0 \
+    && pip install numpy==1.26.3 \
+    && pip install scipy \
+    && pip install h5py \
+    && pip install scikit-learn \
+    && pip install openpyxl \
+    && pip install umap-learn \
+    && pip install tables \
+    && pip install imageio \
+    && pip install xmltodict \
+    && pip install scikit-image \
+    && pip install imagecodecs \
+    && pip install jsonschema \
+    && pip install opencv-python-headless \
+    && pip install pythologist-test-images \
+    && pip install pyarrow
 
-RUN pip3 install pandas \
-    && pip3 install numpy \
-    && pip3 install scipy \
-    && pip3 install h5py \
-    && pip3 install scikit-learn \
-    && pip3 install openpyxl \
-    && pip3 install umap-learn \
-    && pip3 install tables \
-    && pip3 install imageio \
-    && pip3 install xmltodict \
-    && pip3 install scikit-image \
-    && pip3 install imagecodecs \
-    && pip3 install jsonschema \
-    && pip3 install opencv-python-headless \
-    && pip3 install pythologist-test-images
-
+# Create a user with specific user_id and group_id
 ARG user=jupyter_user
-ARG user_id=999
+ARG user_id=9999
 ARG group=jupyter_group
-ARG group_id=999
+ARG group_id=9999
 
-RUN useradd -l -u $user_id -ms /bin/bash $user \
-    && groupadd -g $group_id $group \
+RUN groupadd -g $group_id $group \
+    && useradd -l -u $user_id -ms /bin/bash -g $group $user \
     && usermod -a -G $group $user
 
-RUN pip3 install jupyterlab \
-    && pip3 install matplotlib \
-    && pip3 install plotnine[all] \
-    && pip3 install seaborn 
+# Install additional Python packages inside the virtual environment
+RUN pip install jupyterlab \
+    && pip install matplotlib \
+    && pip install plotnine[all] \
+    && pip install seaborn 
 
+# Clone and install the 'good-neighbors' repository inside the virtual environment
 RUN mkdir /source \
     && cd /source \
     && git clone https://github.com/jason-weirather/good-neighbors.git \
     && cd good-neighbors \
-    && pip3 install -e .
+    && pip install -e .
 
+# Add and install your own package inside the virtual environment
 ADD . /source/pythologist
 RUN cd /source/pythologist \
-    && pip3 install .
+    && pip install .
 
-RUN mkdir .local \
-    && chmod -R 777 .local
-RUN mkdir .jupyter \
-    && chmod -R 777 .jupyter
-RUN mkdir /work
+# Create necessary directories with appropriate permissions
+RUN mkdir -p /home/$user/.local \
+    && mkdir -p /home/$user/.jupyter \
+    && mkdir -p /work \
+    && chown -R $user:$group /home/$user/.local /home/$user/.jupyter /work
+
+# Create necessary directories with appropriate permissions
+RUN mkdir -p /.local /.jupyter /.cache \
+    && chmod -R 777 /.local /.jupyter /.cache
+
+# Switch to the new user
+USER $user
+
+# Set the working directory
 WORKDIR /work
 
-CMD ["jupyter","lab","--ip=0.0.0.0","--port=8888","--allow-root"]
+# Command to start JupyterLab
+CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--allow-root"]
+
