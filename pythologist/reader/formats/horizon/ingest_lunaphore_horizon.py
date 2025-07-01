@@ -5,12 +5,30 @@
 # This code is used to ingest outputs from Lunaphore's Horizon analysis software for use with pythologist. 
 # It converts the output from Horizon into a pythologist CellDataFrame for further use in our pipelines. 
 
-# update: December 27, 2024
+# v2 update: December 27, 2024
 # Harry's Horizon outputs had area and cells dataframes combined in one file. 
 # The area data is the first row(s). 
 # Then the cells data is after that. 
 # Some columns are only used by one or the other. 
 # Let's make a function to optionally take the one file version as input and split them into cells and area dataframes for further processing. 
+
+# v3 update: March 2025
+# Removing cells within the "Exclusion" Class group
+
+# v4 update: April 2025
+# Removing cells within the "Exclusion" Class group and removing excluded areas, handling a few different options. 
+# Main Annotation will encompass the entire tissue. 
+# Polygon Exclusion Annotations: will overlap excluded cells, area of polygon will be subtracted from the Main area.
+# Rectangle Exclusion Annotations: will overlap excluded cells, area of rectangles will be subtracted from the Main area.
+# If Rectangle Exclusion Annotations overlap, will include an "Overlap" Rectangle which will be added back to the Main area.
+
+# v5 update: April 28 2025
+# Uses nested annotations indicated by a naming protocol in the Annotation Group column. 
+# [annotation type]_[main id].[roi id].[exclusion id]_[shape type]
+# Main_1.0.0_Rectangle
+# ROI_1.1.0_Polygon - the first ROI within the Main 1 annotation
+# ROI_1.2.0_Polygon - the second ROI within the Main 1 annotation
+# Exclusion_1.1.1_Polygon - the first Exclusion within ROI 1 within Main 1
 
 import pandas as pd
 import numpy as np
@@ -24,17 +42,18 @@ pd.set_option('display.max_colwidth', None)
 
 
 # run all the ingestion methods
-# cells_df_path: path to cells csv file. Example: 'data/CELLS_20241125.csv'
-# area_df_path: path to areas csv file. Example: 'data/AREA_20241125.csv'
+# horizon_export_path: path to input data file from horizon export. Must be a string filepath. This contains areas and cells that need to be parsed. 
 # Note: in this version, if the cells_df_path and area_df_path are the same, the program assumes they're combined in the same file and will split them. 
 # project_name: name of the project. Example: 'Nick_Horizon_Testing_20241219'
+# savefile_dir: path to the directory you want to save the outputs in. 
+# savefile_name: name of the base name for the outputs. There will be a separate output cdf for each annotation. 
 # microns_per_pixel: should be 0.28 for the Lunaphore instrument as of 20241220
 # run_qc: set to True if you want to check the cdf qc
 # return_cdf: set to True if you want to return the cdf, otherwise just saves the file and doesn't return anything
-def run_lunaphore_ingestion(cells_df_path,
-                            area_df_path,
+def run_lunaphore_ingestion(horizon_export_filepath,
                             project_name,
-                            savefile_path,
+                            savefile_dir,
+                            savefile_name,
                             overwrite_sample_name = None,
                             default_phenotype = 'CD3', 
                             microns_per_pixel=0.28,
@@ -46,79 +65,190 @@ def run_lunaphore_ingestion(cells_df_path,
     
     # validate input parameters
     try:
-        validate_parameters(cells_df_path, area_df_path, project_name, savefile_path, microns_per_pixel, run_qc, return_cdf, overwrite_sample_name, default_phenotype)
+        validate_parameters(horizon_export_filepath, project_name, savefile_dir, savefile_name, microns_per_pixel, run_qc, return_cdf, overwrite_sample_name, default_phenotype)
     except (TypeError, ValueError) as e:
         print(f"Error: {e}")
         return
     
-    # If the cells_df_path and area_df_path are the same, assume that file contains both area and cells data. 
-    # In that case, we need to split them apart. 
-    if cells_df_path != area_df_path:
-        # read in csv files separately
-        cells = pd.read_csv(cells_df_path)
-        area = pd.read_csv(area_df_path)
-        # check for Unnamed: 0 column
-        if 'Unnamed: 0' in list(cells.columns): 
-            cells = cells.drop(columns=['Unnamed: 0'])
-    if cells_df_path == area_df_path:
-        # assume info is in one file
-        temp_input_df1 = pd.read_csv(cells_df_path)
-        # cells df has Nuclei Segmentation in the Annotation Group "path", extract those rows
-        temp_input_cells = temp_input_df1.loc[temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation')]
-        # area df does not have Nuclei Segmentation in the Annotation Group "path", extract those rows
-        temp_input_area = temp_input_df1.loc[~temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation')]
-        # drop columns that only contain nan
-        cells = temp_input_cells.dropna(axis=1, how='all')
-        area = temp_input_area.dropna(axis=1, how='all')
+    # horizon_export_filepath: one input file containing the area of the Main annotation, along with the cells in that Main annotation. 
+    # Other annotation areas may be in this file as well. 
+    # There could be multiple annotations. We'll handle them all using a dictionary. 
+    
+    # read in the horizon output
+    temp_input_df1 = pd.read_csv(horizon_export_filepath)
 
+    # remove unwanted column
+    if 'Unnamed: 0' in list(temp_input_df1.columns):
+        temp_input_df1 = temp_input_df1.drop(columns=['Unnamed: 0'])
+        
+    # cell annotations have Nuclei Segmentation at the end of the Annotation Group "path", label those rows
+    temp_input_df1.loc[temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation'), 'annot_name'] = 'Nuclei Segmentation'
+    # area annotations have the annotation name at the end of the Annotation Group "path". Extract those names
+    temp_input_df1.loc[~temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation'), 'annot_name'] = temp_input_df1['Annotation Group'].str.split('/').str[-1]
+    # Split the cells and the areas dfs apart. 
+    # cells df has Nuclei Segmentation in the Annotation Group "path", extract those rows
+    temp_input_cells = temp_input_df1.loc[temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation')]
+    # area df does not have Nuclei Segmentation in the Annotation Group "path", extract those rows
+    temp_input_area = temp_input_df1.loc[~temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation')]
     
-    # add region areas
-    cells = add_region_areas(cells, area, microns_per_pixel)
+    # remove Exclusions from cells dataframe if there are any
+    if 'Class group' in list(temp_input_cells.columns):
+        print('Removing exclusions...')
+        print('Size before removing exclusions: ' + str(temp_input_cells.shape))
+        temp_input_cells = temp_input_cells.loc[temp_input_cells['Class group']!='Exclusions']
+        print('Size after removing exclusions: ' + str(temp_input_cells.shape))
+
+    # Label parent annotations for CELLS (Main and ROI). Should be in Class group column. 
+    temp_input_cells['parent_id'] = temp_input_cells['Class group'].str.lower().str.split('_').str[1]
+    temp_input_cells['parent_main_id'] = temp_input_cells['Class group'].str.lower().str.split('_').str[1].str.split('.').str[0]
+    temp_input_cells['parent_roi_id'] = temp_input_cells['Class group'].str.lower().str.split('_').str[1].str.split('.').str[1]
     
-    # extract column metadata
-    meta = extract_column_metadata(cells)
+    # drop columns that only contain nan
+    temp_input_cells = temp_input_cells.dropna(axis=1, how='all')
+    temp_input_area = temp_input_area.dropna(axis=1, how='all')
+
+    # Label annotation info for all annotations
+    # ex: ROI_1.1.0_Polygon
+    temp_input_area['annot_type'] = temp_input_area['annot_name'].str.lower().str.split('_').str[0]
+    temp_input_area['annot_shape'] = temp_input_area['annot_name'].str.lower().str.split('_').str[2]
+    temp_input_area['full_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1]
+    temp_input_area['main_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1].str.split('.').str[0]
+    temp_input_area['roi_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1].str.split('.').str[1]
+    temp_input_area['exclusion_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1].str.split('.').str[2]
+
+    print('area df: ')
+    display(temp_input_area)
     
-    # rename markers list if specified
-    if rename_markers_dict is not None:
-        for old_marker_name, new_marker_name in rename_markers_dict.items():
-            meta = rename_marker(meta, old_marker_name, new_marker_name)
+    # ---------------------------------------------------------
+    # Update Main and ROI annotations areas with their respective exclusion areas
+    # Subtract Exclusion areas from Main areas and from ROI areas
+    print('Subtracting exclusion areas from their parent ROI and Main annotation areas: ')
+    # cycle through all annot ids. If exclusion annot id is nonzero, the current annotation is an exclusion annotation. 
+    # The main_annot_id and roi_annot_id columns for that row should show which parent annotations it belongs to. 
+    # Need to go to those annotation rows and subtract the exclusion area from them. 
+    for curr_annot_id in temp_input_area['full_annot_id']:
+        print('curr_annot_id = ' + str(curr_annot_id))
+        # if the current exclusion id is 0, it is not an exclusion. So we can skip this one. 
+        if temp_input_area.loc[temp_input_area['full_annot_id']==curr_annot_id,'exclusion_annot_id'].iloc[0] == '0': continue
+        
+        # Now, the current exclusion id should be nonzero. 
+        curr_area_to_subtract = temp_input_area.loc[temp_input_area['full_annot_id']==curr_annot_id,'Area in μm²'].iloc[0]
+        curr_main_id = temp_input_area.loc[temp_input_area['full_annot_id']==curr_annot_id,'main_annot_id'].iloc[0]
+        curr_roi_id = temp_input_area.loc[temp_input_area['full_annot_id']==curr_annot_id,'roi_annot_id'].iloc[0]
+
+        # check
+        print(f"Area to subtract: {curr_area_to_subtract:.2f}")
+        print(f"Current Main ID: {curr_main_id}")
+        print(f"Current ROI ID: {curr_roi_id}")
+        
+        # We are only operating on ROIs, so let's not worry about Mains (sometimes TBL doesn't export Main areas anymore)
+        # Subtract exclusion area from its parent ROI
+        temp_input_area.loc[((temp_input_area['main_annot_id']==curr_main_id) &
+                            (temp_input_area['roi_annot_id']==curr_roi_id) &
+                            (temp_input_area['exclusion_annot_id']=='0')),'Area in μm²'] -= curr_area_to_subtract
+        # We are only operating on ROIs, so let's not worry about Mains (sometimes TBL doesn't export Main areas anymore)
+        ## Subtract exclusion area from its parent Main
+        #temp_input_area.loc[((temp_input_area['main_annot_id']==curr_main_id) &
+        #                    (temp_input_area['roi_annot_id']=='0') &
+        #                    (temp_input_area['exclusion_annot_id']=='0')),'Area in μm²'] -= curr_area_to_subtract
+
+    # Now we can drop all exclusion annotations. (exclusion annot id equals zero)
+    temp_input_area = temp_input_area.loc[temp_input_area['exclusion_annot_id']=='0']
     
     if show_meta:
-        display(meta)
+        print('updated area: ')
+        display(temp_input_area)
     
-    # convert to pythologist CellDataFrame
-    cdf = ingest_Lunaphore(cells, 
-                           meta, 
-                           proj_name=project_name, 
-                           default_phenotype=default_phenotype, 
-                           microns_per_pixel=0.28,
-                           overwrite_sample_name = overwrite_sample_name)
+    # split each areas and cells df apart for each ROI annotation and store in a dict of dataframes. 
+    # for cells, will be in 'parent_id' column. 
+    # for areas, will be in 'full_annot_id' column. 
+    # Note: Main annotations will be in the areas dict, but will not be processed because cell parent_id will never match their full_annot_id. 
+    # Therefore only ROIs will be processed. 
+    grouped_cells = temp_input_cells.groupby('parent_id')
+    grouped_areas = temp_input_area.groupby('full_annot_id')
+    # store each annotation separately in a dict
+    cells_by_annot_dict = {parent_id: group for parent_id, group in grouped_cells}
+    areas_by_annot_dict = {full_annot_id: group for full_annot_id, group in grouped_areas}
+
+    if show_meta:
+        print('annotations in cells: ')
+        print([parent_id for parent_id, group in grouped_cells])
+        print('annotations in areas: ')
+        print([full_annot_id for full_annot_id, group in grouped_areas])
+
+    # ---------------------------------------------------------
+    # add region areas (per annot)
+    # cells = add_region_areas(cells, area, microns_per_pixel)
+    for curr_annot, curr_cells in cells_by_annot_dict.items():
+        print(curr_annot)
+        cells_by_annot_dict[curr_annot] = add_region_areas(curr_cells, areas_by_annot_dict[curr_annot], microns_per_pixel)
     
-    if save_cdf:
-        # save cdf, as .cdf.h5
-        # example savefile_path: 'Processing/Nick_Horizon_Testing_20241219.cdf.h5'
-        cdf.to_hdf(savefile_path,'data')
+    # initialize a meta dict with the same keys as cells_by_annot_dict, but empty dataframes as values for now. 
+    meta_dict = {key: pd.DataFrame() for key in cells_by_annot_dict}
+    # initialize an output cdf dict with the same keys as cells_by_annot_dict, but empty dataframes as values for now. 
+    cdf_dict = {key: pd.DataFrame() for key in cells_by_annot_dict}
     
-    if run_qc:
-        qc = cdf.qc()
-        qc.run_tests()
-        qc.print_results()
+    # extract column metadata
+    #meta = extract_column_metadata(cells)
+    for curr_annot, curr_cells in cells_by_annot_dict.items():
+        print(' ')
+        print('- - - - - - - - - - - - - - - - - - - - - - - -')
+        print('processing ' + str(curr_annot) + ' - - - - - - -')
+        # remove columns with only nans... again
+        curr_cells = curr_cells.dropna(axis=1, how='all')
+        # check
+        #display(curr_cells.head(5))
+        # get meta
+        meta_dict[curr_annot] = extract_column_metadata(curr_cells)
+        
+        # rename markers list if specified
+        if rename_markers_dict is not None:
+            for old_marker_name, new_marker_name in rename_markers_dict.items():
+                meta_dict[curr_annot] = rename_marker(meta_dict[curr_annot], old_marker_name, new_marker_name)
     
+        if show_meta:
+            print('meta for ' + str(curr_annot) + ':')
+            display(meta_dict[curr_annot])
+    
+        # convert to pythologist CellDataFrame
+        cdf = ingest_Lunaphore(curr_cells, 
+                               meta_dict[curr_annot], 
+                               proj_name=project_name, 
+                               default_phenotype=default_phenotype, 
+                               microns_per_pixel=0.28,
+                               overwrite_sample_name = overwrite_sample_name)
+
+        if save_cdf:
+            # save cdf, as .cdf.h5
+            # example savefile_path: 'Processing/Nick_Horizon_Testing_20241219.cdf.h5'
+            # savefile_dir
+            # savefile_name
+            savefile_path = os.path.join(savefile_dir, savefile_name + '_' + curr_annot + '.cdf.h5')
+            cdf.to_hdf(savefile_path,'data')
+
+        if run_qc:
+            qc = cdf.qc()
+            qc.run_tests()
+            qc.print_results()
+        
+        # add cdf to the cdf_dict
+        cdf_dict[curr_annot] = cdf
+        
     if return_cdf:
-        return cdf
+        return cdf_dict
 
 
 # function to validate input parameters before proceeding
-def validate_parameters(cells_df_path, area_df_path, project_name, savefile_path, microns_per_pixel, run_qc, return_cdf, overwrite_sample_name, default_phenotype):
+def validate_parameters(horizon_export_filepath, project_name, savefile_dir, savefile_name, microns_per_pixel, run_qc, return_cdf, overwrite_sample_name, default_phenotype):
     # Type checking
-    if not isinstance(cells_df_path, str):
-        raise TypeError("cells_df_path must be a string")
-    if not isinstance(area_df_path, str):
-        raise TypeError("area_df_path must be a string")
+    if not isinstance(horizon_export_filepath, str):
+        raise TypeError("horizon_export_filepath must be a string")
     if not isinstance(project_name, str):
         raise TypeError("project_name must be a string")
-    if not isinstance(savefile_path, str):
-        raise TypeError("savefile_path must be a string")
+    if not isinstance(savefile_dir, str):
+        raise TypeError("savefile_dir must be a string")
+    if not isinstance(savefile_name, str):
+        raise TypeError("savefile_name must be a string")
     if not isinstance(microns_per_pixel, float):
         raise TypeError("microns_per_pixel must be a float")
     if not isinstance(run_qc, bool):
@@ -131,10 +261,8 @@ def validate_parameters(cells_df_path, area_df_path, project_name, savefile_path
     if not isinstance(default_phenotype, str):
         raise TypeError("default_phenotype must be a string")
     # validate files exist
-    if not os.path.isfile(cells_df_path):
-        raise ValueError(f"The path '{cells_df_path}' is not a file")
-    if not os.path.isfile(area_df_path):
-        raise ValueError(f"The path '{area_df_path}' is not a file")
+    if not os.path.isfile(horizon_export_filepath):
+        raise ValueError(f"The path '{horizon_export_filepath}' is not a file")
 
 
 # function to integrate region areas into the cells dataframe. 
@@ -148,25 +276,6 @@ def add_region_areas(cells_df, area_df, microns_per_pixel):
     area_df['Area_pixels_squared'] = area_df['Area in μm²'].apply(lambda x: round(x*((1/microns_per_pixel)**2), 3))
     # Extract dictionary of region areas using ANY as region label
     region_areas_dict = dict(zip(area_df['region_label'],area_df['Area_pixels_squared']))
-    # put this region areas dict into the regions column. It'll be the same value for every row. 
-    cells_df['regions'] = cells_df['region_label'].apply(lambda x: region_areas_dict)
-    
-    return cells_df
-
-
-# function to integrate region areas into the cells dataframe. 
-def old_add_region_areas(cells_df, area_df):
-    # Want to drop the Nuclei Segmentation part of the Annotation Group. 
-    # explode Annotation Group
-    temp_region_df = cells_df['Annotation Group'].str.split('/', expand=True)
-    # get number of columns 
-    num_cols = len(list(temp_region_df.columns))
-    # keep all but last one and put them back together
-    temp_region_df = temp_region_df.iloc[:,0:num_cols-1]
-    # Recombine back together
-    cells_df['region_label'] = temp_region_df.apply(lambda x: '/'.join(x), axis=1)
-    # Extract dictionary of region areas. 
-    region_areas_dict = dict(zip(area_df['Annotation Group'],area_df['Area in μm²']))
     # put this region areas dict into the regions column. It'll be the same value for every row. 
     cells_df['regions'] = cells_df['region_label'].apply(lambda x: region_areas_dict)
     
@@ -193,7 +302,9 @@ def extract_column_metadata(cells_df):
         'Mean Intensity':'Mean Intensity',
         'Threshold':'Threshold',
         'regions':'regions',
-        'region_label':'region_label'
+        'region_label':'region_label',
+        'parent_id':'Parent Annotation',
+        'Leiden clusters':'Leiden clusters'
     }
     
     compartment_type_map = {
@@ -202,7 +313,9 @@ def extract_column_metadata(cells_df):
         'Nuclei':'Nucleus',
         'Annotation':'Annotation',
         'Position':'Annotation',
-        'region':'Annotation'
+        'region':'Annotation',
+        'parent_id':'Annotation',
+        'Leiden clusters':'Annotation'
     }
     
     # ----------------------------
@@ -261,7 +374,7 @@ def extract_column_metadata(cells_df):
     # ----------------------------
     # Extract Thresholds
     # same for nuclei and other cell compartments
-    temp_thresholds_df = df['orig_cols'].str.split('Threshold \(', expand=True)
+    temp_thresholds_df = df['orig_cols'].str.split('Threshold \\(', expand=True)
     # Take 2nd column, after the "Threshold ("
     temp_thresholds_df2 = temp_thresholds_df.iloc[:, 1].str.split(')', expand=True)
     # Take 1st column, before the ")"
@@ -337,10 +450,16 @@ def ingest_Lunaphore(df,
     print('values columns subset')
     df_vals = df_vals.rename(columns = vals_remapping_dict)
     print('values columns renamed')
+    print(list(df_vals.columns))
     
     # Use these columns for index
-    index_columns = ['Annotation Group','cell_index','cell_area','x','y','region_label']
+    if 'Leiden clusters' in df_vals.columns:
+        index_columns = ['Annotation Group','Parent Annotation','cell_index','cell_area','x','y','region_label','Leiden clusters']
+    else:
+        index_columns = ['Annotation Group','Parent Annotation','cell_index','cell_area','x','y','region_label']
     # Pull out regions column since it's not hashable (can't set it to index)
+    # make the regions column into strings instead of dicts... (not ideal)
+    #df_vals['regions'] = df_vals['regions'].apply(lambda x: str(x))
     df_regions = df_vals[index_columns + ['regions']].set_index(index_columns)
     # drop regions column from df_vals because it's not hashable. Will merge it back in later. 
     df_vals = df_vals.drop(columns=['regions'])
@@ -425,13 +544,16 @@ def ingest_Lunaphore(df,
     df_merge['frame_id'] = uuid.uuid4().hex
     if overwrite_sample_name is not None:
         df_merge['sample_name'] = overwrite_sample_name
-        df_merge['frame_name'] = overwrite_sample_name
+        #df_merge['frame_name'] = overwrite_sample_name
     else:
-        df_merge['sample_name'] = df_merge['region_label']
-        df_merge['frame_name'] = df_merge['region_label']
+        #df_merge['sample_name'] = df_merge['region_label']
+        df_merge['sample_name'] = df_merge['Parent Annotation']
+        #df_merge['frame_name'] = df_merge['region_label']
+    df_merge['frame_name'] = df_merge['Parent Annotation']
     df_merge['project_name'] = proj_name
     df_merge['project_id'] = uuid.uuid4().hex
     df_merge['sample_id'] = uuid.uuid4().hex
+    # I should calculate this using the minimum and maximum cell centroid locations for each ROI...
     df_merge['frame_shape'] = df_merge['region_label'].apply(lambda x: tuple([1000,1000]))
     #print('other pythologist columns added')
     
