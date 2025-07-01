@@ -66,7 +66,7 @@ class Counts(Measurement):
                     apply(lambda x: pd.Series(dict(zip(
                         ['count','cell_area_pixels'],
                         [len(x['cell_index']),sum(x['cell_area'])]
-                    )))).reset_index()
+                    ))), include_groups=False).reset_index()
                 else:
                     df = self.measured_regions[mergeon].copy()
                     df.loc[:,'count'] = 0

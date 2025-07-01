@@ -35,6 +35,7 @@ import numpy as np
 import uuid
 from pythologist import CellDataFrame
 import os
+import warnings
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
@@ -61,7 +62,8 @@ def run_lunaphore_ingestion(horizon_export_filepath,
                             save_cdf = False,
                             return_cdf = False,
                             show_meta = False,
-                            rename_markers_dict = None):
+                            rename_markers_dict = None,
+                            choose_duplicate_threshold_to_keep = None):
     
     # validate input parameters
     try:
@@ -107,6 +109,43 @@ def run_lunaphore_ingestion(horizon_export_filepath,
     temp_input_cells = temp_input_cells.dropna(axis=1, how='all')
     temp_input_area = temp_input_area.dropna(axis=1, how='all')
 
+    # ---------------------------------------------------------
+    # check meta on cells data, drop duplicate markers if necessary
+    qc_input_cells = extract_column_metadata(temp_input_cells)
+    # check for duplicate thresholds per marker in the cell compartment
+    qc_input_cells_cell_thresholds = qc_input_cells.loc[(qc_input_cells['Measurement_Type']=='Threshold') & (qc_input_cells['Compartment_Type']=='Cell')]
+    # keep duplicates AND originals to investigate
+    qc_input_cells_threshold_duplicates = qc_input_cells_cell_thresholds.loc[qc_input_cells_cell_thresholds.duplicated(subset=['Label_Mapping'], keep=False)]
+    # Warning and display if there are ny duplicates. 
+    if not qc_input_cells_threshold_duplicates.empty:
+        unique_labels = qc_input_cells_threshold_duplicates['Label_Mapping'].unique()
+        warnings.warn(
+            f"---------------------------------------------------------\n"
+            f"Duplicate thresholds found for the following markers: \n"
+            f"Duplicated Label_Mapping values: {list(unique_labels)}\n"
+            f"---------------------------------------------------------\n"
+        )
+        display(qc_input_cells_threshold_duplicates)
+        if choose_duplicate_threshold_to_keep is None:
+            raise ValueError(
+            f"See warning above. Please input a list of integers to choose_duplicate_threshold_to_keep specifying which indexes in the duplicated dataframe above to KEEP. Others will be dropped. \n")
+        elif type(choose_duplicate_threshold_to_keep) is list:
+            # get the opposite of what we want to keep, so we can drop these from the original data columns
+            qc_input_cells_threshold_duplicates_to_drop = qc_input_cells_threshold_duplicates.drop(choose_duplicate_threshold_to_keep)
+            drop_col_list = list(qc_input_cells_threshold_duplicates_to_drop['orig_cols'])
+            # drop duplicate columns from dataset
+            print('dropping the following columns: ')
+            print(drop_col_list)
+            temp_input_cells = temp_input_cells.drop(columns=drop_col_list)
+            # keep chosen ones by index, just for display purposes
+            qc_input_cells_threshold_duplicates_to_keep = qc_input_cells_threshold_duplicates.loc[choose_duplicate_threshold_to_keep,]
+            print('updated after dropping duplicates: ')
+            display(qc_input_cells_threshold_duplicates)
+        else:
+            raise ValueError(
+            f"choose_duplicate_threshold_to_keep must be a list. \n")
+    # ---------------------------------------------------------
+    
     # Label annotation info for all annotations
     # ex: ROI_1.1.0_Polygon
     temp_input_area['annot_type'] = temp_input_area['annot_name'].str.lower().str.split('_').str[0]
