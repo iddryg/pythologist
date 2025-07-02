@@ -138,9 +138,9 @@ def run_lunaphore_ingestion(horizon_export_filepath,
             print(drop_col_list)
             temp_input_cells = temp_input_cells.drop(columns=drop_col_list)
             # keep chosen ones by index, just for display purposes
-            qc_input_cells_threshold_duplicates_to_keep = qc_input_cells_threshold_duplicates.loc[choose_duplicate_threshold_to_keep,]
+            qc_input_cells_threshold_duplicates_to_keep = qc_input_cells_threshold_duplicates.loc[choose_duplicate_threshold_to_keep,:]
             print('updated after dropping duplicates: ')
-            display(qc_input_cells_threshold_duplicates)
+            display(qc_input_cells_threshold_duplicates_to_keep)
         else:
             raise ValueError(
             f"choose_duplicate_threshold_to_keep must be a list. \n")
