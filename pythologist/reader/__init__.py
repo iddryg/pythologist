@@ -354,8 +354,8 @@ class CellFrameGeneric(object):
             #print(data_table.dtypes)
             #print('-----')
             #print(data_table)
-            data_table.to_hdf(h5file,
-                              location+'/data/'+table_name,
+            data_table.to_hdf(path_or_buf=h5file,
+                              key=location+'/data/'+table_name,
                               mode='a',
                               format='table',
                               complib='zlib',
@@ -600,7 +600,7 @@ class CellFrameGeneric(object):
 
         _fdt = self.get_data('feature_definitions')
         _fdt['feature_tuple'] = _fdt.apply(lambda x: tuple([x['feature_value'],x['feature_value_label']]),1)
-        _fgt = _fdt.groupby('feature_index').apply(lambda x: set(x['feature_tuple']))
+        _fgt = _fdt.groupby('feature_index').apply(lambda x: set(x['feature_tuple']),include_groups=False)
         _binary_feature_index = _fgt.loc[_fgt=={(0, "-"), (1, "+")}].index
         # Filter to only binary features
         _fdt = _fdt.loc[_fdt['feature_index'].isin(_binary_feature_index),:].copy().drop(columns=['feature_tuple'])
@@ -822,10 +822,10 @@ class CellSampleGeneric(object):
         f.close()
         for frame_id in self.frame_ids:
             frame = self._frames[frame_id]
-            frame.to_hdf(h5file,
-                         location+'/frames/'+frame_id,
-                          mode='a')
-        self._key.to_hdf(h5file,location+'/info',mode='r+',format='table',complib='zlib',complevel=9)
+            frame.to_hdf(path_or_buf=h5file,
+                         key=location+'/frames/'+frame_id,
+                         mode='a')
+        self._key.to_hdf(path_or_buf=h5file,key=location+'/info',mode='r+',format='table',complib='zlib',complevel=9)
 
 
     def read_hdf(self,h5file,location=''):
@@ -1003,7 +1003,7 @@ class CellProjectGeneric(object):
                                       'sample_id':sample.id,
                                       'sample_name':sample.sample_name}]).set_index('db_id')
             current = pd.concat([current,addition])
-        current.to_hdf(self.h5path,'info',mode='r+',complib='zlib',complevel=9,format='table')
+        current.to_hdf(path_or_buf=self.h5path,key='info',mode='r+',complib='zlib',complevel=9,format='table')
         return
 
     def qc(self,*args,**kwargs):
