@@ -227,8 +227,9 @@ def run_lunaphore_ingestion(horizon_export_filepath,
     # initialize an output cdf dict with the same keys as cells_by_annot_dict, but empty dataframes as values for now. 
     cdf_dict = {key: pd.DataFrame() for key in cells_by_annot_dict}
     
-    # extract column metadata
-    #meta = extract_column_metadata(cells)
+    # ---------------------------------------------------------
+    # Run the code to convert to pythologist CellDataFrame for each annotation. 
+    # ---------------------------------------------------------
     for curr_annot, curr_cells in cells_by_annot_dict.items():
         print(' ')
         print('- - - - - - - - - - - - - - - - - - - - - - - -')
@@ -237,7 +238,8 @@ def run_lunaphore_ingestion(horizon_export_filepath,
         curr_cells = curr_cells.dropna(axis=1, how='all')
         # check
         #display(curr_cells.head(5))
-        # get meta
+        
+        # Extract column metadata for the current annotation
         meta_dict[curr_annot] = extract_column_metadata(curr_cells)
         
         # rename markers list if specified
@@ -257,24 +259,35 @@ def run_lunaphore_ingestion(horizon_export_filepath,
                                microns_per_pixel=0.28,
                                overwrite_sample_name = overwrite_sample_name)
 
-        if save_cdf:
-            # save cdf, as .cdf.h5
-            # example savefile_path: 'Processing/Nick_Horizon_Testing_20241219.cdf.h5'
-            # savefile_dir
-            # savefile_name
-            savefile_path = os.path.join(savefile_dir, savefile_name + '_' + curr_annot + '.cdf.h5')
-            cdf.to_hdf(savefile_path,'data')
-
-        if run_qc:
-            qc = cdf.qc()
-            qc.run_tests()
-            qc.print_results()
         
         # add cdf to the cdf_dict
         cdf_dict[curr_annot] = cdf
+
+    # Now we have processed all the ROIs within the same sample separately, stored in the cdf_dict. 
+    # Let's concatenate them all together in the same cdf to save, run qc, and/or return. 
+    cdf = pd.concat(cdf_dict.values(), ignore_index=True)
+    # They currently have separate sample_name and sample_id. Let's set them all the same. 
+    cdf['sample_id'] = uuid.uuid4().hex
+    if overwrite_sample_name is not None:
+        cdf['sample_name'] = overwrite_sample_name
+    else:
+        cdf['sample_name'] = cdf['Annotation Group'].split('/')[1]
+    
+    if save_cdf:
+        # save cdf, as .cdf.h5
+        # example savefile_path: 'Processing/Nick_Horizon_Testing_20241219.cdf.h5'
+        # savefile_dir
+        # savefile_name
+        savefile_path = os.path.join(savefile_dir, savefile_name + '.cdf.h5')
+        cdf.to_hdf(savefile_path,'data')
+
+    if run_qc:
+        qc = cdf.qc()
+        qc.run_tests()
+        qc.print_results()
         
     if return_cdf:
-        return cdf_dict
+        return cdf
 
 
 # function to validate input parameters before proceeding
