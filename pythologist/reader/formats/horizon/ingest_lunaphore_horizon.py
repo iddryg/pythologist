@@ -276,6 +276,8 @@ def run_lunaphore_ingestion(horizon_export_filepath,
         cdf['sample_name'] = cdf['Annotation Group'].split('/')[1]
     # Combine sample_name with Parent Annotation (current frame_name) to get the updated frame_name
     cdf['frame_name'] = cdf['sample_name'] + '_' + cdf['frame_name']
+    # set microns_per_pixel for combined cdf
+    cdf.microns_per_pixel = microns_per_pixel
     
     if save_cdf:
         # save cdf, as .cdf.h5
