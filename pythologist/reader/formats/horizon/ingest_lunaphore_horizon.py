@@ -267,6 +267,8 @@ def run_lunaphore_ingestion(horizon_export_filepath,
     # Let's concatenate them all together in the same cdf to save, run qc, and/or return. 
     cdf = pd.concat(cdf_dict.values(), ignore_index=True)
     # They currently have separate sample_name and sample_id. Let's set them all the same. 
+    # Same with project_id. 
+    cdf['project_id'] = uuid.uuid4().hex
     cdf['sample_id'] = uuid.uuid4().hex
     if overwrite_sample_name is not None:
         cdf['sample_name'] = overwrite_sample_name
