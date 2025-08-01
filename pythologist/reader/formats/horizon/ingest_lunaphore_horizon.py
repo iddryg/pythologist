@@ -274,6 +274,8 @@ def run_lunaphore_ingestion(horizon_export_filepath,
         cdf['sample_name'] = overwrite_sample_name
     else:
         cdf['sample_name'] = cdf['Annotation Group'].split('/')[1]
+    # Combine sample_name with Parent Annotation (current frame_name) to get the updated frame_name
+    cdf['frame_name'] = cdf['sample_name'] + '_' + cdf['frame_name']
     
     if save_cdf:
         # save cdf, as .cdf.h5
