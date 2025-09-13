@@ -727,7 +727,7 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     cdf['regions'] = cdf['regions'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
     # expand dict column. New df will have keys as columns. 
     curr_roi_area_df = pd.json_normalize(cdf['regions'])
-    curr_roi_area_pixels2 = curr_roi_area_df['ANY'].first()
+    curr_roi_area_pixels2 = curr_roi_area_df['ANY'].iloc[[0]]
     curr_roi_area_microns2 = curr_roi_area_pixels2 * (microns_per_pixel ** 2)
     densities_df_pixels2 = counts_df / curr_roi_area_pixels2
     densities_df_microns2 = counts_df / curr_roi_area_microns2
@@ -742,7 +742,7 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
 
     # Get sample and roi labels
     labs_keep = ['Annotation Group','Parent Annotation','sample_name','frame_name','project_name']
-    labs_cols = cdf[labs_keep].first()
+    labs_cols = cdf[labs_keep].iloc[[0]]
 
     # Aggregate all measures together into one datafrome
     roi_measures = pd.concat([labs_cols,
