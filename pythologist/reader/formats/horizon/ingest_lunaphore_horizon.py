@@ -656,7 +656,8 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     cell_areas_df = pd.DataFrame({'cell_area_mean':cell_area_mean,
                                  'cell_area_median':cell_area_median,
                                  'cell_area_min':cell_area_min,
-                                 'cell_area_max':cell_area_max})
+                                 'cell_area_max':cell_area_max}, 
+                                index=[0])
 
     # Imports
     from pandas.io.json import json_normalize
@@ -733,7 +734,8 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     densities_df_microns2 = counts_df / curr_roi_area_microns2
     # combine
     roi_areas_df = pd.DataFrame({'roi_area_pixels2':curr_roi_area_pixels2,
-                            'roi_area_microns2':curr_roi_area_microns2})
+                            'roi_area_microns2':curr_roi_area_microns2}, 
+                             index=[0])
     # add suffixes to counts and densities dfs
     counts_df = counts_df.add_suffix('_counts')
     densities_df_pixels2 = densities_df_pixels2.add_suffix('_density_pixels2')
