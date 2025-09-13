@@ -660,7 +660,6 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
                                 index=[0])
 
     # Imports
-    from pandas.io.json import json_normalize
     import ast
 
     # function to calculate gini index
@@ -693,7 +692,7 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     # Ensure they're dicts and not strings
     cdf['channel_values'] = cdf['channel_values'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
     # expand dict column. New df will have keys as columns. 
-    fluorescence_df_pre = json_normalize(cdf['channel_values'])
+    fluorescence_df_pre = pd.json_normalize(cdf['channel_values'])
     fluorescence_mean_df = fluorescence_df_pre.mean()
     fluorescence_median_df = fluorescence_df_pre.median()
     fluorescence_min_df = fluorescence_df_pre.min()
@@ -707,7 +706,7 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     # Ensure they're dicts and not strings
     cdf['phenotype_calls'] = cdf['phenotype_calls'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
     # expand dict column. New df will have keys as columns. 
-    phenotype_df = json_normalize(cdf['phenotype_calls'])
+    phenotype_df = pd.json_normalize(cdf['phenotype_calls'])
     if 'OTHER' in phenotype_df.columns:
         phenotype_df_pre = phenotype_df.drop('OTHER', axis=1)
 
@@ -715,7 +714,7 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     # Ensure they're dicts and not strings
     cdf['scored_calls'] = cdf['scored_calls'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
     # expand dict column. New df will have keys as columns. 
-    scored_calls_df = json_normalize(cdf['scored_calls'])
+    scored_calls_df = pd.json_normalize(cdf['scored_calls'])
 
     # Combine phenotypes and scored calls
     phenotype_df = pd.concat([phenotype_df_pre,scored_calls_df], axis=1)
@@ -727,7 +726,7 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     # Ensure they're dicts and not strings
     cdf['regions'] = cdf['regions'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
     # expand dict column. New df will have keys as columns. 
-    curr_roi_area_df = json_normalize(cdf['regions'])
+    curr_roi_area_df = pd.json_normalize(cdf['regions'])
     curr_roi_area_pixels2 = curr_roi_area_df['ANY'].first()
     curr_roi_area_microns2 = curr_roi_area_pixels2 * (microns_per_pixel ** 2)
     densities_df_pixels2 = counts_df / curr_roi_area_pixels2
