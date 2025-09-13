@@ -732,8 +732,8 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     densities_df_pixels2 = counts_df / curr_roi_area_pixels2
     densities_df_microns2 = counts_df / curr_roi_area_microns2
     # combine
-    roi_areas_df = pd.DataFrame('roi_area_pixels2':curr_roi_area_pixels2,
-                            'roi_area_microns2':curr_roi_area_microns2)
+    roi_areas_df = pd.DataFrame({'roi_area_pixels2':curr_roi_area_pixels2,
+                            'roi_area_microns2':curr_roi_area_microns2})
     # add suffixes to counts and densities dfs
     counts_df = counts_df.add_suffix('_counts')
     densities_df_pixels2 = densities_df_pixels2.add_suffix('_density_pixels2')
