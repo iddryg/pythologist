@@ -653,10 +653,10 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     cell_area_min = cdf['cell_area'].min()
     cell_area_max = cdf['cell_area'].max()
     # combine
-    cell_areas_df = pd.DataFrame('cell_area_mean':cell_area_mean,
+    cell_areas_df = pd.DataFrame({'cell_area_mean':cell_area_mean,
                                  'cell_area_median':cell_area_median,
                                  'cell_area_min':cell_area_min,
-                                 'cell_area_max':cell_area_max)
+                                 'cell_area_max':cell_area_max})
 
     # Imports
     from pandas.io.json import json_normalize
