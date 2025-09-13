@@ -33,7 +33,7 @@
 import pandas as pd
 import numpy as np
 import uuid
-from pythologist import CellDataFrame
+from pythologist import CellDataFrame, SubsetLogic as SL, PercentageLogic as PL
 import os
 import warnings
 
@@ -259,7 +259,6 @@ def run_lunaphore_ingestion(horizon_export_filepath,
                                microns_per_pixel=0.28,
                                overwrite_sample_name = overwrite_sample_name)
 
-        
         # add cdf to the cdf_dict
         cdf_dict[curr_annot] = cdf
 
@@ -291,7 +290,27 @@ def run_lunaphore_ingestion(horizon_export_filepath,
         qc = cdf.qc()
         qc.run_tests()
         qc.print_results()
-        
+    
+    # ----------------------------------
+    # Process ROI measures/stats
+    # ----------------------------------
+    # cycle through all rois in the cdf and extract measures for them. 
+    # first, initialize a list of dataframes to store roi measures in.
+    roi_measures_list = []
+    for curr_roi in cdf['Parent Annotation'].unique():
+        cdf_sub = cdf.loc[cdf['Parent Annotation']==curr_roi]
+        # extract measures for current roi
+        curr_roi_measures = extract_roi_measures(cdf_sub, microns_per_pixel=0.28)
+        # add roi_measures to the list
+        roi_measures_list.append(curr_roi_measures)
+    # Concatenate all roi_measures for this sample together
+    all_roi_measures = pd.concat(roi_measures_list)
+    # save measures
+    if save_cdf:
+        # save as csv file
+        savefile_path_roi_measures = os.path.join(savefile_dir, savefile_name + '_roi_measures.csv')
+        cdf.to_csv(savefile_path_roi_measures)
+
     if return_cdf:
         return cdf
 
@@ -621,3 +640,125 @@ def ingest_Lunaphore(df,
     cdf.microns_per_pixel = microns_per_pixel
     
     return cdf
+
+# Input: pythologist cdf that has been ingested from Lunaphore
+# Calculate QC measures per ROI. 
+# Fluorescence per marker: Mean, Median, Min, Max, Standard Deviation
+# Cell Area: Mean, Median, Min, Max, Standard Deviation
+# Cell density per phenotype in this ROI (including all cells)
+def extract_roi_measures(cdf, microns_per_pixel=0.28):
+    # Cell Areas
+    cell_area_mean = cdf['cell_area'].mean()
+    cell_area_median = cdf['cell_area'].median()
+    cell_area_min = cdf['cell_area'].min()
+    cell_area_max = cdf['cell_area'].max()
+    # combine
+    cell_areas_df = pd.DataFrame('cell_area_mean':cell_area_mean,
+                                 'cell_area_median':cell_area_median,
+                                 'cell_area_min':cell_area_min,
+                                 'cell_area_max':cell_area_max)
+
+    # Imports
+    from pandas.io.json import json_normalize
+    import ast
+
+    # function to calculate gini index
+    def gini_coefficient(x):
+        """
+        Calculate the Gini coefficient for a given array of values.
+        Parameters:
+        x : array-like
+            Array of values (e.g., fluorescence intensities)
+        Returns:
+        float
+            Gini coefficient (0 = perfect equality, 1 = perfect inequality)
+        """
+        # Remove NaN values
+        x = x[~np.isnan(x)]
+        # Handle edge cases
+        if len(x) == 0:
+            return np.nan
+        if len(x) == 1 or np.all(x == x[0]):
+            return 0.0
+        # Sort the values
+        x_sorted = np.sort(x)
+        n = len(x_sorted)
+        # Calculate Gini coefficient
+        cumsum = np.cumsum(x_sorted)
+        gini = (2 * np.sum((np.arange(1, n + 1) * x_sorted))) / (n * cumsum[-1]) - (n + 1) / n
+        return gini
+
+    # Fluorescence Measurements
+    # Ensure they're dicts and not strings
+    cdf['channel_values'] = cdf['channel_values'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+    # expand dict column. New df will have keys as columns. 
+    fluorescence_df_pre = json_normalize(cdf['channel_values'])
+    fluorescence_mean_df = fluorescence_df_pre.mean()
+    fluorescence_median_df = fluorescence_df_pre.median()
+    fluorescence_min_df = fluorescence_df_pre.min()
+    fluorescence_max_df = fluorescence_df_pre.max()
+    fluorescence_std_df = fluorescence_df_pre.std()
+    fluorescence_skew_df = fluorescence_df_pre.skew()
+    fluorescence_kurtosis_df = fluorescence_df_pre.kurtosis()
+    fluorescence_gini_df = fluorescence_df_pre.apply(lambda col: gini_coefficient(col.values))
+
+    # Phenotype Measurements
+    # Ensure they're dicts and not strings
+    cdf['phenotype_calls'] = cdf['phenotype_calls'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+    # expand dict column. New df will have keys as columns. 
+    phenotype_df = json_normalize(cdf['phenotype_calls'])
+    if 'OTHER' in phenotype_df.columns:
+        phenotype_df_pre = phenotype_df.drop('OTHER', axis=1)
+
+    # Scored Call Measurements
+    # Ensure they're dicts and not strings
+    cdf['scored_calls'] = cdf['scored_calls'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+    # expand dict column. New df will have keys as columns. 
+    scored_calls_df = json_normalize(cdf['scored_calls'])
+
+    # Combine phenotypes and scored calls
+    phenotype_df = pd.concat([phenotype_df_pre,scored_calls_df], axis=1)
+
+    # Calculate the number of positive cells for each phenotype, "count"
+    counts_df = phenotype_df.sum()
+
+    # Calculate the cell densities by dividing by the area
+    # Ensure they're dicts and not strings
+    cdf['regions'] = cdf['regions'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+    # expand dict column. New df will have keys as columns. 
+    curr_roi_area_df = json_normalize(cdf['regions'])
+    curr_roi_area_pixels2 = curr_roi_area_df['ANY'].first()
+    curr_roi_area_microns2 = curr_roi_area_pixels2 * (microns_per_pixel ** 2)
+    densities_df_pixels2 = counts_df / curr_roi_area_pixels2
+    densities_df_microns2 = counts_df / curr_roi_area_microns2
+    # combine
+    roi_areas_df = pd.DataFrame('roi_area_pixels2':curr_roi_area_pixels2,
+                            'roi_area_microns2':curr_roi_area_microns2)
+    # add suffixes to counts and densities dfs
+    counts_df = counts_df.add_suffix('_counts')
+    densities_df_pixels2 = densities_df_pixels2.add_suffix('_density_pixels2')
+    densities_df_microns2 = densities_df_microns2.add_suffix('_density_microns2')
+
+    # Get sample and roi labels
+    labs_keep = ['Annotation Group','Parent Annotation','sample_name','frame_name','project_name']
+    labs_cols = cdf[labs_keep].first()
+
+    # Aggregate all measures together into one datafrome
+    roi_measures = pd.concat([labs_cols,
+                             roi_areas_df,
+                             counts_df,
+                             densities_df_pixels2,
+                             densities_df_microns2,
+                             fluorescence_mean_df,
+                             fluorescence_median_df,
+                             fluorescence_min_df,
+                             fluorescence_max_df,
+                             fluorescence_std_df,
+                             fluorescence_skew_df,
+                             fluorescence_kurtosis_df,
+                             fluorescence_gini_df,
+                             cell_areas_df
+                             ],
+                             axis=1)
+    
+    return roi_measures
