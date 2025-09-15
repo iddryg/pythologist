@@ -1,28 +1,11 @@
-# December 20, 2024
+# September 15, 2025
 # Ian Dryg
 # Dana-Farber Cancer Institute
 # Center for Immuno-Oncology
-# This code is used to ingest outputs from Lunaphore's Horizon analysis software for use with pythologist. 
-# It converts the output from Horizon into a pythologist CellDataFrame for further use in our pipelines. 
+# This code is used to VALIDATE outputs from Lunaphore's Horizon analysis software for use with pythologist. 
+# It quickly checks the output from Horizon and flags any issues before we proceed to data ingestion. 
 
-# v2 update: December 27, 2024
-# Harry's Horizon outputs had area and cells dataframes combined in one file. 
-# The area data is the first row(s). 
-# Then the cells data is after that. 
-# Some columns are only used by one or the other. 
-# Let's make a function to optionally take the one file version as input and split them into cells and area dataframes for further processing. 
-
-# v3 update: March 2025
-# Removing cells within the "Exclusion" Class group
-
-# v4 update: April 2025
-# Removing cells within the "Exclusion" Class group and removing excluded areas, handling a few different options. 
-# Main Annotation will encompass the entire tissue. 
-# Polygon Exclusion Annotations: will overlap excluded cells, area of polygon will be subtracted from the Main area.
-# Rectangle Exclusion Annotations: will overlap excluded cells, area of rectangles will be subtracted from the Main area.
-# If Rectangle Exclusion Annotations overlap, will include an "Overlap" Rectangle which will be added back to the Main area.
-
-# v5 update: April 28 2025
+# Nested Annotation Strategy
 # Uses nested annotations indicated by a naming protocol in the Annotation Group column. 
 # [annotation type]_[main id].[roi id].[exclusion id]_[shape type]
 # Main_1.0.0_Rectangle
@@ -51,23 +34,15 @@ pd.set_option('display.max_colwidth', None)
 # microns_per_pixel: should be 0.28 for the Lunaphore instrument as of 20241220
 # run_qc: set to True if you want to check the cdf qc
 # return_cdf: set to True if you want to return the cdf, otherwise just saves the file and doesn't return anything
-def run_lunaphore_ingestion(horizon_export_filepath,
-                            project_name,
-                            savefile_dir,
-                            savefile_name,
-                            overwrite_sample_name = None,
-                            default_phenotype = 'CD3', 
-                            microns_per_pixel=0.28,
-                            run_qc = False,
-                            save_cdf = False,
-                            return_cdf = False,
-                            show_meta = False,
-                            rename_markers_dict = None,
-                            choose_duplicate_threshold_to_keep = None):
+def validate_lunaphore(horizon_export_filepath,
+                        project_name,
+                        savefile_dir,
+                        savefile_name,
+                        microns_per_pixel=0.28):
     
     # validate input parameters
     try:
-        validate_parameters(horizon_export_filepath, project_name, savefile_dir, savefile_name, microns_per_pixel, run_qc, return_cdf, overwrite_sample_name, default_phenotype)
+        validate_parameters(horizon_export_filepath, project_name, savefile_dir, savefile_name, microns_per_pixel)
     except (TypeError, ValueError) as e:
         print(f"Error: {e}")
         return
@@ -309,14 +284,14 @@ def run_lunaphore_ingestion(horizon_export_filepath,
     if save_cdf:
         # save as csv file
         savefile_path_roi_measures = os.path.join(savefile_dir, savefile_name + '_roi_measures.csv')
-        all_roi_measures.to_csv(savefile_path_roi_measures)
+        cdf.to_csv(savefile_path_roi_measures)
 
     if return_cdf:
         return cdf
 
 
 # function to validate input parameters before proceeding
-def validate_parameters(horizon_export_filepath, project_name, savefile_dir, savefile_name, microns_per_pixel, run_qc, return_cdf, overwrite_sample_name, default_phenotype):
+def validate_parameters(horizon_export_filepath, project_name, savefile_dir, savefile_name, microns_per_pixel):
     # Type checking
     if not isinstance(horizon_export_filepath, str):
         raise TypeError("horizon_export_filepath must be a string")
@@ -328,15 +303,6 @@ def validate_parameters(horizon_export_filepath, project_name, savefile_dir, sav
         raise TypeError("savefile_name must be a string")
     if not isinstance(microns_per_pixel, float):
         raise TypeError("microns_per_pixel must be a float")
-    if not isinstance(run_qc, bool):
-        raise TypeError("run_qc must be a boolean")
-    if not isinstance(return_cdf, bool):
-        raise TypeError("return_cdf must be a boolean")
-    if overwrite_sample_name is not None:
-        if not isinstance(overwrite_sample_name, str):
-                raise TypeError("overwrite_sample_name must be a string")
-    if not isinstance(default_phenotype, str):
-        raise TypeError("default_phenotype must be a string")
     # validate files exist
     if not os.path.isfile(horizon_export_filepath):
         raise ValueError(f"The path '{horizon_export_filepath}' is not a file")
