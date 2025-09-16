@@ -132,7 +132,8 @@ class Counts(Measurement):
                      np.nan if len([y for y in x['area_coverage_percent'] if y==y]) <=1 else sem(x['area_coverage_percent'],ddof=_degrees_of_freedom,nan_policy='omit'),
                      len([y for y in x['density_mm2'] if y==y])
                     ]
-                )))
+                ))), 
+                include_groups=False
             ).reset_index()
         cnts1= cnts1.merge(fc,on=mergeon)
         #cnts1['measured_frame_count'] = cnts1['measured_frame_count'].astype(int)
@@ -290,7 +291,8 @@ class Counts(Measurement):
                'stddev_percent':np.nan if len([y for y in x['percent'] if y==y]) <= 1 else x['percent'].std(ddof=_degrees_of_freedom,skipna=True),
                'stderr_percent':np.nan if len([y for y in x['percent'] if y==y]) <= 1 else sem(x['percent'],ddof=_degrees_of_freedom,nan_policy='omit'),
                #'measured_frame_count':len([y for y in x['percent'] if y==y]),
-           }))
+           })), 
+           include_groups=False
            ).reset_index()
         cnts = cnts.merge(fc,on=self.cdf.sample_columns+['region_label','phenotype_label'])
         cnts['measured_count'] = cnts['measured_count'].astype(int)
