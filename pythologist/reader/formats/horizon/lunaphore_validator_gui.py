@@ -1,37 +1,182 @@
-# September 15, 2025
-# Ian Dryg
-# Dana-Farber Cancer Institute
-# Center for Immuno-Oncology
-# This code is used to VALIDATE outputs from Lunaphore's Horizon analysis software for use with pythologist. 
-# It quickly checks the output from Horizon and flags any issues before we proceed to data ingestion. 
+#!/usr/bin/env python3
+"""
+Lunaphore Validation Tool with GUI
+September 17, 2025
+Modified from original by Ian Dryg
+Dana-Farber Cancer Institute
+Center for Immuno-Oncology
 
-# Nested Annotation Strategy
-# Uses nested annotations indicated by a naming protocol in the Annotation Group column. 
-# [annotation type]_[main id].[roi id].[exclusion id]_[shape type]
-# Main_1.0.0_Rectangle
-# ROI_1.1.0_Polygon - the first ROI within the Main 1 annotation
-# ROI_1.2.0_Polygon - the second ROI within the Main 1 annotation
-# Exclusion_1.1.1_Polygon - the first Exclusion within ROI 1 within Main 1
+This code is used to VALIDATE outputs from Lunaphore's Horizon analysis software for use with pythologist. 
+It quickly checks the output from Horizon and flags any issues before we proceed to data ingestion. 
+
+GUI version allows user to select input file and output directory through file browser.
+"""
 
 import pandas as pd
 import numpy as np
 import os
 import warnings
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+import sys
+from pathlib import Path
 
+# Set pandas display options
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_colwidth', None)
 
 
-# validate horizon exports before ingesting. 
-# horizon_export_path: path to input data file from horizon export. Must be a string filepath. This contains areas and cells that need to be parsed. 
-# Note: in this version, if the cells_df_path and area_df_path are the same, the program assumes they're combined in the same file and will split them. 
-# savefile_dir: path to the directory you want to save the outputs in. 
-# microns_per_pixel: should be 0.28 for the Lunaphore instrument as of 20241220
-def validate_lunaphore(horizon_export_filepath,
-                        savefile_dir,
-                        microns_per_pixel=0.28):
+class LunaphoreValidatorGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Lunaphore Validator")
+        self.root.geometry("600x400")
+        
+        # Variables to store file paths
+        self.input_file = tk.StringVar()
+        self.output_dir = tk.StringVar()
+        self.microns_per_pixel = tk.DoubleVar(value=0.28)
+        
+        self.setup_gui()
+        
+    def setup_gui(self):
+        # Main frame
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Title
+        title_label = ttk.Label(main_frame, text="Lunaphore Horizon Export Validator", 
+                               font=("Arial", 16, "bold"))
+        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
+        
+        # Input file selection
+        ttk.Label(main_frame, text="Input File:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(main_frame, textvariable=self.input_file, width=50).grid(row=1, column=1, padx=5, pady=5)
+        ttk.Button(main_frame, text="Browse", command=self.select_input_file).grid(row=1, column=2, padx=5, pady=5)
+        
+        # Output directory selection
+        ttk.Label(main_frame, text="Output Directory:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(main_frame, textvariable=self.output_dir, width=50).grid(row=2, column=1, padx=5, pady=5)
+        ttk.Button(main_frame, text="Browse", command=self.select_output_dir).grid(row=2, column=2, padx=5, pady=5)
+        
+        # Microns per pixel setting
+        ttk.Label(main_frame, text="Microns per Pixel:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(main_frame, textvariable=self.microns_per_pixel, width=10).grid(row=3, column=1, sticky=tk.W, padx=5, pady=5)
+        
+        # Run button
+        run_button = ttk.Button(main_frame, text="Run Validation", command=self.run_validation)
+        run_button.grid(row=4, column=0, columnspan=3, pady=20)
+        
+        # Progress bar
+        self.progress = ttk.Progressbar(main_frame, mode='indeterminate')
+        self.progress.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        
+        # Output text area
+        text_frame = ttk.Frame(main_frame)
+        text_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=10)
+        
+        self.output_text = tk.Text(text_frame, height=15, width=70)
+        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.output_text.yview)
+        self.output_text.configure(yscrollcommand=scrollbar.set)
+        
+        self.output_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        
+        # Configure grid weights
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+        main_frame.columnconfigure(1, weight=1)
+        main_frame.rowconfigure(6, weight=1)
+        text_frame.columnconfigure(0, weight=1)
+        text_frame.rowconfigure(0, weight=1)
+        
+    def select_input_file(self):
+        filename = filedialog.askopenfilename(
+            title="Select Horizon Export File",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        if filename:
+            self.input_file.set(filename)
+            
+    def select_output_dir(self):
+        directory = filedialog.askdirectory(title="Select Output Directory")
+        if directory:
+            self.output_dir.set(directory)
+            
+    def log_message(self, message):
+        """Add message to the output text area"""
+        self.output_text.insert(tk.END, message + "\n")
+        self.output_text.see(tk.END)
+        self.root.update()
+        
+    def run_validation(self):
+        # Validate inputs
+        if not self.input_file.get():
+            messagebox.showerror("Error", "Please select an input file")
+            return
+            
+        if not self.output_dir.get():
+            messagebox.showerror("Error", "Please select an output directory")
+            return
+            
+        # Clear output text
+        self.output_text.delete(1.0, tk.END)
+        
+        # Start progress bar
+        self.progress.start()
+        
+        try:
+            # Create output filename
+            input_path = Path(self.input_file.get())
+            output_filename = input_path.stem + "_validate.txt"
+            output_path = Path(self.output_dir.get()) / output_filename
+            
+            self.log_message(f"Starting validation of: {input_path.name}")
+            self.log_message(f"Output will be saved to: {output_path}")
+            
+            # Redirect stdout to capture print statements
+            original_stdout = sys.stdout
+            sys.stdout = self
+            
+            # Run the validation
+            validate_lunaphore(
+                str(input_path),
+                str(self.output_dir.get()),
+                self.microns_per_pixel.get()
+            )
+            
+            # Restore stdout
+            sys.stdout = original_stdout
+            
+            # Save output to file
+            with open(output_path, 'w') as f:
+                f.write(self.output_text.get(1.0, tk.END))
+            
+            self.log_message(f"\nValidation complete! Results saved to: {output_path}")
+            messagebox.showinfo("Success", f"Validation complete!\nResults saved to: {output_path}")
+            
+        except Exception as e:
+            sys.stdout = original_stdout
+            error_msg = f"Error during validation: {str(e)}"
+            self.log_message(error_msg)
+            messagebox.showerror("Error", error_msg)
+        
+        finally:
+            self.progress.stop()
     
+    def write(self, text):
+        """Method to capture stdout and redirect to GUI"""
+        if text.strip():  # Only log non-empty strings
+            self.log_message(text.strip())
+    
+    def flush(self):
+        """Required for stdout redirection"""
+        pass
+
+
+# Your original validation functions (unchanged)
+def validate_lunaphore(horizon_export_filepath, savefile_dir, microns_per_pixel=0.28):
     # validate input parameters
     try:
         validate_parameters(horizon_export_filepath, savefile_dir, microns_per_pixel)
@@ -45,10 +190,6 @@ def validate_lunaphore(horizon_export_filepath,
     print("---------------------------------------------------------")
     print("---------------------------------------------------------")
 
-    # horizon_export_filepath: one input file containing the area of the Main annotation, along with the cells in that Main annotation. 
-    # Other annotation areas may be in this file as well. 
-    # There could be multiple annotations. We'll handle them all using a dictionary. 
-    
     # read in the horizon output
     temp_input_df1 = pd.read_csv(horizon_export_filepath)
 
@@ -92,7 +233,7 @@ def validate_lunaphore(horizon_export_filepath,
     temp_input_area['exclusion_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1].str.split('.').str[2]
 
     print('area df: ')
-    display(temp_input_area)
+    print(temp_input_area.to_string())
 
     # ---------------------------------------------------------
     print("---------------------------------------------------------")
@@ -102,7 +243,7 @@ def validate_lunaphore(horizon_export_filepath,
     print("---------------------------------------------------------")
     print("---------------------------------------------------------")
     print("Review area annotations:")
-    print(temp_input_area['full_annot_id'])
+    print(temp_input_area['full_annot_id'].to_string())
     print("---------------------------------------------------------")
     print("---------------------------------------------------------")
     print("Check annotations for required columns:")
@@ -122,11 +263,11 @@ def validate_lunaphore(horizon_export_filepath,
             print(str(num_nans))
             if num_nans > 0:
                 print("Annotations with NaNs: ")
-                print(temp_input_area.loc[temp_input_area[curr_col].isna()]['Annotation Group'])
+                print(temp_input_area.loc[temp_input_area[curr_col].isna()]['Annotation Group'].to_string())
     print("---------------------------------------------------------")
     print("---------------------------------------------------------")
     print("view areas df: ")
-    display(temp_input_area)
+    print(temp_input_area.to_string())
     print("---------------------------------------------------------")
     print("---------------------------------------------------------")
     print("Check cells for duplicate thresholds: ")
@@ -151,7 +292,6 @@ def validate_lunaphore(horizon_export_filepath,
     print("---------------------------------------------------------")
 
 
-# function to validate input parameters before proceeding
 def validate_parameters(horizon_export_filepath, savefile_dir, microns_per_pixel):
     # Type checking
     if not isinstance(horizon_export_filepath, str):
@@ -165,8 +305,6 @@ def validate_parameters(horizon_export_filepath, savefile_dir, microns_per_pixel
         raise ValueError(f"The path '{horizon_export_filepath}' is not a file")
 
 
-# function to integrate region areas into the cells dataframe. 
-# regions will just be called ANY (assuming there's only one)
 def add_region_areas(cells_df, area_df, microns_per_pixel):
     # Set region label to ANY
     area_df['region_label'] = 'ANY'
@@ -181,10 +319,6 @@ def add_region_areas(cells_df, area_df, microns_per_pixel):
     
     return cells_df
 
-
-# function to extract metadata
-# This function labels columns in the dataset to indicate which columns should be used for what later on. 
-# It also helps set up to rename the columns later. 
 
 def extract_column_metadata(cells_df):
     import numpy as np
@@ -304,14 +438,23 @@ def extract_column_metadata(cells_df):
     return df
 
 
-# function to check Marker names
 def check_markers(meta):
-    display(list(meta['Marker'].dropna().unique()))
+    print(list(meta['Marker'].dropna().unique()))
 
 
-# function to rename Marker names
 def rename_marker(meta, old_marker_name, new_marker_name):
     meta['Marker'] = meta['Marker'].replace(old_marker_name, new_marker_name)
     # also update Label_Mapping column
     meta['Label_Mapping'] = meta['Label_Mapping'].replace(old_marker_name, new_marker_name)
     return meta
+
+
+def main():
+    """Main function to launch the GUI"""
+    root = tk.Tk()
+    app = LunaphoreValidatorGUI(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()

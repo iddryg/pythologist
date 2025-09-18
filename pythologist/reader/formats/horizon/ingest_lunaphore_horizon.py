@@ -653,14 +653,11 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     cell_area_min = cdf['cell_area'].min()
     cell_area_max = cdf['cell_area'].max()
     # combine
-    cell_areas_df = pd.DataFrame({'cell_area_mean':cell_area_mean,
-                                 'cell_area_median':cell_area_median,
-                                 'cell_area_min':cell_area_min,
-                                 'cell_area_max':cell_area_max}, 
+    cell_areas_df = pd.DataFrame({'cell_area_microns2_mean':cell_area_mean,
+                                 'cell_area_microns2_median':cell_area_median,
+                                 'cell_area_microns2_min':cell_area_min,
+                                 'cell_area_microns2_max':cell_area_max}, 
                                 index=[0])
-
-    # Imports
-    import ast
 
     # function to calculate gini index
     def gini_coefficient(x):
@@ -688,19 +685,22 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
         gini = (2 * np.sum((np.arange(1, n + 1) * x_sorted))) / (n * cumsum[-1]) - (n + 1) / n
         return gini
 
+    # Imports
+    import ast
+
     # Fluorescence Measurements
     # Ensure they're dicts and not strings
     cdf['channel_values'] = cdf['channel_values'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
     # expand dict column. New df will have keys as columns. 
     fluorescence_df_pre = pd.json_normalize(cdf['channel_values'])
-    fluorescence_mean_df = fluorescence_df_pre.mean()
-    fluorescence_median_df = fluorescence_df_pre.median()
-    fluorescence_min_df = fluorescence_df_pre.min()
-    fluorescence_max_df = fluorescence_df_pre.max()
-    fluorescence_std_df = fluorescence_df_pre.std()
-    fluorescence_skew_df = fluorescence_df_pre.skew()
-    fluorescence_kurtosis_df = fluorescence_df_pre.kurtosis()
-    fluorescence_gini_df = fluorescence_df_pre.apply(lambda col: gini_coefficient(col.values))
+    fluorescence_mean_df = pd.DataFrame(fluorescence_df_pre.mean()).T.add_suffix('_mean')
+    fluorescence_median_df = pd.DataFrame(fluorescence_df_pre.median()).T.add_suffix('_median')
+    fluorescence_min_df = pd.DataFrame(fluorescence_df_pre.min()).T.add_suffix('_min')
+    fluorescence_max_df = pd.DataFrame(fluorescence_df_pre.max()).T.add_suffix('_max')
+    fluorescence_std_df = pd.DataFrame(fluorescence_df_pre.std()).T.add_suffix('_std')
+    fluorescence_skew_df = pd.DataFrame(fluorescence_df_pre.skew()).T.add_suffix('_skew')
+    fluorescence_kurtosis_df = pd.DataFrame(fluorescence_df_pre.kurtosis()).T.add_suffix('_kurtosis')
+    fluorescence_gini_df = pd.DataFrame(fluorescence_df_pre.apply(lambda col: gini_coefficient(col.values))).T.add_suffix('_gini')
 
     # Phenotype Measurements
     # Ensure they're dicts and not strings
@@ -720,7 +720,7 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     phenotype_df = pd.concat([phenotype_df_pre,scored_calls_df], axis=1)
 
     # Calculate the number of positive cells for each phenotype, "count"
-    counts_df = phenotype_df.sum()
+    counts_df = pd.DataFrame(phenotype_df.sum()).T
 
     # Calculate the cell densities by dividing by the area
     # Ensure they're dicts and not strings
