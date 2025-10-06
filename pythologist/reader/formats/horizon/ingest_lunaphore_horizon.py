@@ -706,7 +706,7 @@ def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
     cell_area_std = (cdf['cell_area'] * 0.000001).std()
     cell_area_skew = (cdf['cell_area'] * 0.000001).skew()
     cell_area_kurtosis = (cdf['cell_area'] * 0.000001).kurtosis()
-    cell_area_gini = (cdf['cell_area'] * 0.000001).apply(lambda x: gini_coefficient(x))
+    cell_area_gini = gini_coefficient(cdf['cell_area'] * 0.000001).values)
     # combine
     #cell_areas_df = pd.DataFrame({'cell_area_mm2_mean':cell_area_mean,
     #                             'cell_area_mm2_median':cell_area_median,
