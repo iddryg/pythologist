@@ -779,13 +779,14 @@ def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
     # get thresholds to add in
     thresholds_df = get_thresholds_from_meta(meta)
     # transform thresholds_df for wideform 
+    thresholds_df_wideform = thresholds_df.copy()
     # first, add compartment to marker name
-    for col in thresholds_df.columns:
+    for col in thresholds_df_wideform.columns:
         if col == 'data_type': continue
-        thresholds_df = thresholds_df.rename(columns={col:col + '_' + str(thresholds_df.loc[thresholds_df['data_type']=='Compartment_Type',col].values[0])})
+        thresholds_df_wideform = thresholds_df_wideform.rename(columns={col:col + '_' + str(thresholds_df_wideform.loc[thresholds_df_wideform['data_type']=='Compartment_Type',col].values[0])})
     # take only Threshold values for wideform
-    thresholds_df_wideform = thresholds_df.loc[thresholds_df['data_type']=='Threshold']
-    thresholds_df_wideform = thresholds_df_wideform.drop(columns=['data_type']).add_suffix('_Threshold')
+    thresholds_df_wideform = thresholds_df_wideform.loc[thresholds_df_wideform['data_type']=='Threshold']
+    thresholds_df_wideform = thresholds_df_wideform.drop(columns=['data_type']).add_suffix('_Threshold').reset_index(drop=True)
 
     # Aggregate all measures together into one datafrome
     # note fluorescence dfs have corresponding cell_area_mm2 stats in them. 
@@ -832,8 +833,8 @@ def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
                                    columns=roi_measures_longform_rois.columns)
     
     # concat them together
-    roi_measures_longform = pd.concat([roi_measures_longform_rois_matchnumrows,
-                                       roi_measures_longform_cells],
+    roi_measures_longform = pd.concat([roi_measures_longform_rois_matchnumrows.reset_index(drop=True),
+                                       roi_measures_longform_cells.reset_index(drop=True)],
                                        axis=1)
     
     return roi_measures_wideform, roi_measures_longform
