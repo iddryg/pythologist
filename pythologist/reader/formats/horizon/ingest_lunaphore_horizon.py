@@ -65,6 +65,7 @@ def run_lunaphore_ingestion(horizon_export_filepath,
                             rename_markers_dict = None,
                             choose_duplicate_threshold_to_keep = None):
     
+    # ---------------------------------------------------------
     # validate input parameters
     try:
         validate_parameters(horizon_export_filepath, project_name, savefile_dir, savefile_name, microns_per_pixel, run_qc, return_cdf, overwrite_sample_name, default_phenotype)
@@ -76,44 +77,18 @@ def run_lunaphore_ingestion(horizon_export_filepath,
     # Other annotation areas may be in this file as well. 
     # There could be multiple annotations. We'll handle them all using a dictionary. 
     
-    # read in the horizon output
-    temp_input_df1 = pd.read_csv(horizon_export_filepath)
-
-    # remove unwanted column
-    if 'Unnamed: 0' in list(temp_input_df1.columns):
-        temp_input_df1 = temp_input_df1.drop(columns=['Unnamed: 0'])
-        
-    # cell annotations have Nuclei Segmentation at the end of the Annotation Group "path", label those rows
-    temp_input_df1.loc[temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation'), 'annot_name'] = 'Nuclei Segmentation'
-    # area annotations have the annotation name at the end of the Annotation Group "path". Extract those names
-    temp_input_df1.loc[~temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation'), 'annot_name'] = temp_input_df1['Annotation Group'].str.split('/').str[-1]
-    # Split the cells and the areas dfs apart. 
-    # cells df has Nuclei Segmentation in the Annotation Group "path", extract those rows
-    temp_input_cells = temp_input_df1.loc[temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation')]
-    # area df does not have Nuclei Segmentation in the Annotation Group "path", extract those rows
-    temp_input_area = temp_input_df1.loc[~temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation')]
-    
-    # remove Exclusions from cells dataframe if there are any
-    if 'Class group' in list(temp_input_cells.columns):
-        print('Removing exclusions...')
-        print('Size before removing exclusions: ' + str(temp_input_cells.shape))
-        temp_input_cells = temp_input_cells.loc[temp_input_cells['Class group']!='Exclusions']
-        print('Size after removing exclusions: ' + str(temp_input_cells.shape))
-
-    # Label parent annotations for CELLS (Main and ROI). Should be in Class group column. 
-    temp_input_cells['parent_id'] = temp_input_cells['Class group'].str.lower().str.split('_').str[1]
-    temp_input_cells['parent_main_id'] = temp_input_cells['Class group'].str.lower().str.split('_').str[1].str.split('.').str[0]
-    temp_input_cells['parent_roi_id'] = temp_input_cells['Class group'].str.lower().str.split('_').str[1].str.split('.').str[1]
-    
-    # drop columns that only contain nan
-    temp_input_cells = temp_input_cells.dropna(axis=1, how='all')
-    temp_input_area = temp_input_area.dropna(axis=1, how='all')
+    # ---------------------------------------------------------
+    # import horizon file, get cells and area dfs
+    temp_input_cells, temp_input_area = import_horizon_file(horizon_export_filepath)
 
     # ---------------------------------------------------------
-    # check meta on cells data, drop duplicate markers if necessary
+    # QC check on metadata for cells data.
+    # To detect if there are duplicate markers, and drop them if necessary
     qc_input_cells = extract_column_metadata(temp_input_cells)
+
     # check for duplicate thresholds per marker in the cell compartment
-    qc_input_cells_cell_thresholds = qc_input_cells.loc[(qc_input_cells['Measurement_Type']=='Threshold') & (qc_input_cells['Compartment_Type']=='Cell')]
+    #qc_input_cells_cell_thresholds = qc_input_cells.loc[(qc_input_cells['Measurement_Type']=='Threshold') & (qc_input_cells['Compartment_Type']=='Cell')]
+    qc_input_cells_cell_thresholds = qc_input_cells.loc[qc_input_cells['Measurement_Type']=='Threshold']
     # keep duplicates AND originals to investigate
     qc_input_cells_threshold_duplicates = qc_input_cells_cell_thresholds.loc[qc_input_cells_cell_thresholds.duplicated(subset=['Label_Mapping'], keep=False)]
     # Warning and display if there are ny duplicates. 
@@ -296,20 +271,28 @@ def run_lunaphore_ingestion(horizon_export_filepath,
     # ----------------------------------
     # cycle through all rois in the cdf and extract measures for them. 
     # first, initialize a list of dataframes to store roi measures in.
-    roi_measures_list = []
+    roi_measures_list_wide = []
+    roi_measures_list_long = []
     for curr_roi in cdf['Parent Annotation'].unique():
         cdf_sub = cdf.loc[cdf['Parent Annotation']==curr_roi]
+        # get meta for current roi from the meta_dict created above
+        curr_meta = meta_dict[curr_roi]
         # extract measures for current roi
-        curr_roi_measures = extract_roi_measures(cdf_sub, microns_per_pixel=0.28)
+        # outputs: roi_measures_wideform, roi_measures_longform
+        curr_roi_measures_wide, curr_roi_measures_long = extract_roi_measures(cdf_sub, curr_meta, microns_per_pixel=0.28)
         # add roi_measures to the list
-        roi_measures_list.append(curr_roi_measures)
+        roi_measures_list_wide.append(curr_roi_measures_wide)
+        roi_measures_list_long.append(curr_roi_measures_long)
     # Concatenate all roi_measures for this sample together
-    all_roi_measures = pd.concat(roi_measures_list)
+    all_roi_measures_wide = pd.concat(roi_measures_list_wide)
+    all_roi_measures_long = pd.concat(roi_measures_list_long)
     # save measures
     if save_cdf:
         # save as csv file
-        savefile_path_roi_measures = os.path.join(savefile_dir, savefile_name + '_roi_measures.csv')
-        all_roi_measures.to_csv(savefile_path_roi_measures)
+        savefile_path_roi_measures_wide = os.path.join(savefile_dir, savefile_name + '_roi_measures_wide.csv')
+        savefile_path_roi_measures_long = os.path.join(savefile_dir, savefile_name + '_roi_measures_long.csv')
+        all_roi_measures_wide.to_csv(savefile_path_roi_measures_wide)
+        all_roi_measures_long.to_csv(savefile_path_roi_measures_long)
 
     if return_cdf:
         return cdf
@@ -341,6 +324,47 @@ def validate_parameters(horizon_export_filepath, project_name, savefile_dir, sav
     if not os.path.isfile(horizon_export_filepath):
         raise ValueError(f"The path '{horizon_export_filepath}' is not a file")
 
+# function to read in and process a horizon export file
+# Will remove excluded cells, and separate areas and cells df. 
+# Will annotate the annotations according to the nested structure we require. 
+# Main annotation: 1.0.0
+# ROI annotation: 1.1.0
+# Exclusion annotation: 1.1.1
+def import_horizon_file(horizon_export_filepath):
+    # read in the horizon output
+    temp_input_df1 = pd.read_csv(horizon_export_filepath)
+
+    # remove unwanted column
+    if 'Unnamed: 0' in list(temp_input_df1.columns):
+        temp_input_df1 = temp_input_df1.drop(columns=['Unnamed: 0'])
+        
+    # cell annotations have Nuclei Segmentation at the end of the Annotation Group "path", label those rows
+    temp_input_df1.loc[temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation'), 'annot_name'] = 'Nuclei Segmentation'
+    # area annotations have the annotation name at the end of the Annotation Group "path". Extract those names
+    temp_input_df1.loc[~temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation'), 'annot_name'] = temp_input_df1['Annotation Group'].str.split('/').str[-1]
+    # Split the cells and the areas dfs apart. 
+    # cells df has Nuclei Segmentation in the Annotation Group "path", extract those rows
+    temp_input_cells = temp_input_df1.loc[temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation')]
+    # area df does not have Nuclei Segmentation in the Annotation Group "path", extract those rows
+    temp_input_area = temp_input_df1.loc[~temp_input_df1['Annotation Group'].str.contains('Nuclei Segmentation')]
+    
+    # remove Exclusions from cells dataframe if there are any
+    if 'Class group' in list(temp_input_cells.columns):
+        print('Removing exclusions...')
+        print('Size before removing exclusions: ' + str(temp_input_cells.shape))
+        temp_input_cells = temp_input_cells.loc[temp_input_cells['Class group']!='Exclusions']
+        print('Size after removing exclusions: ' + str(temp_input_cells.shape))
+
+    # Label parent annotations for CELLS (Main and ROI). Should be in Class group column. 
+    temp_input_cells['parent_id'] = temp_input_cells['Class group'].str.lower().str.split('_').str[1]
+    temp_input_cells['parent_main_id'] = temp_input_cells['Class group'].str.lower().str.split('_').str[1].str.split('.').str[0]
+    temp_input_cells['parent_roi_id'] = temp_input_cells['Class group'].str.lower().str.split('_').str[1].str.split('.').str[1]
+    
+    # drop columns that only contain nan
+    temp_input_cells = temp_input_cells.dropna(axis=1, how='all')
+    temp_input_area = temp_input_area.dropna(axis=1, how='all')
+
+    return temp_input_cells, temp_input_area
 
 # function to integrate region areas into the cells dataframe. 
 # regions will just be called ANY (assuming there's only one)
@@ -646,18 +670,7 @@ def ingest_Lunaphore(df,
 # Fluorescence per marker: Mean, Median, Min, Max, Standard Deviation
 # Cell Area: Mean, Median, Min, Max, Standard Deviation
 # Cell density per phenotype in this ROI (including all cells)
-def extract_roi_measures(cdf, microns_per_pixel=0.28):
-    # Cell Areas
-    cell_area_mean = cdf['cell_area'].mean()
-    cell_area_median = cdf['cell_area'].median()
-    cell_area_min = cdf['cell_area'].min()
-    cell_area_max = cdf['cell_area'].max()
-    # combine
-    cell_areas_df = pd.DataFrame({'cell_area_microns2_mean':cell_area_mean,
-                                 'cell_area_microns2_median':cell_area_median,
-                                 'cell_area_microns2_min':cell_area_min,
-                                 'cell_area_microns2_max':cell_area_max}, 
-                                index=[0])
+def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
 
     # function to calculate gini index
     def gini_coefficient(x):
@@ -685,6 +698,26 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
         gini = (2 * np.sum((np.arange(1, n + 1) * x_sorted))) / (n * cumsum[-1]) - (n + 1) / n
         return gini
 
+    # Cell Areas, in millimeters squared
+    cell_area_mean = cdf['cell_area'].mean() * 0.000001
+    cell_area_median = cdf['cell_area'].median() * 0.000001
+    cell_area_min = cdf['cell_area'].min() * 0.000001
+    cell_area_max = cdf['cell_area'].max() * 0.000001
+    cell_area_std = (cdf['cell_area'] * 0.000001).std()
+    cell_area_skew = (cdf['cell_area'] * 0.000001).skew()
+    cell_area_kurtosis = (cdf['cell_area'] * 0.000001).kurtosis()
+    cell_area_gini = (cdf['cell_area'] * 0.000001).apply(lambda x: gini_coefficient(x))
+    # combine
+    #cell_areas_df = pd.DataFrame({'cell_area_mm2_mean':cell_area_mean,
+    #                             'cell_area_mm2_median':cell_area_median,
+    #                             'cell_area_mm2_min':cell_area_min,
+    #                             'cell_area_mm2_max':cell_area_max,
+    #                             'cell_area_mm2_std':cell_area_std,
+    #                             'cell_area_mm2_skew':cell_area_skew,
+    #                             'cell_area_mm2_kurtosis':cell_area_kurtosis,
+    #                             'cell_area_mm2_gini':cell_area_gini}, 
+    #                            index=[0])
+
     # Imports
     import ast
 
@@ -693,14 +726,15 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     cdf['channel_values'] = cdf['channel_values'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
     # expand dict column. New df will have keys as columns. 
     fluorescence_df_pre = pd.json_normalize(cdf['channel_values'])
-    fluorescence_mean_df = pd.DataFrame(fluorescence_df_pre.mean()).T.add_suffix('_mean')
-    fluorescence_median_df = pd.DataFrame(fluorescence_df_pre.median()).T.add_suffix('_median')
-    fluorescence_min_df = pd.DataFrame(fluorescence_df_pre.min()).T.add_suffix('_min')
-    fluorescence_max_df = pd.DataFrame(fluorescence_df_pre.max()).T.add_suffix('_max')
-    fluorescence_std_df = pd.DataFrame(fluorescence_df_pre.std()).T.add_suffix('_std')
-    fluorescence_skew_df = pd.DataFrame(fluorescence_df_pre.skew()).T.add_suffix('_skew')
-    fluorescence_kurtosis_df = pd.DataFrame(fluorescence_df_pre.kurtosis()).T.add_suffix('_kurtosis')
-    fluorescence_gini_df = pd.DataFrame(fluorescence_df_pre.apply(lambda col: gini_coefficient(col.values))).T.add_suffix('_gini')
+    # get fluorescence stats, adding cell_area_mm2 values as a column to the end.
+    fluorescence_mean_df = pd.DataFrame(fluorescence_df_pre.mean()).T.assign(cell_area_mm2=cell_area_mean)
+    fluorescence_median_df = pd.DataFrame(fluorescence_df_pre.median()).T.assign(cell_area_mm2=cell_area_median)
+    fluorescence_min_df = pd.DataFrame(fluorescence_df_pre.min()).T.assign(cell_area_mm2=cell_area_min)
+    fluorescence_max_df = pd.DataFrame(fluorescence_df_pre.max()).T.assign(cell_area_mm2=cell_area_max)
+    fluorescence_std_df = pd.DataFrame(fluorescence_df_pre.std()).T.assign(cell_area_mm2=cell_area_std)
+    fluorescence_skew_df = pd.DataFrame(fluorescence_df_pre.skew()).T.assign(cell_area_mm2=cell_area_skew)
+    fluorescence_kurtosis_df = pd.DataFrame(fluorescence_df_pre.kurtosis()).T.assign(cell_area_mm2=cell_area_kurtosis)
+    fluorescence_gini_df = pd.DataFrame(fluorescence_df_pre.apply(lambda col: gini_coefficient(col.values))).T.assign(cell_area_mm2=cell_area_gini)
 
     # Phenotype Measurements
     # Ensure they're dicts and not strings
@@ -728,38 +762,88 @@ def extract_roi_measures(cdf, microns_per_pixel=0.28):
     # expand dict column. New df will have keys as columns. 
     curr_roi_area_df = pd.json_normalize(cdf['regions'])
     curr_roi_area_pixels2 = curr_roi_area_df['ANY'].iloc[[0]]
-    curr_roi_area_microns2 = curr_roi_area_pixels2 * (microns_per_pixel ** 2)
+    curr_roi_area_mm2 = curr_roi_area_pixels2 * (microns_per_pixel ** 2) * 0.000001
     densities_df_pixels2 = counts_df / curr_roi_area_pixels2
-    densities_df_microns2 = counts_df / curr_roi_area_microns2
+    densities_df_mm2 = counts_df / curr_roi_area_mm2
     # combine
     roi_areas_df = pd.DataFrame({'roi_area_pixels2':curr_roi_area_pixels2,
-                            'roi_area_microns2':curr_roi_area_microns2}, 
+                            'roi_area_mm2':curr_roi_area_mm2}, 
                              index=[0])
-    # add suffixes to counts and densities dfs
-    counts_df = counts_df.add_suffix('_counts')
-    densities_df_pixels2 = densities_df_pixels2.add_suffix('_density_pixels2')
-    densities_df_microns2 = densities_df_microns2.add_suffix('_density_microns2')
 
     # Get sample and roi labels
     labs_keep = ['Annotation Group','Parent Annotation','sample_name','frame_name','project_name']
     labs_cols = cdf[labs_keep].iloc[[0]]
+    # add ingestion date
+    labs_cols['ingestion_date'] = pd.Timestamp.today().strftime('%Y-%m-%d')
+
+    # get thresholds to add in
+    thresholds_df = get_thresholds_from_meta(meta)
+    # transform thresholds_df for wideform 
+    # first, add compartment to marker name
+    for col in thresholds_df.columns:
+        if col == 'data_type': continue
+        thresholds_df = thresholds_df.rename(columns={col:col + '_' + str(thresholds_df.loc[thresholds_df['data_type']=='Compartment_Type',col].values[0])})
+    # take only Threshold values for wideform
+    thresholds_df_wideform = thresholds_df.loc[thresholds_df['data_type']=='Threshold']
+    thresholds_df_wideform = thresholds_df_wideform.drop(columns=['data_type']).add_suffix('_Threshold')
 
     # Aggregate all measures together into one datafrome
-    roi_measures = pd.concat([labs_cols,
+    # note fluorescence dfs have corresponding cell_area_mm2 stats in them. 
+    roi_measures_wideform = pd.concat([labs_cols,
                              roi_areas_df,
-                             counts_df,
-                             densities_df_pixels2,
-                             densities_df_microns2,
-                             fluorescence_mean_df,
-                             fluorescence_median_df,
-                             fluorescence_min_df,
-                             fluorescence_max_df,
-                             fluorescence_std_df,
-                             fluorescence_skew_df,
-                             fluorescence_kurtosis_df,
-                             fluorescence_gini_df,
-                             cell_areas_df
+                             counts_df.add_suffix('_counts'),
+                             densities_df_pixels2.add_suffix('_density_pixels2'),
+                             densities_df_mm2.add_suffix('_density_mm2'),
+                             fluorescence_mean_df.add_suffix('_mean'),
+                             fluorescence_median_df.add_suffix('_median'),
+                             fluorescence_min_df.add_suffix('_min'),
+                             fluorescence_max_df.add_suffix('_max'),
+                             fluorescence_std_df.add_suffix('_std'),
+                             fluorescence_skew_df.add_suffix('_skew'),
+                             fluorescence_kurtosis_df.add_suffix('_kurtosis'),
+                             fluorescence_gini_df.add_suffix('_gini'),
+                             thresholds_df_wideform
                              ],
                              axis=1)
     
-    return roi_measures
+    # Create a long-form version
+    roi_measures_longform_rois = pd.concat([labs_cols, 
+                                            roi_areas_df
+                                            ],
+                                            axis=1)
+
+    roi_measures_longform_cells = pd.concat([
+                             counts_df.insert(0, 'data_type', 'count'),
+                             densities_df_pixels2.insert(0, 'data_type', 'density_pixels2'),
+                             densities_df_mm2.insert(0, 'data_type', 'density_mm2'),
+                             fluorescence_mean_df.insert(0, 'data_type', 'mean'),
+                             fluorescence_median_df.insert(0, 'data_type', 'median'),
+                             fluorescence_min_df.insert(0, 'data_type', 'min'),
+                             fluorescence_max_df.insert(0, 'data_type', 'max'),
+                             fluorescence_std_df.insert(0, 'data_type', 'std'),
+                             fluorescence_skew_df.insert(0, 'data_type', 'skew'),
+                             fluorescence_kurtosis_df.insert(0, 'data_type', 'kurtosis'),
+                             fluorescence_gini_df.insert(0, 'data_type', 'gini'),
+                             thresholds_df],
+                             axis=0)
+    
+    # repeat the roi info to match the number of rows before concatenating. 
+    roi_measures_longform_rois_matchnumrows = pd.DataFrame(np.repeat(roi_measures_longform_rois.values, len(roi_measures_longform_cells.index), axis=0), 
+                                   columns=roi_measures_longform_rois.columns)
+    
+    # concat them together
+    roi_measures_longform = pd.concat([roi_measures_longform_rois_matchnumrows,
+                                       roi_measures_longform_cells],
+                                       axis=1)
+    
+    return roi_measures_wideform, roi_measures_longform
+
+
+def get_thresholds_from_meta(meta):
+    thresholds_df_pre = meta.loc[meta['Measurement_Type']=='Threshold']
+    # subset to columns of interest, set Marker as index, Transpose to get Markers as col names
+    thresholds_df = thresholds_df_pre[['Compartment_Type','Marker','Channel','Threshold']].set_index('Marker').T.reset_index().rename(columns={'index': 'data_type'})
+    # remove name from columns list
+    thresholds_df.columns.name = None
+    
+    return thresholds_df
