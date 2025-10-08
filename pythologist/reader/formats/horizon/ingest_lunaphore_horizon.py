@@ -814,18 +814,19 @@ def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
                                             axis=1)
 
     roi_measures_longform_cells = pd.concat([
-                             counts_df.insert(0, 'data_type', 'count'),
-                             densities_df_pixels2.insert(0, 'data_type', 'density_pixels2'),
-                             densities_df_mm2.insert(0, 'data_type', 'density_mm2'),
-                             fluorescence_mean_df.insert(0, 'data_type', 'mean'),
-                             fluorescence_median_df.insert(0, 'data_type', 'median'),
-                             fluorescence_min_df.insert(0, 'data_type', 'min'),
-                             fluorescence_max_df.insert(0, 'data_type', 'max'),
-                             fluorescence_std_df.insert(0, 'data_type', 'std'),
-                             fluorescence_skew_df.insert(0, 'data_type', 'skew'),
-                             fluorescence_kurtosis_df.insert(0, 'data_type', 'kurtosis'),
-                             fluorescence_gini_df.insert(0, 'data_type', 'gini'),
-                             thresholds_df],
+                             thresholds_df,
+                             counts_df.assign(data_type='count'),
+                             densities_df_pixels2.assign(data_type='density_pixels2'),
+                             densities_df_mm2.assign(data_type='density_mm2'),
+                             fluorescence_mean_df.assign(data_type='mean'),
+                             fluorescence_median_df.assign(data_type='median'),
+                             fluorescence_min_df.assign(data_type='min'),
+                             fluorescence_max_df.assign(data_type='max'),
+                             fluorescence_std_df.assign(data_type='std'),
+                             fluorescence_skew_df.assign(data_type='skew'),
+                             fluorescence_kurtosis_df.assign(data_type='kurtosis'),
+                             fluorescence_gini_df.assign(data_type='gini')
+                             ],
                              axis=0)
     
     # repeat the roi info to match the number of rows before concatenating. 
