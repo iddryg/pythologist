@@ -727,14 +727,14 @@ def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
     # expand dict column. New df will have keys as columns. 
     fluorescence_df_pre = pd.json_normalize(cdf['channel_values'])
     # get fluorescence stats, adding cell_area_mm2 values as a column to the end.
-    fluorescence_mean_df = pd.DataFrame(fluorescence_df_pre.mean()).T.assign(cell_area_mm2=cell_area_mean)
-    fluorescence_median_df = pd.DataFrame(fluorescence_df_pre.median()).T.assign(cell_area_mm2=cell_area_median)
-    fluorescence_min_df = pd.DataFrame(fluorescence_df_pre.min()).T.assign(cell_area_mm2=cell_area_min)
-    fluorescence_max_df = pd.DataFrame(fluorescence_df_pre.max()).T.assign(cell_area_mm2=cell_area_max)
-    fluorescence_std_df = pd.DataFrame(fluorescence_df_pre.std()).T.assign(cell_area_mm2=cell_area_std)
-    fluorescence_skew_df = pd.DataFrame(fluorescence_df_pre.skew()).T.assign(cell_area_mm2=cell_area_skew)
-    fluorescence_kurtosis_df = pd.DataFrame(fluorescence_df_pre.kurtosis()).T.assign(cell_area_mm2=cell_area_kurtosis)
-    fluorescence_gini_df = pd.DataFrame(fluorescence_df_pre.apply(lambda col: gini_coefficient(col.values))).T.assign(cell_area_mm2=cell_area_gini)
+    fluorescence_mean_df = pd.DataFrame([fluorescence_df_pre.mean())].T.assign(cell_area_mm2=cell_area_mean)
+    fluorescence_median_df = pd.DataFrame([fluorescence_df_pre.median()]).T.assign(cell_area_mm2=cell_area_median)
+    fluorescence_min_df = pd.DataFrame([fluorescence_df_pre.min()]).T.assign(cell_area_mm2=cell_area_min)
+    fluorescence_max_df = pd.DataFrame([fluorescence_df_pre.max()]).T.assign(cell_area_mm2=cell_area_max)
+    fluorescence_std_df = pd.DataFrame([fluorescence_df_pre.std()]).T.assign(cell_area_mm2=cell_area_std)
+    fluorescence_skew_df = pd.DataFrame([fluorescence_df_pre.skew()]).T.assign(cell_area_mm2=cell_area_skew)
+    fluorescence_kurtosis_df = pd.DataFrame([fluorescence_df_pre.kurtosis()]).T.assign(cell_area_mm2=cell_area_kurtosis)
+    fluorescence_gini_df = pd.DataFrame([fluorescence_df_pre.apply(lambda col: gini_coefficient(col.values))]).T.assign(cell_area_mm2=cell_area_gini)
 
     # Phenotype Measurements
     # Ensure they're dicts and not strings
@@ -761,7 +761,7 @@ def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
     cdf['regions'] = cdf['regions'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
     # expand dict column. New df will have keys as columns. 
     curr_roi_area_df = pd.json_normalize(cdf['regions'])
-    curr_roi_area_pixels2 = curr_roi_area_df['ANY'].iloc[[0]]
+    curr_roi_area_pixels2 = curr_roi_area_df['ANY'].iloc[0]
     curr_roi_area_mm2 = curr_roi_area_pixels2 * (microns_per_pixel ** 2) * 0.000001
     densities_df_pixels2 = counts_df / curr_roi_area_pixels2
     densities_df_mm2 = counts_df / curr_roi_area_mm2

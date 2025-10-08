@@ -146,6 +146,8 @@ def validate_lunaphore(horizon_export_filepath,
             f"Duplicated Label_Mapping values: {list(unique_labels)}\n"
             f"---------------------------------------------------------\n"
         )
+        display(qc_input_cells_threshold_duplicates)
+        warnings.warn(f"See warning above. When running the ingestion, please input a list of integers to choose_duplicate_threshold_to_keep specifying which indexes in the duplicated dataframe above to KEEP. Others will be dropped. \n")
     # ---------------------------------------------------------
     print("---------------------------------------------------------")
     print("---------------------------------------------------------")
