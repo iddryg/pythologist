@@ -727,14 +727,14 @@ def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
     # expand dict column. New df will have keys as columns. 
     fluorescence_df_pre = pd.json_normalize(cdf['channel_values'])
     # get fluorescence stats, adding cell_area_mm2 values as a column to the end.
-    fluorescence_mean_df = pd.DataFrame([fluorescence_df_pre.mean())].T.assign(cell_area_mm2=cell_area_mean)
-    fluorescence_median_df = pd.DataFrame([fluorescence_df_pre.median()]).T.assign(cell_area_mm2=cell_area_median)
-    fluorescence_min_df = pd.DataFrame([fluorescence_df_pre.min()]).T.assign(cell_area_mm2=cell_area_min)
-    fluorescence_max_df = pd.DataFrame([fluorescence_df_pre.max()]).T.assign(cell_area_mm2=cell_area_max)
-    fluorescence_std_df = pd.DataFrame([fluorescence_df_pre.std()]).T.assign(cell_area_mm2=cell_area_std)
-    fluorescence_skew_df = pd.DataFrame([fluorescence_df_pre.skew()]).T.assign(cell_area_mm2=cell_area_skew)
-    fluorescence_kurtosis_df = pd.DataFrame([fluorescence_df_pre.kurtosis()]).T.assign(cell_area_mm2=cell_area_kurtosis)
-    fluorescence_gini_df = pd.DataFrame([fluorescence_df_pre.apply(lambda col: gini_coefficient(col.values))]).T.assign(cell_area_mm2=cell_area_gini)
+    fluorescence_mean_df = pd.DataFrame([fluorescence_df_pre.mean()]).assign(cell_area_mm2=cell_area_mean)
+    fluorescence_median_df = pd.DataFrame([fluorescence_df_pre.median()]).assign(cell_area_mm2=cell_area_median)
+    fluorescence_min_df = pd.DataFrame([fluorescence_df_pre.min()]).assign(cell_area_mm2=cell_area_min)
+    fluorescence_max_df = pd.DataFrame([fluorescence_df_pre.max()]).assign(cell_area_mm2=cell_area_max)
+    fluorescence_std_df = pd.DataFrame([fluorescence_df_pre.std()]).assign(cell_area_mm2=cell_area_std)
+    fluorescence_skew_df = pd.DataFrame([fluorescence_df_pre.skew()]).assign(cell_area_mm2=cell_area_skew)
+    fluorescence_kurtosis_df = pd.DataFrame([fluorescence_df_pre.kurtosis()]).assign(cell_area_mm2=cell_area_kurtosis)
+    fluorescence_gini_df = pd.DataFrame([fluorescence_df_pre.apply(lambda col: gini_coefficient(col.values))]).assign(cell_area_mm2=cell_area_gini)
 
     # Phenotype Measurements
     # Ensure they're dicts and not strings
