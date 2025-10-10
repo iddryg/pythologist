@@ -81,6 +81,9 @@ def run_lunaphore_ingestion(horizon_export_filepath,
     # import horizon file, get cells and area dfs
     temp_input_cells, temp_input_area = import_horizon_file(horizon_export_filepath)
 
+    print('area df: ')
+    display(temp_input_area)
+
     # ---------------------------------------------------------
     # QC check on metadata for cells data.
     # To detect if there are duplicate markers, and drop them if necessary
@@ -120,18 +123,6 @@ def run_lunaphore_ingestion(horizon_export_filepath,
             raise ValueError(
             f"choose_duplicate_threshold_to_keep must be a list. \n")
     # ---------------------------------------------------------
-    
-    # Label annotation info for all annotations
-    # ex: ROI_1.1.0_Polygon
-    temp_input_area['annot_type'] = temp_input_area['annot_name'].str.lower().str.split('_').str[0]
-    temp_input_area['annot_shape'] = temp_input_area['annot_name'].str.lower().str.split('_').str[2]
-    temp_input_area['full_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1]
-    temp_input_area['main_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1].str.split('.').str[0]
-    temp_input_area['roi_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1].str.split('.').str[1]
-    temp_input_area['exclusion_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1].str.split('.').str[2]
-
-    print('area df: ')
-    display(temp_input_area)
     
     # ---------------------------------------------------------
     # Update Main and ROI annotations areas with their respective exclusion areas
@@ -291,8 +282,8 @@ def run_lunaphore_ingestion(horizon_export_filepath,
         # save as csv file
         savefile_path_roi_measures_wide = os.path.join(savefile_dir, savefile_name + '_roi_measures_wide.csv')
         savefile_path_roi_measures_long = os.path.join(savefile_dir, savefile_name + '_roi_measures_long.csv')
-        all_roi_measures_wide.to_csv(savefile_path_roi_measures_wide)
-        all_roi_measures_long.to_csv(savefile_path_roi_measures_long)
+        all_roi_measures_wide.to_csv(savefile_path_roi_measures_wide, index=False)
+        all_roi_measures_long.to_csv(savefile_path_roi_measures_long, index=False)
 
     if return_cdf:
         return cdf
@@ -363,6 +354,15 @@ def import_horizon_file(horizon_export_filepath):
     # drop columns that only contain nan
     temp_input_cells = temp_input_cells.dropna(axis=1, how='all')
     temp_input_area = temp_input_area.dropna(axis=1, how='all')
+
+    # Label annotation info for all annotations
+    # ex: ROI_1.1.0_Polygon
+    temp_input_area['annot_type'] = temp_input_area['annot_name'].str.lower().str.split('_').str[0]
+    temp_input_area['annot_shape'] = temp_input_area['annot_name'].str.lower().str.split('_').str[2]
+    temp_input_area['full_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1]
+    temp_input_area['main_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1].str.split('.').str[0]
+    temp_input_area['roi_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1].str.split('.').str[1]
+    temp_input_area['exclusion_annot_id'] = temp_input_area['annot_name'].str.lower().str.split('_').str[1].str.split('.').str[2]
 
     return temp_input_cells, temp_input_area
 
@@ -769,10 +769,11 @@ def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
     roi_areas_df = pd.DataFrame({'roi_area_pixels2':curr_roi_area_pixels2,
                             'roi_area_mm2':curr_roi_area_mm2}, 
                              index=[0])
+    roi_areas_df = roi_areas_df.reset_index(drop=True)
 
     # Get sample and roi labels
     labs_keep = ['Annotation Group','Parent Annotation','sample_name','frame_name','project_name']
-    labs_cols = cdf[labs_keep].iloc[[0]]
+    labs_cols = pd.DataFrame(cdf[labs_keep]).head(1).reset_index(drop=True)
     # add ingestion date
     labs_cols['ingestion_date'] = pd.Timestamp.today().strftime('%Y-%m-%d')
 
@@ -787,6 +788,10 @@ def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
     # take only Threshold values for wideform
     thresholds_df_wideform = thresholds_df_wideform.loc[thresholds_df_wideform['data_type']=='Threshold']
     thresholds_df_wideform = thresholds_df_wideform.drop(columns=['data_type']).add_suffix('_Threshold').reset_index(drop=True)
+
+    # clean up indexes if needed
+    labs_cols = labs_cols.reset_index(drop=True)
+    roi_areas_df = roi_areas_df.reset_index(drop=True)
 
     # Aggregate all measures together into one datafrome
     # note fluorescence dfs have corresponding cell_area_mm2 stats in them. 
@@ -806,7 +811,7 @@ def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
                              thresholds_df_wideform
                              ],
                              axis=1)
-    
+
     # Create a long-form version
     roi_measures_longform_rois = pd.concat([labs_cols, 
                                             roi_areas_df
