@@ -823,7 +823,9 @@ class CellDataFrame(pd.DataFrame):
             keepers = [(k,v) for k,v in d.items() if k not in inputs]
             # combine anything thats not a keeper
             return dict(keepers+\
-                        [(output_region_label,sum([d[x] for x in overlap]))])
+                        #[(output_region_label,sum([d[x] for x in overlap]))])
+                        # changed Jan 2026 after getting errors. 
+                        [(output_region_label, sum([d[x] if d[x] is not None else 0 for x in overlap]))])
         data['regions'] = data.apply(lambda x:
             _swap_in(x['regions'],input_region_labels,output_region_label)
             ,1)
