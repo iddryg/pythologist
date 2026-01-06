@@ -33,7 +33,7 @@ def _clean_neighbors(left,right,k_neighbors):
           pd.Series(dict(zip(
               range(0,len(x['_neighbor_rank'])),
               x['_neighbor_rank']
-          )))
+          ))), include_groups=False
          ).stack().reset_index().\
         rename(columns={'level_1':'neighbor_rank',0:'_neighbor_rank'})
     dists = dists.merge(_rank_code,on=['cell_index','_neighbor_rank']).drop(columns=['_neighbor_rank'])
