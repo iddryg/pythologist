@@ -57,9 +57,10 @@ def run_lunaphore_ingestion(horizon_export_filepath,
                             savefile_name,
                             overwrite_sample_name = None,
                             default_phenotype = 'CD3', 
-                            microns_per_pixel=0.28,
+                            microns_per_pixel=0.28, #
                             run_qc = False,
                             save_cdf = False,
+                            save_full_single_cell = False,
                             return_cdf = False,
                             show_meta = False,
                             rename_markers_dict = None,
@@ -68,7 +69,7 @@ def run_lunaphore_ingestion(horizon_export_filepath,
     # ---------------------------------------------------------
     # validate input parameters
     try:
-        validate_parameters(horizon_export_filepath, project_name, savefile_dir, savefile_name, microns_per_pixel, run_qc, return_cdf, overwrite_sample_name, default_phenotype)
+        validate_parameters(horizon_export_filepath, project_name, savefile_dir, savefile_name, microns_per_pixel, run_qc, return_cdf, save_full_single_cell, overwrite_sample_name, default_phenotype)
     except (TypeError, ValueError) as e:
         print(f"Error: {e}")
         return
@@ -285,12 +286,16 @@ def run_lunaphore_ingestion(horizon_export_filepath,
         all_roi_measures_wide.to_csv(savefile_path_roi_measures_wide, index=False)
         all_roi_measures_long.to_csv(savefile_path_roi_measures_long, index=False)
 
+    # Export Full Single Cell Data if requested
+    if save_full_single_cell:
+        export_comprehensive_single_cell(temp_input_cells, cdf, savefile_dir, savefile_name)
+
     if return_cdf:
         return cdf
 
 
 # function to validate input parameters before proceeding
-def validate_parameters(horizon_export_filepath, project_name, savefile_dir, savefile_name, microns_per_pixel, run_qc, return_cdf, overwrite_sample_name, default_phenotype):
+def validate_parameters(horizon_export_filepath, project_name, savefile_dir, savefile_name, microns_per_pixel, run_qc, return_cdf, save_full_single_cell, overwrite_sample_name, default_phenotype):
     # Type checking
     if not isinstance(horizon_export_filepath, str):
         raise TypeError("horizon_export_filepath must be a string")
@@ -306,6 +311,8 @@ def validate_parameters(horizon_export_filepath, project_name, savefile_dir, sav
         raise TypeError("run_qc must be a boolean")
     if not isinstance(return_cdf, bool):
         raise TypeError("return_cdf must be a boolean")
+    if not isinstance(save_full_single_cell, bool):
+        raise TypeError("save_full_single_cell must be a boolean")
     if overwrite_sample_name is not None:
         if not isinstance(overwrite_sample_name, str):
                 raise TypeError("overwrite_sample_name must be a string")
@@ -632,11 +639,6 @@ def ingest_Lunaphore(df,
     df_merge = df_vals.merge(df_phenos_calls, how='inner', left_index=True, right_index=True)
     # merge the regions column back in using indexes. 
     df_merge = df_merge.merge(df_regions, how='inner', left_index=True, right_index=True)
-    #print('df_vals' + str(df_vals.shape))
-    #print('df_phenos_calls' + str(df_phenos_calls.shape))
-    #print('df_regions' + str(df_regions.shape))
-    #print('df_merge' + str(df_merge.shape))
-    #print('vals and calls merged')
     
     # Add some other pythologist columns
     # neighbors	frame_name	frame_id	sample_name	project_name	sample_id	project_id	frame_shape
@@ -647,16 +649,13 @@ def ingest_Lunaphore(df,
         df_merge['sample_name'] = overwrite_sample_name
         #df_merge['frame_name'] = overwrite_sample_name
     else:
-        #df_merge['sample_name'] = df_merge['region_label']
         df_merge['sample_name'] = df_merge['Parent Annotation']
-        #df_merge['frame_name'] = df_merge['region_label']
     df_merge['frame_name'] = df_merge['Parent Annotation']
     df_merge['project_name'] = proj_name
     df_merge['project_id'] = uuid.uuid4().hex
     df_merge['sample_id'] = uuid.uuid4().hex
     # I should calculate this using the minimum and maximum cell centroid locations for each ROI...
     df_merge['frame_shape'] = df_merge['region_label'].apply(lambda x: tuple([1000,1000]))
-    #print('other pythologist columns added')
     
     # convert to pythologist CellDataFrame
     cdf = CellDataFrame(df_merge)
@@ -674,15 +673,6 @@ def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
 
     # function to calculate gini index
     def gini_coefficient(x):
-        """
-        Calculate the Gini coefficient for a given array of values.
-        Parameters:
-        x : array-like
-            Array of values (e.g., fluorescence intensities)
-        Returns:
-        float
-            Gini coefficient (0 = perfect equality, 1 = perfect inequality)
-        """
         # Remove NaN values
         x = x[~np.isnan(x)]
         # Handle edge cases
@@ -707,16 +697,6 @@ def extract_roi_measures(cdf, meta, microns_per_pixel=0.28):
     cell_area_skew = (cdf['cell_area'] * 0.000001).skew()
     cell_area_kurtosis = (cdf['cell_area'] * 0.000001).kurtosis()
     cell_area_gini = gini_coefficient((cdf['cell_area'] * 0.000001).values)
-    # combine
-    #cell_areas_df = pd.DataFrame({'cell_area_mm2_mean':cell_area_mean,
-    #                             'cell_area_mm2_median':cell_area_median,
-    #                             'cell_area_mm2_min':cell_area_min,
-    #                             'cell_area_mm2_max':cell_area_max,
-    #                             'cell_area_mm2_std':cell_area_std,
-    #                             'cell_area_mm2_skew':cell_area_skew,
-    #                             'cell_area_mm2_kurtosis':cell_area_kurtosis,
-    #                             'cell_area_mm2_gini':cell_area_gini}, 
-    #                            index=[0])
 
     # Imports
     import ast
@@ -854,3 +834,38 @@ def get_thresholds_from_meta(meta):
     thresholds_df.columns.name = None
     
     return thresholds_df
+
+
+# NEW FUNCTION: Export Comprehensive Single Cell Data
+def export_comprehensive_single_cell(temp_input_cells, cdf, savefile_dir, savefile_name):
+    """
+    Merges Pythologist CDF metadata back onto the full single-cell dataset
+    to retain all compartments (Nucleus, Cytoplasm, Cell) and measurements
+    while perfectly aligning with Pythologist identifiers.
+    """
+    
+    # 1. Select Pythologist identifier columns to merge
+    cdf_meta = cdf[['cell_index', 'Annotation Group', 'Parent Annotation',
+                    'sample_name', 'frame_name', 'project_name',
+                    'sample_id', 'project_id', 'frame_id']].copy()
+
+    # 2. Prepare the raw single-cell data for merging
+    temp_full = temp_input_cells.copy()
+    temp_full = temp_full.rename(columns={
+        'Annotation Index': 'cell_index',
+        'parent_id': 'Parent Annotation'
+    })
+
+    # 3. Inner merge filters out any cells not present in the final CDF
+    #    (e.g., Exclusions dropped earlier, or cells ignored because they weren't in a valid ROI)
+    #    while directly appending the pythologist naming conventions to the full feature set.
+    full_sc_data = pd.merge(temp_full, cdf_meta,
+                            on=['cell_index', 'Annotation Group', 'Parent Annotation'],
+                            how='inner')
+
+    # 4. Save to CSV
+    savefile_path = os.path.join(savefile_dir, savefile_name + '_full_single_cell.csv')
+    full_sc_data.to_csv(savefile_path, index=False)
+    print(f"Comprehensive single-cell data successfully saved to: {savefile_path}")
+
+    return full_sc_data
