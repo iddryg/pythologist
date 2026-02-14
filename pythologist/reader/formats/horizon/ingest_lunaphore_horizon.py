@@ -448,7 +448,8 @@ def extract_column_metadata(cells_df):
     temp_marker_df2_nucleus = temp_marker_df.iloc[:, 1].str.split(' - ', expand=True)
     # conditionally fill where it's Nucleus and Mean Intensity using nucleus outputs, otherwise use other outputs. 
     # use 1st column to separate out the marker
-    df['Marker'] = np.where((df['Compartment_Type']=='Nucleus') & (df['Measurement_Type']=='Threshold'), 
+    #df['Marker'] = np.where((df['Compartment_Type']=='Nucleus') & (df['Measurement_Type']=='Threshold'), 
+    df['Marker'] = np.where((df['Compartment_Type']=='Nucleus'), 
                             temp_marker_df2_nucleus.iloc[:, 0], 
                             temp_marker_df2.iloc[:, 0])
     # manually edit DAPI
@@ -476,6 +477,29 @@ def extract_column_metadata(cells_df):
     df['Channel'] = np.where((df['Compartment_Type']=='Nucleus') & (df['Measurement_Type']=='Threshold'),
                              temp_marker_df3_nucleus.iloc[:, 0],
                              temp_marker_df3.iloc[:, 0])
+    
+    # ----------------------------
+    # Extract Channel Label
+    # We must replicate the same logic for Channels to ensure they align
+    
+    # Cell/Cytoplasm Channels
+    if temp_marker_df2.shape[1] > 1:
+        temp_marker_df3 = temp_marker_df2.iloc[:, 1].str.split(')', expand=True)
+    else:
+        temp_marker_df3 = pd.DataFrame(index=df.index, columns=[0]) # Empty fallback
+
+    # Nucleus Channels
+    if temp_marker_df2_nucleus.shape[1] > 1:
+        temp_marker_df3_nucleus = temp_marker_df2_nucleus.iloc[:, 1].str.split(')', expand=True)
+    else:
+        temp_marker_df3_nucleus = pd.DataFrame(index=df.index, columns=[0]) # Empty fallback
+    
+    # Apply logic
+    #df['Channel'] = np.where((df['Compartment_Type']=='Nucleus') & (df['Measurement_Type']=='Threshold'),
+    df['Channel'] = np.where(df['Compartment_Type']=='Nucleus',
+                             temp_marker_df3_nucleus.iloc[:, 0],
+                             temp_marker_df3.iloc[:, 0])
+
     # manually edit DAPI
     df.loc[df['orig_cols'].str.contains('DAPI'),'Channel'] = 'DAPI'
     
@@ -483,11 +507,15 @@ def extract_column_metadata(cells_df):
     # Extract Thresholds
     # same for nuclei and other cell compartments
     temp_thresholds_df = df['orig_cols'].str.split('Threshold \\(', expand=True)
-    # Take 2nd column, after the "Threshold ("
-    temp_thresholds_df2 = temp_thresholds_df.iloc[:, 1].str.split(')', expand=True)
-    # Take 1st column, before the ")"
-    df['Threshold'] = temp_thresholds_df2.iloc[:, 0]
     
+    if temp_thresholds_df.shape[1] > 1:
+        # Take 2nd column, after the "Threshold ("
+        temp_thresholds_df2 = temp_thresholds_df.iloc[:, 1].str.split(')', expand=True)
+        # Take 1st column, before the ")"
+        df['Threshold'] = temp_thresholds_df2.iloc[:, 0]
+    else:
+        df['Threshold'] = np.nan
+
     # ----------------------------
     # Edge cases:
     # manually set the Measurement Type for Area Threshold and Position Thresholds
@@ -909,7 +937,7 @@ def export_comprehensive_single_cell(temp_input_cells, cdf, savefile_dir, savefi
 
     # 3. Inner merge to align with Pythologist identifiers. This filters out
     #    any cells not present in the final CDF (e.g., Exclusions).
-    full_sc_data = pd.merge(temp_full, cdf_meta,
+    full_sc_data = pd.merge(cdf_meta, temp_full,
                             on=['cell_index', 'Annotation Group', 'Parent Annotation'],
                             how='inner')
 
