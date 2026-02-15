@@ -898,9 +898,9 @@ def _create_consistent_column_name(row):
 
     # Standardize measurement names
     measurement_map = {
-        'cell_area': 'Area_um2', 'x': 'X_Position_um', 'y': 'Y_Position_um',
+        'cell_area': 'Area_um2', 'x': 'X_Position_Cell_um', 'y': 'Y_Position_Cell_um',
         'Mean Intensity': 'MeanIntensity', 'Threshold': 'Threshold',
-        'nucleus_x': 'X_Position_um', 'nucleus_y': 'Y_Position_um',
+        'nucleus_x': 'X_Position_Nucleus_um', 'nucleus_y': 'Y_Position_Nucleus_um',
         'Area Threshold': 'Area_Threshold', 'Position Threshold': 'Position_Threshold'
     }
     if measurement in measurement_map:
